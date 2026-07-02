@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Xcode / Swift
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.swiftpm/
+.build/
+
+# Local models & audio — never commit these
+models/
+*.wav
+*.m4a
+*.mlmodelc
+*.gguf
+*.bin
+
+# Env / secrets
+.env
+.env.*
