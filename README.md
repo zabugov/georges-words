@@ -13,7 +13,7 @@ A system-wide dictation app for macOS, in the spirit of [commercial Flow](https:
 - **Snippets** — say a trigger phrase ("my sign off"), get your exact boilerplate inserted.
 - **History** — the last 200 transcripts, stored only on this Mac, one click to copy, one click to clear.
 
-Formatting is two-stage: instant rule-based cleanup always, plus an optional rewrite by a local LLM via [Ollama](https://ollama.com) — see below. See [`docs/research/`](docs/research/) for the commercial Flow deep-dive and [`docs/decisions/`](docs/decisions/) for the ADRs.
+Formatting is two-stage: instant rule-based cleanup always, plus an optional rewrite by a local LLM via [Ollama](https://ollama.com) — see below. See [`docs/research/`](docs/research/) for the commercial Flow deep-dive, [`docs/decisions/`](docs/decisions/) for the ADRs, and [`FUTURE_IMPROVEMENTS.md`](FUTURE_IMPROVEMENTS.md) for the backlog to full commercial Flow parity.
 
 ## Quick start (on your Mac)
 
