@@ -204,4 +204,20 @@ final class LLMFormatter {
         guard let (_, response) = try? await URLSession.shared.data(for: request) else { return false }
         return (response as? HTTPURLResponse)?.statusCode == 200
     }
+
+    /// Models downloaded in Ollama (`/api/tags`), for the Settings dropdown.
+    /// Returns nil when Ollama can't be reached.
+    static func installedModels() async -> [String]? {
+        struct TagsResponse: Decodable {
+            struct Model: Decodable { let name: String }
+            let models: [Model]
+        }
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:11434/api/tags")!)
+        request.timeoutInterval = 3
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let decoded = try? JSONDecoder().decode(TagsResponse.self, from: data)
+        else { return nil }
+        return decoded.models.map(\.name).sorted()
+    }
 }

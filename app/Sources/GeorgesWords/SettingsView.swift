@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @State private var ollamaRunning: Bool?
+    @State private var installedModels: [String]?
 
     var body: some View {
         Form {
@@ -64,30 +65,46 @@ struct SettingsView: View {
 
             Section("AI polish (local)") {
                 Toggle("Polish transcripts with a local LLM", isOn: $settings.llmEnabled)
-                TextField("Ollama model", text: $settings.llmModel, prompt: Text(AppSettings.defaultLLMModel))
-                    .disabled(!settings.llmEnabled)
-                if settings.llmModel.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Text("Empty — using the default (\(AppSettings.defaultLLMModel)).")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
 
-                switch ollamaRunning {
-                case .some(true):
-                    Label("Ollama detected on this Mac", systemImage: "checkmark.circle.fill")
-                        .font(.footnote)
-                        .foregroundStyle(.green)
-                case .some(false):
-                    Text("Ollama isn’t running. Install it from ollama.com, then run:  ollama pull \(settings.effectiveLLMModel)\nDictation still works without it — you just get rule-based cleanup instead of the full rewrite.")
-                        .font(.footnote)
-                        .foregroundStyle(.orange)
-                case .none:
+                if ollamaRunning == nil {
                     Text("Checking for Ollama…")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                } else if ollamaRunning == false {
+                    Text("Ollama isn’t running. Install it from ollama.com, then run:  ollama pull \(settings.effectiveLLMModel)\nDictation still works without it — you just get rule-based cleanup instead of the full rewrite.")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                } else if let models = installedModels, models.isEmpty {
+                    Text("Ollama is running but has no models downloaded yet. In Terminal:  ollama pull \(AppSettings.defaultLLMModel)  — then click Refresh.")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                } else if let models = installedModels {
+                    Picker("Polish model", selection: $settings.llmModel) {
+                        ForEach(models, id: \.self) { name in
+                            Text(name).tag(name)
+                        }
+                        // Keep a remembered-but-deleted model selectable so the
+                        // picker never shows a blank selection.
+                        if !settings.llmModel.isEmpty && !models.contains(settings.llmModel) {
+                            Text("\(settings.llmModel) — not downloaded").tag(settings.llmModel)
+                        }
+                    }
+                    .disabled(!settings.llmEnabled)
+                    if !settings.llmModel.isEmpty && !models.contains(settings.llmModel) {
+                        Text("This model isn’t downloaded anymore — pick another, or run:  ollama pull \(settings.llmModel)")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                    }
+                    Label("Ollama detected — \(models.count) model\(models.count == 1 ? "" : "s") available", systemImage: "checkmark.circle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.green)
                 }
 
-                Text("Fixes self-corrections (“Tuesday — no wait, Friday”), sentence structure, and tone, matched to the app you’re dictating into. Runs entirely on this Mac via Ollama (localhost); nothing is sent anywhere.")
+                Button("Refresh model list") {
+                    Task { await refreshOllama() }
+                }
+
+                Text("Fixes self-corrections (“Tuesday — no wait, Friday”), sentence structure, and tone, matched to the app you’re dictating into. Runs entirely on this Mac via Ollama (localhost); nothing is sent anywhere. Download more models with “ollama pull <name>”, then Refresh.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -130,6 +147,24 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 480, height: 660)
-        .task { ollamaRunning = await LLMFormatter.ollamaIsRunning() }
+        .task { await refreshOllama() }
+    }
+
+    private func refreshOllama() async {
+        ollamaRunning = nil
+        installedModels = nil
+        let running = await LLMFormatter.ollamaIsRunning()
+        ollamaRunning = running
+        guard running else { return }
+        let models = await LLMFormatter.installedModels() ?? []
+        installedModels = models
+
+        // Nothing selected yet → pick the default if it's downloaded,
+        // otherwise the first available model.
+        if settings.llmModel.trimmingCharacters(in: .whitespaces).isEmpty, !models.isEmpty {
+            settings.llmModel = models.contains(AppSettings.defaultLLMModel)
+                ? AppSettings.defaultLLMModel
+                : models[0]
+        }
     }
 }
