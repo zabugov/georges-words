@@ -14,8 +14,16 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 cp ".build/release/GeorgesWords" "$APP_DIR/Contents/MacOS/GeorgesWords"
 cp "Info.plist" "$APP_DIR/Contents/Info.plist"
 
-echo "==> Signing (ad-hoc)"
-codesign --force --deep --sign - "$APP_DIR"
+IDENTITY="GeorgesWords Dev"
+if security find-identity -v -p codesigning 2>/dev/null | grep -q "$IDENTITY"; then
+    echo "==> Signing with '$IDENTITY' (stable identity — permissions survive rebuilds)"
+    codesign --force --deep --sign "$IDENTITY" "$APP_DIR"
+else
+    echo "==> Signing (ad-hoc)."
+    echo "    Tip: run ./app/setup-signing.sh once, and macOS will stop asking you"
+    echo "    to re-grant Accessibility after every rebuild."
+    codesign --force --deep --sign - "$APP_DIR"
+fi
 
 echo "==> Launching"
 open "$APP_DIR"

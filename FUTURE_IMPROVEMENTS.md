@@ -58,7 +58,7 @@ The gap that matters most — commercial feels instant.
 
 ## 7. Distribution & maintenance
 
-- [ ] **(M)** **Developer ID signing + notarization** — stable identity fixes the "re-grant Accessibility after every rebuild" annoyance and removes Gatekeeper friction. (Requires a $99/yr Apple Developer account.)
+- [ ] **(M)** **Developer ID signing + notarization** — removes Gatekeeper friction for distributing to other people. (Requires a $99/yr Apple Developer account. The local "re-grant Accessibility after every rebuild" annoyance is already solved by `app/setup-signing.sh`'s self-signed identity.)
 - [ ] **(S)** **DMG packaging** so it installs like a normal Mac app.
 - [ ] **(M)** **Auto-updates** via Sparkle.
 - [ ] **(M)** **CI on GitHub Actions** (macOS runner): build + tests on every push, so compile errors are caught without a manual `build.sh` run.

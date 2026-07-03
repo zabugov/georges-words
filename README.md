@@ -32,7 +32,18 @@ First run:
 3. Wait for the menu-bar hourglass to become a mic — the first launch downloads the speech model (one-time, ~500 MB; the only network use this app will ever make).
 4. Click into any text field, **hold Fn, speak, release.**
 
-The speech model, hotkey (Fn, Right ⌘, or Right ⌥), AI polish, and personal dictionary live in **Settings…** under the menu-bar icon. If the hotkey stops responding after a rebuild, toggle the Accessibility permission off and on (ad-hoc signing quirk).
+The speech model, hotkey (Fn, Right ⌘, or Right ⌥), AI polish, and personal dictionary live in **Settings…** under the menu-bar icon.
+
+### Recommended: stable signing (do this once)
+
+By default each rebuild is ad-hoc signed, and macOS treats every rebuild as a *new* app — silently invalidating the Accessibility grant, which breaks text insertion until you re-toggle it. Fix it permanently:
+
+```sh
+./app/setup-signing.sh    # creates a "GeorgesWords Dev" certificate in your keychain
+./app/build.sh            # from now on, builds are signed with it
+```
+
+After the *first* signed build, re-grant Accessibility one last time (System Settings → Privacy & Security → Accessibility → toggle GeorgesWords) and click "Always Allow" if macOS asks about keychain access during the build. Every rebuild after that keeps its permissions.
 
 ### Optional: full AI polish via a local LLM
 
