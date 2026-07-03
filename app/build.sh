@@ -26,15 +26,23 @@ if ! swift build -c release; then
 fi
 
 APP_DIR="build/GeorgesWords.app"
-echo "==> Assembling ${APP_DIR}"
-rm -rf "$APP_DIR"
-mkdir -p "$APP_DIR/Contents/MacOS"
-cp ".build/release/GeorgesWords" "$APP_DIR/Contents/MacOS/GeorgesWords"
-cp "Info.plist" "$APP_DIR/Contents/Info.plist"
 
-# iCloud/Finder stamp extended attributes onto files, which codesign rejects
-# ("resource fork … detritus not allowed"). Strip them before signing.
-xattr -cr "$APP_DIR" 2>/dev/null || true
+# Assemble and SIGN in a private temp dir. The project may live in an
+# iCloud-synced folder, and iCloud stamps extended attributes onto files
+# faster than we can strip them — codesign then fails with "resource fork,
+# Finder information, or similar detritus not allowed". Signing outside
+# iCloud's reach avoids the race entirely; the finished app is moved into
+# place afterwards.
+STAGE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/georgeswords.XXXXXX")"
+trap 'rm -rf "$STAGE_DIR"' EXIT
+STAGE_APP="$STAGE_DIR/GeorgesWords.app"
+
+echo "==> Assembling ${APP_DIR}"
+mkdir -p "$STAGE_APP/Contents/MacOS"
+cp ".build/release/GeorgesWords" "$STAGE_APP/Contents/MacOS/GeorgesWords"
+cp "Info.plist" "$STAGE_APP/Contents/Info.plist"
+xattr -cr "$STAGE_APP" 2>/dev/null || true
+find "$STAGE_APP" -name "._*" -delete 2>/dev/null || true
 
 IDENTITY="GeorgesWords Dev"
 if ! security find-identity -v -p codesigning 2>/dev/null | grep -q "$IDENTITY"; then
@@ -45,12 +53,20 @@ fi
 
 if security find-identity -v -p codesigning 2>/dev/null | grep -q "$IDENTITY"; then
     echo "==> Signing with '$IDENTITY' (stable identity — permissions survive rebuilds)"
-    codesign --force --deep --sign "$IDENTITY" "$APP_DIR"
+    codesign --force --deep --sign "$IDENTITY" "$STAGE_APP"
 else
     echo "!! Signing ad-hoc — macOS WILL reset Microphone/Accessibility permissions"
     echo "!! on every rebuild. Run ./app/setup-signing.sh manually to fix this."
-    codesign --force --deep --sign - "$APP_DIR"
+    codesign --force --deep --sign - "$STAGE_APP"
 fi
+
+echo "==> Signature check:"
+codesign -dv "$STAGE_APP" 2>&1 | grep -E "Signature|Authority" || true
+
+echo "==> Installing ${APP_DIR}"
+mkdir -p build
+rm -rf "$APP_DIR"
+mv "$STAGE_APP" "$APP_DIR"
 
 if [ -z "${GW_SKIP_OPEN:-}" ]; then
     echo "==> Launching"
