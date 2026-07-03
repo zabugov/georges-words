@@ -1,14 +1,21 @@
 # App icon
 
-`AppIcon.svg` is the source of truth; `AppIcon.icns` is the packed bundle icon
-(all 10 macOS representations, 16–1024 px, PNG-based). The mark is a "G" whose
-crossbar is a voice waveform — the heavy right bar doubles as the G's upright
-stem. The menu-bar icon is *not* this artwork: it stays an SF Symbols template
-image (`mic.fill` / `waveform`) so it adapts to light/dark menu bars.
+`George.png` (a portrait of George himself, with a speech bubble) is the
+source of truth; `AppIcon.icns` is the packed bundle icon (all 10 macOS
+representations, 16–1024 px, PNG-based). The earlier G-monogram SVG was
+retired when this artwork arrived (it's in git history if ever wanted).
 
-To regenerate after editing the SVG (any machine with Chromium + Playwright,
-or swap in `rsvg-convert`): render the SVG to transparent PNGs at 16, 32, 64,
-128, 256, 512, 1024 px, then pack them into the icns container — the format is
-just an `icns` header plus `(type, length, png-bytes)` chunks with types
-icp4/icp5/ic07–ic14. On a Mac, `iconutil -c icns` over a standard `.iconset`
-folder of those PNGs does the same thing.
+The source PNG has opaque white padding around its squircle, so packing
+isn't a straight resize: the pipeline auto-crops to the art's bounding
+box, scales it into the standard macOS icon grid (824×824 centered on a
+transparent 1024 canvas), and clips to the grid squircle (corner radius
+185.4) — that supplies the transparency and the margin that makes it sit
+at the same visual size as neighboring Dock icons.
+
+To regenerate: any Chromium+Playwright (canvas `roundRect` clip +
+stepped-halving downscale for the small sizes), then pack the PNGs into
+an icns container — `icns` header plus `(type, length, png-bytes)`
+chunks, types icp4/icp5/ic07–ic14. On a Mac, `iconutil -c icns` over a
+standard `.iconset` folder does the same, but crop/mask the source
+first. The menu-bar icon is unaffected: it stays an SF Symbols template
+image (`mic.fill` / `waveform`).
