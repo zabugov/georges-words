@@ -643,6 +643,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         openMainWindow(section: .about)
     }
 
+    /// Transient outcome text in the sidebar's update footer.
+    private func showUpdateNotice(_ text: String) {
+        appStatus.updateNotice = text
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
+            if self?.appStatus.updateNotice == text {
+                self?.appStatus.updateNotice = nil
+            }
+        }
+    }
+
     @objc private func checkForUpdates() {
         guard !updater.isUpdating else { return }
         // Instant feedback on click — the first background progress message
