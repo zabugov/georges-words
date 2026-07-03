@@ -29,6 +29,7 @@ When we start something from this list, move it out of here and into the work it
 
 - [ ] **2.1 (S)** **Evaluate `distil-large-v3` as the default STT model** (currently `small.en`) — measure accuracy gain vs latency cost on real dictations.
 - [ ] **2.2 (M)** **Dictionary biasing in the speech model itself** — feed personal-dictionary terms to Whisper as a decoding prompt (WhisperKit `promptTokens`) so names come out right at transcription time, not just fixed afterwards. This is how commercial nails jargon on the first pass.
+- [ ] **2.5 (M)** **Auto-learning dictionary isn't catching corrections well** (Zach, 2026-07-03, same day it shipped — details TBD from real use). Debugging leads, roughly in order of suspicion: (a) the fixed ~6 s re-read window — corrections made later are invisible; (b) the AX field re-read returning nothing in the apps he dictates into (Electron apps often fail `AXValue` reads — log the failure reason); (c) filters too strict — similarity ≥ 0.35, stopword-only rejection, or the ≥60% LCS gate discarding legit fixes; (d) suggestions being learned but not noticed in the Dictionary tab (surface a subtle badge/notification when one arrives?). First step: add a debug log line per stage (read ok? aligned? filtered why?) so a failing dictation can be diagnosed from Console instead of guesswork. See ADR 0005 for the design.
 
 ## 3. Formatting intelligence
 
