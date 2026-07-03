@@ -226,7 +226,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] enabled in
                 guard let self else { return }
-                ManagedOllama.shared.setEnabled(enabled, model: self.settings.effectiveLLMModel)
+                let model = self.settings.effectiveLLMModel
+                // ManagedOllama is @MainActor; the sink closure isn't
+                // (statically), so hop explicitly.
+                Task { @MainActor in
+                    ManagedOllama.shared.setEnabled(enabled, model: model)
+                }
             }
             .store(in: &cancellables)
     }
