@@ -7,13 +7,15 @@ let package = Package(
         .macOS(.v14)
     ],
     dependencies: [
-        .package(url: "https://github.com/argmaxinc/WhisperKit.git", .upToNextMajor(from: "0.9.0"))
+        .package(url: "https://github.com/argmaxinc/WhisperKit.git", .upToNextMajor(from: "0.9.0")),
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", .upToNextMajor(from: "0.12.4"))
     ],
     targets: [
         .executableTarget(
             name: "GeorgesWords",
             dependencies: [
-                .product(name: "WhisperKit", package: "WhisperKit")
+                .product(name: "WhisperKit", package: "WhisperKit"),
+                .product(name: "FluidAudio", package: "FluidAudio")
             ],
             path: "Sources/GeorgesWords"
         )

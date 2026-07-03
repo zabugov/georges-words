@@ -36,6 +36,21 @@ enum HotkeyChoice: String, CaseIterable, Identifiable {
     }
 }
 
+/// Which on-device speech-to-text engine transcribes the audio.
+enum SpeechEngine: String, CaseIterable, Identifiable {
+    case parakeet
+    case whisper
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .parakeet: return "Parakeet v3 — fastest (recommended)"
+        case .whisper: return "Whisper (WhisperKit)"
+        }
+    }
+}
+
 /// User preferences, persisted to UserDefaults, observable from SwiftUI.
 final class AppSettings: ObservableObject {
 
@@ -43,7 +58,13 @@ final class AppSettings: ObservableObject {
 
     private let defaults = UserDefaults.standard
 
+    /// Speech-to-text engine (Parakeet via FluidAudio, or Whisper via WhisperKit).
+    @Published var engine: SpeechEngine {
+        didSet { defaults.set(engine.rawValue, forKey: "Engine") }
+    }
+
     /// WhisperKit model identifier (prefix-matched against argmaxinc/whisperkit-coreml).
+    /// Only used when `engine == .whisper`.
     @Published var modelName: String {
         didSet { defaults.set(modelName, forKey: "ModelName") }
     }
@@ -121,6 +142,7 @@ final class AppSettings: ObservableObject {
     ]
 
     private init() {
+        engine = SpeechEngine(rawValue: defaults.string(forKey: "Engine") ?? "") ?? .whisper
         modelName = defaults.string(forKey: "ModelName") ?? "small.en"
         hotkey = HotkeyChoice(rawValue: defaults.string(forKey: "Hotkey") ?? "") ?? .fn
         launchAtLogin = SMAppService.mainApp.status == .enabled

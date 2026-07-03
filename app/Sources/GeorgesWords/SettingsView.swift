@@ -7,12 +7,23 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Speech recognition") {
-                Picker("Speech model", selection: $settings.modelName) {
+                Picker("Engine", selection: $settings.engine) {
+                    ForEach(SpeechEngine.allCases) { engine in
+                        Text(engine.displayName).tag(engine)
+                    }
+                }
+                if settings.engine == .parakeet {
+                    Text("Parakeet v3 (NVIDIA, via FluidAudio): much faster on Apple Silicon, top-ranked accuracy. English, 24 European languages, and Japanese. One-time ~600 MB download.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Picker("Whisper model", selection: $settings.modelName) {
                     ForEach(AppSettings.modelOptions, id: \.name) { option in
                         Text(option.label).tag(option.name)
                     }
                 }
-                Text("Changing the model triggers a one-time download, then everything runs offline.")
+                .disabled(settings.engine != .whisper)
+                Text("Changing engine or model triggers a one-time download, then everything runs offline.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

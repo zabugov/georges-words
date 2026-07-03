@@ -8,18 +8,16 @@ When we start something from this list, move it out of here and into the work it
 
 The gap that matters most — commercial feels instant.
 
-- [ ] **(L)** **Switch STT to Parakeet** via FluidAudio (CoreML). The model behind VoiceInk/Handy's near-instant feel; tops the Open ASR Leaderboard. Keep WhisperKit as a fallback path. → would become ADR 0004.
-- [ ] **(L)** **Streaming transcription** — transcribe chunks *while* speaking (the live preview already does this crudely), so key-release only costs the final chunk + polish instead of the whole utterance.
+- [ ] **(M)** **Make Parakeet the default engine** once validated in daily use (shipped as a Settings option in ADR 0004; Whisper remains default).
+- [ ] **(L)** **Streaming transcription** — transcribe chunks *while* speaking (the live preview already does this crudely), so key-release only costs the final chunk + polish instead of the whole utterance. FluidAudio's `SlidingWindowAsrManager` is the candidate API.
 - [ ] **(M)** **Evaluate smaller/faster polish models** — `qwen2.5:1.5b`, `llama3.2:1b`, `gemma3:1b` — measure quality-vs-latency with a fixed test set of messy transcripts.
 - [ ] **(M)** **Apple Foundation Models** (macOS 26+) as the polish engine — Apple's built-in on-device ~3B model; would remove the Ollama install entirely for users on new macOS. Needs a macOS 26 SDK build path.
-- [ ] **(S)** **Trim leading/trailing silence** before transcription (simple energy-based VAD) — less audio to process, faster results.
-- [ ] **(S)** **Warm the STT model** with a tiny dummy transcription right after load, so the first real dictation of a session doesn't pay ANE compilation.
 
 ## 2. Accuracy
 
 - [ ] **(S)** **Evaluate `distil-large-v3` as the default STT model** (currently `small.en`) — measure accuracy gain vs latency cost on real dictations.
 - [ ] **(M)** **Dictionary biasing in the speech model itself** — feed personal-dictionary terms to Whisper as a decoding prompt (WhisperKit `promptTokens`) so names come out right at transcription time, not just fixed afterwards. This is how commercial nails jargon on the first pass.
-- [ ] **(M)** **Auto-learning dictionary** — when the user edits inserted text immediately after a dictation, capture the diff as a dictionary candidate and suggest it in Settings. (Local-only, of course.)
+- [ ] **(M/L)** **Auto-learning dictionary** — learn from the user's corrections so misheard words come out right next time. Not trivial: the app inserts text into *other* apps and then loses sight of it, so noticing a correction requires re-reading the focused text field (Accessibility API) a few seconds after insertion and diffing it against what was inserted. Sketch: after each insertion, snapshot the inserted string; ~5 s later read the field's value via AX, align the two, and extract word-level substitutions (e.g. "coober netties" → "Kubernetes"); collect candidates locally and surface them in Settings as one-click "add to dictionary" suggestions (auto-adding risks learning garbage). Fallback for apps where AX reads fail: a "Correct last transcript…" menu action where the user pastes/edits the right version and the diff is learned from that. All local, per ADR 0001.
 - [ ] **(S)** **Number/date/format normalization** in the rule pass — "twenty five percent" → "25%", "three thirty pm" → "3:30 PM" (Whisper does some of this; catch the rest).
 
 ## 3. Formatting intelligence

@@ -125,6 +125,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Task { await self.loadModel() }
             }
             .store(in: &cancellables)
+
+        settings.$engine
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { await self.loadModel() }
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Model
@@ -178,7 +188,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func endRecording(_ mode: Mode) {
         guard case .recording = state, self.mode == mode else { return }
         previewTask?.cancel()
-        let samples = recorder.stop()
+        let samples = AudioTrim.trimSilence(recorder.stop())
         SoundFeedback.recordingStopped()
 
         // Ignore accidental taps shorter than ~0.3 s of audio (16 kHz mono).
@@ -371,7 +381,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusItem.button?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: text)
         statusMenuItem.title = text
-        modelMenuItem.title = "Model: \(settings.modelName)"
+        modelMenuItem.title = "Model: \(settings.engine == .parakeet ? "parakeet-tdt-0.6b-v3" : settings.modelName)"
 
         switch state {
         case .recording:

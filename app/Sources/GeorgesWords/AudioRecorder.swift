@@ -1,5 +1,27 @@
 import AVFoundation
 
+enum AudioTrim {
+    /// Trim leading/trailing near-silence (e.g. the pause before speaking
+    /// and the beat between finishing and releasing the key), keeping
+    /// 0.15 s of padding on each side. Less audio → faster transcription.
+    static func trimSilence(_ samples: [Float], threshold: Float = 0.003) -> [Float] {
+        guard !samples.isEmpty else { return samples }
+        let padding = 2_400 // 0.15 s at 16 kHz
+
+        var start = 0
+        while start < samples.count && abs(samples[start]) < threshold { start += 1 }
+        // All silence — nothing to keep.
+        guard start < samples.count else { return [] }
+
+        var end = samples.count - 1
+        while end > start && abs(samples[end]) < threshold { end -= 1 }
+
+        let from = max(0, start - padding)
+        let to = min(samples.count, end + 1 + padding)
+        return Array(samples[from..<to])
+    }
+}
+
 /// Captures microphone audio and accumulates it as 16 kHz mono Float32
 /// samples — the input format Whisper-family models expect.
 final class AudioRecorder {
