@@ -1,9 +1,32 @@
+import AppKit
 import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @State private var ollamaRunning: Bool?
     @State private var installedModels: [String]?
+
+    private struct RunningApp: Identifiable {
+        let name: String
+        let bundleID: String
+        var id: String { bundleID }
+    }
+
+    /// Regular apps currently running, minus ones that already have a note.
+    private var runningApps: [RunningApp] {
+        var seen = Set<String>()
+        return NSWorkspace.shared.runningApplications
+            .filter { $0.activationPolicy == .regular }
+            .compactMap { app -> RunningApp? in
+                guard let id = app.bundleIdentifier?.lowercased(), !id.isEmpty,
+                      let name = app.localizedName
+                else { return nil }
+                guard seen.insert(id).inserted else { return nil }
+                guard !settings.appInstructions.contains(where: { $0.bundleID == id }) else { return nil }
+                return RunningApp(name: name, bundleID: id)
+            }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
 
     var body: some View {
         Form {
@@ -117,6 +140,41 @@ struct SettingsView: View {
                 }
 
                 Text("Fixes self-corrections (“Tuesday — no wait, Friday”), sentence structure, and tone, matched to the app you’re dictating into. Runs entirely on this Mac via Ollama (localhost); nothing is sent anywhere. Download more models with “ollama pull <name>”, then Refresh.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Per-app style notes") {
+                ForEach($settings.appInstructions) { $entry in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(entry.appName.isEmpty ? entry.bundleID : entry.appName)
+                                .fontWeight(.medium)
+                            Spacer()
+                            Button {
+                                settings.appInstructions.removeAll { $0.id == entry.id }
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                        TextField("e.g. use markdown headings; keep it terse", text: $entry.instruction)
+                        Text(entry.bundleID)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.vertical, 2)
+                }
+                Menu("Add App…") {
+                    ForEach(runningApps) { app in
+                        Button(app.name) {
+                            settings.appInstructions.append(
+                                AppInstruction(appName: app.name, bundleID: app.bundleID, instruction: "")
+                            )
+                        }
+                    }
+                }
+                Text("Your own style notes for specific apps — “use markdown headings”, “sign off with -Z”. Applied on top of the built-in tone when the polish style is “Rewrite for clarity”. The menu lists apps that are currently running.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

@@ -453,7 +453,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             tone: context.tone,
             dictionary: dictionary,
             model: settings.effectiveLLMModel,
-            strength: settings.polishStrength
+            strength: settings.polishStrength,
+            customInstruction: settings.appInstruction(for: context.bundleID)
         )
         await updateTiming(transcribe: transcribeSeconds, polish: Date().timeIntervalSince(polishStart))
         return polished ?? cleaned

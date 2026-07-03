@@ -32,7 +32,6 @@ When we start something from this list, move it out of here and into the work it
 
 ## 3. Formatting intelligence
 
-- [ ] **3.2 (M)** **Per-app custom instructions** — let the user attach their own style notes to specific apps ("in Obsidian, use markdown headings"), extending the built-in tone profiles.
 - [ ] **3.3 (L)** **Personal style matching** — learn the user's tone from local samples of their writing (e.g. pasted examples) instead of generic casual/professional presets. commercial's "sounds like you" feature, done locally.
 - [ ] **3.4 (M)** **Better long-dictation structure** — paragraph splitting for multi-minute rambles; the current few-shot examples only cover 1–3 sentence utterances.
 - [ ] **3.5 (S)** **Grow the few-shot bank** from real-world failures — keep a small corpus of messy-transcript → ideal-output pairs and iterate on it as bad cleanups are noticed.
@@ -52,7 +51,6 @@ When we start something from this list, move it out of here and into the work it
 ## 6. Reliability & compatibility
 
 - [ ] **6.2 (M)** **Per-app insertion quirks** — audit the AX path in Electron apps, terminals (trailing-newline behavior), Java apps, and browsers; maintain a fallback list.
-- [ ] **6.3 (M)** **Graceful degradation UI** — one place that shows why something isn't working (mic permission, AX permission, model missing, Ollama down) instead of NSLog.
 
 ## 7. Distribution & maintenance
 

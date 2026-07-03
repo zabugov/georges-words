@@ -1,4 +1,6 @@
 import AppKit
+import ApplicationServices
+import AVFoundation
 import SwiftUI
 
 /// The main app window: sidebar navigation between Home, History,
@@ -45,17 +47,30 @@ struct HomeView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject private var stats = StatsStore.shared
     @ObservedObject private var history = HistoryStore.shared
+    @State private var ollamaRunning: Bool?
+    @State private var ollamaModels: [String]?
+    @State private var recheckTick = 0
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 statCards
+                healthCard
                 recentDictations
             }
             .padding(24)
             .frame(maxWidth: 680, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .task(id: recheckTick) {
+            ollamaRunning = nil
+            ollamaModels = nil
+            guard settings.llmEnabled else { return }
+            let running = await LLMFormatter.ollamaIsRunning()
+            ollamaRunning = running
+            guard running else { return }
+            ollamaModels = await LLMFormatter.installedModels()
         }
         .navigationTitle("George's Words")
         .toolbar {
@@ -124,6 +139,127 @@ struct HomeView: View {
                 label: "Typing time saved",
                 symbol: "clock.arrow.circlepath"
             )
+        }
+    }
+
+    // MARK: - Health (backlog 6.3): why isn't it working, in one place.
+
+    private struct HealthRow: Identifiable {
+        enum Level {
+            case ok, warn, fail
+        }
+        let id: String
+        let level: Level
+        let title: String
+        let detail: String?
+        var fixTitle: String?
+        var fix: (() -> Void)?
+    }
+
+    private var healthRows: [HealthRow] {
+        var rows: [HealthRow] = []
+
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            rows.append(HealthRow(id: "mic", level: .ok, title: "Microphone", detail: "Permission granted"))
+        case .notDetermined:
+            rows.append(HealthRow(id: "mic", level: .warn, title: "Microphone", detail: "Not asked yet — starting a dictation triggers the permission prompt"))
+        default:
+            rows.append(HealthRow(
+                id: "mic", level: .fail, title: "Microphone",
+                detail: "Permission denied — dictation can't hear you",
+                fixTitle: "Open Settings",
+                fix: { Self.openPrivacyPane("Privacy_Microphone") }
+            ))
+        }
+
+        if AXIsProcessTrusted() {
+            rows.append(HealthRow(id: "ax", level: .ok, title: "Accessibility", detail: "Permission granted — text can be inserted"))
+        } else {
+            rows.append(HealthRow(
+                id: "ax", level: .fail, title: "Accessibility",
+                detail: "Not granted — transcripts go to the clipboard instead of your cursor. After a rebuild, toggle GeorgesWords off and on again in the list.",
+                fixTitle: "Open Settings",
+                fix: { Self.openPrivacyPane("Privacy_Accessibility") }
+            ))
+        }
+
+        switch status.health {
+        case .error:
+            rows.append(HealthRow(id: "model", level: .fail, title: "Speech model", detail: status.statusText))
+        case .loading:
+            rows.append(HealthRow(id: "model", level: .warn, title: "Speech model", detail: "Downloading / loading — dictation available once this finishes"))
+        default:
+            rows.append(HealthRow(id: "model", level: .ok, title: "Speech model", detail: status.engineDescription))
+        }
+
+        if !settings.llmEnabled {
+            rows.append(HealthRow(id: "polish", level: .ok, title: "AI polish", detail: "Off — rule-based cleanup only"))
+        } else if ollamaRunning == nil {
+            rows.append(HealthRow(id: "polish", level: .warn, title: "AI polish", detail: "Checking Ollama…"))
+        } else if ollamaRunning == false {
+            rows.append(HealthRow(
+                id: "polish", level: .warn, title: "AI polish",
+                detail: "Ollama isn't running — dictation still works, with rule-based cleanup instead of the full polish",
+                fixTitle: "Get Ollama",
+                fix: { NSWorkspace.shared.open(URL(string: "https://ollama.com")!) }
+            ))
+        } else if let models = ollamaModels, !models.contains(settings.effectiveLLMModel) {
+            rows.append(HealthRow(
+                id: "polish", level: .warn, title: "AI polish",
+                detail: "Ollama is running but \(settings.effectiveLLMModel) isn't downloaded — run: ollama pull \(settings.effectiveLLMModel)"
+            ))
+        } else {
+            rows.append(HealthRow(id: "polish", level: .ok, title: "AI polish", detail: "\(settings.effectiveLLMModel) via Ollama, ready"))
+        }
+
+        return rows
+    }
+
+    private var healthCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Health")
+                    .font(.title3.bold())
+                Spacer()
+                Button("Recheck") { recheckTick += 1 }
+            }
+            ForEach(healthRows) { row in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Circle()
+                        .fill(color(for: row.level))
+                        .frame(width: 8, height: 8)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(row.title)
+                        if let detail = row.detail {
+                            Text(detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    if let fixTitle = row.fixTitle, let fix = row.fix {
+                        Button(fixTitle, action: fix)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func color(for level: HealthRow.Level) -> Color {
+        switch level {
+        case .ok: return .green
+        case .warn: return .orange
+        case .fail: return .red
+        }
+    }
+
+    private static func openPrivacyPane(_ anchor: String) {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") {
+            NSWorkspace.shared.open(url)
         }
     }
 

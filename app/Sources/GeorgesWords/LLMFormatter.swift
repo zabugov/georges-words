@@ -114,9 +114,17 @@ final class LLMFormatter {
         return messages
     }
 
-    private static func userMessage(text: String, tone: ToneProfile, dictionary: [String], strength: PolishStrength) -> String {
-        // Light mode carries no STYLE line — style hints invite rewording.
-        var lines = strength == .light ? [] : ["STYLE: \(tone.styleDescription)"]
+    private static func userMessage(text: String, tone: ToneProfile, dictionary: [String], strength: PolishStrength, customInstruction: String?) -> String {
+        // Light mode carries no STYLE line — style hints invite rewording,
+        // so per-app notes also apply only to full rewrites.
+        var lines: [String] = []
+        if strength != .light {
+            var style = "STYLE: \(tone.styleDescription)"
+            if let customInstruction, !customInstruction.isEmpty {
+                style += ". App-specific notes from the user: \(customInstruction)"
+            }
+            lines.append(style)
+        }
         let terms = dictionary.filter { !$0.isEmpty }
         if !terms.isEmpty {
             lines.append("DICTIONARY: \(terms.joined(separator: ", "))")
@@ -132,9 +140,9 @@ final class LLMFormatter {
         let message: Message
     }
 
-    func format(_ text: String, tone: ToneProfile, dictionary: [String], model: String, strength: PolishStrength) async -> String? {
+    func format(_ text: String, tone: ToneProfile, dictionary: [String], model: String, strength: PolishStrength, customInstruction: String? = nil) async -> String? {
         var messages = Self.prefixMessages(strength: strength)
-        messages.append(["role": "user", "content": Self.userMessage(text: text, tone: tone, dictionary: dictionary, strength: strength)])
+        messages.append(["role": "user", "content": Self.userMessage(text: text, tone: tone, dictionary: dictionary, strength: strength, customInstruction: customInstruction)])
 
         let output = await chat(messages: messages, model: model, maxTokens: 700, timeout: 12)
         guard let output, Self.isSane(input: text, output: output) else { return nil }

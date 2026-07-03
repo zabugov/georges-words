@@ -80,6 +80,15 @@ enum PolishStrength: String, CaseIterable, Identifiable {
     }
 }
 
+/// A user style note attached to one app: "in Obsidian, use markdown
+/// headings". Matched against the frontmost app's bundle identifier.
+struct AppInstruction: Codable, Identifiable, Equatable {
+    var id = UUID()
+    var appName: String
+    var bundleID: String
+    var instruction: String
+}
+
 /// User preferences, persisted to UserDefaults, observable from SwiftUI.
 final class AppSettings: ObservableObject {
 
@@ -193,6 +202,32 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Per-app style notes, applied on top of the built-in tone profile
+    /// in full-rewrite polish (backlog 3.2).
+    @Published var appInstructions: [AppInstruction] {
+        didSet {
+            if let data = try? JSONEncoder().encode(appInstructions) {
+                defaults.set(data, forKey: "AppInstructions")
+            }
+        }
+    }
+
+    /// The style note matching a frontmost-app bundle ID, if any.
+    func appInstruction(for bundleID: String) -> String? {
+        Self.matchInstruction(appInstructions, bundleID: bundleID)
+    }
+
+    static func matchInstruction(_ instructions: [AppInstruction], bundleID: String) -> String? {
+        guard !bundleID.isEmpty else { return nil }
+        for entry in instructions {
+            let key = entry.bundleID.trimmingCharacters(in: .whitespaces).lowercased()
+            let note = entry.instruction.trimmingCharacters(in: .whitespaces)
+            guard !key.isEmpty, !note.isEmpty else { continue }
+            if bundleID.lowercased().contains(key) { return note }
+        }
+        return nil
+    }
+
     static let modelOptions: [(name: String, label: String)] = [
         ("base.en", "base.en — fastest, rough accuracy (~150 MB)"),
         ("small.en", "small.en — good balance (default, ~500 MB)"),
@@ -218,6 +253,12 @@ final class AppSettings: ObservableObject {
             snippets = saved
         } else {
             snippets = []
+        }
+        if let data = defaults.data(forKey: "AppInstructions"),
+           let saved = try? JSONDecoder().decode([AppInstruction].self, from: data) {
+            appInstructions = saved
+        } else {
+            appInstructions = []
         }
     }
 
