@@ -25,8 +25,10 @@ else
     codesign --force --deep --sign - "$APP_DIR"
 fi
 
-echo "==> Launching"
-open "$APP_DIR"
+if [ -z "${GW_SKIP_OPEN:-}" ]; then
+    echo "==> Launching"
+    open "$APP_DIR"
+fi
 
 cat <<'EOF'
 

@@ -60,7 +60,7 @@ The gap that matters most — commercial feels instant.
 
 - [ ] **(M)** **Developer ID signing + notarization** — removes Gatekeeper friction for distributing to other people. (Requires a $99/yr Apple Developer account. The local "re-grant Accessibility after every rebuild" annoyance is already solved by `app/setup-signing.sh`'s self-signed identity.)
 - [ ] **(S)** **DMG packaging** so it installs like a normal Mac app.
-- [ ] **(M)** **Auto-updates** via Sparkle.
+- [ ] **(M)** **Auto-updates** via Sparkle — for a binary-distributed app later. (The source checkout already self-updates: menu bar → Check for Updates… pulls, rebuilds, and relaunches.)
 - [ ] **(M)** **CI on GitHub Actions** (macOS runner): build + tests on every push, so compile errors are caught without a manual `build.sh` run.
 - [ ] **(M)** **Unit tests** for the pure logic: `TranscriptCleaner`, `SnippetExpander`, LLM output sanity checks, history store.
 - [ ] **(S)** **Latency benchmark script** — a repeatable measurement of transcribe/polish times across models, so speed work is data-driven.

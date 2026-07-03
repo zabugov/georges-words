@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let llmFormatter = LLMFormatter()
     private let inserter = TextInserter()
     private let pill = PillController()
+    private let updater = Updater()
     private var dictationHotkey: HotkeyMonitor?
     private var commandHotkey: HotkeyMonitor?
     private var cancellables = Set<AnyCancellable>()
@@ -56,6 +57,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         recorder.onLevel = { [weak self] level in
             self?.pill.updateLevel(level)
+        }
+
+        updater.onProgress = { [weak self] text in
+            guard let self else { return }
+            if let text {
+                self.statusMenuItem.title = text
+            } else {
+                self.updateStatusUI()
+            }
         }
 
         installHotkeys()
@@ -330,6 +340,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
+        let updateItem = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        updateItem.target = self
+        menu.addItem(updateItem)
+
         menu.addItem(NSMenuItem(title: "Quit George's Words", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         statusItem.menu = menu
@@ -396,6 +410,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow?.center()
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    @objc private func checkForUpdates() {
+        updater.checkAndInstall()
     }
 
     @objc private func openHistory() {

@@ -34,6 +34,8 @@ First run:
 
 The speech model, hotkey (Fn, Right ⌘, or Right ⌥), AI polish, and personal dictionary live in **Settings…** under the menu-bar icon.
 
+**Updating:** menu bar → **Check for Updates…** pulls the latest from GitHub, rebuilds, and relaunches — no terminal needed after the first install.
+
 ### Recommended: stable signing (do this once)
 
 By default each rebuild is ad-hoc signed, and macOS treats every rebuild as a *new* app — silently invalidating the Accessibility grant, which breaks text insertion until you re-toggle it. Fix it permanently:
