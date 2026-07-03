@@ -5,7 +5,21 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 echo "==> Building (first run downloads Swift dependencies — may take a few minutes)"
-swift build -c release
+if ! swift build -c release; then
+    # "could not build module '_DarwinFoundation…'" and similar module errors
+    # are a stale compiler module cache (often leftover from a previous Xcode
+    # / SDK), not a code problem. Clear the caches and try once more from clean.
+    echo ""
+    echo "==> Build failed. Clearing compiler/module caches and retrying from clean…"
+    rm -rf .build
+    rm -rf "$HOME/Library/Caches/org.swift.swiftpm"
+    rm -rf "$HOME/Library/Developer/Xcode/DerivedData/ModuleCache.noindex"
+    CACHE_DIR="$(getconf DARWIN_USER_CACHE_DIR 2>/dev/null || true)"
+    if [ -n "$CACHE_DIR" ]; then
+        rm -rf "${CACHE_DIR}org.llvm.clang" "${CACHE_DIR}clang"
+    fi
+    swift build -c release
+fi
 
 APP_DIR="build/GeorgesWords.app"
 echo "==> Assembling ${APP_DIR}"
