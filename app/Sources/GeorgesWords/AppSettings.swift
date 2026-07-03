@@ -61,9 +61,20 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(llmEnabled, forKey: "LLMEnabled") }
     }
 
-    /// Ollama model tag used for the polish pass.
+    static let defaultLLMModel = "qwen2.5:3b"
+
+    /// Ollama model tag used for the polish pass. May be empty or
+    /// mid-edit in the Settings field — use `effectiveLLMModel` when
+    /// actually calling Ollama.
     @Published var llmModel: String {
         didSet { defaults.set(llmModel, forKey: "LLMModel") }
+    }
+
+    /// The model tag to actually use: falls back to the default when the
+    /// Settings field is emptied, so polish never silently stops working.
+    var effectiveLLMModel: String {
+        let trimmed = llmModel.trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? Self.defaultLLMModel : trimmed
     }
 
     /// Personal dictionary, one term per line (exact spellings to enforce).
@@ -114,7 +125,7 @@ final class AppSettings: ObservableObject {
         hotkey = HotkeyChoice(rawValue: defaults.string(forKey: "Hotkey") ?? "") ?? .fn
         launchAtLogin = SMAppService.mainApp.status == .enabled
         llmEnabled = defaults.object(forKey: "LLMEnabled") as? Bool ?? true
-        llmModel = defaults.string(forKey: "LLMModel") ?? "qwen2.5:3b"
+        llmModel = defaults.string(forKey: "LLMModel") ?? Self.defaultLLMModel
         dictionaryText = defaults.string(forKey: "Dictionary") ?? ""
         commandHotkey = HotkeyChoice(rawValue: defaults.string(forKey: "CommandHotkey") ?? "") ?? .rightOption
         previewEnabled = defaults.object(forKey: "PreviewEnabled") as? Bool ?? true

@@ -51,8 +51,13 @@ struct SettingsView: View {
 
             Section("AI polish (local)") {
                 Toggle("Polish transcripts with a local LLM", isOn: $settings.llmEnabled)
-                TextField("Ollama model", text: $settings.llmModel)
+                TextField("Ollama model", text: $settings.llmModel, prompt: Text(AppSettings.defaultLLMModel))
                     .disabled(!settings.llmEnabled)
+                if settings.llmModel.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Text("Empty — using the default (\(AppSettings.defaultLLMModel)).")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
 
                 switch ollamaRunning {
                 case .some(true):
@@ -60,7 +65,7 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.green)
                 case .some(false):
-                    Text("Ollama isn’t running. Install it from ollama.com, then run:  ollama pull \(settings.llmModel)\nDictation still works without it — you just get rule-based cleanup instead of the full rewrite.")
+                    Text("Ollama isn’t running. Install it from ollama.com, then run:  ollama pull \(settings.effectiveLLMModel)\nDictation still works without it — you just get rule-based cleanup instead of the full rewrite.")
                         .font(.footnote)
                         .foregroundStyle(.orange)
                 case .none:
