@@ -186,13 +186,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task {
                 let text = await self.processDictation(samples: samples, context: context)
                 await MainActor.run {
+                    var outcome: TextInserter.Outcome?
                     if !text.isEmpty {
                         self.lastTranscript = text
                         HistoryStore.shared.add(text)
-                        self.inserter.insert(text)
+                        outcome = self.inserter.insert(text)
                     }
                     // A model swap may have taken over the state meanwhile.
                     if case .processing = self.state { self.state = .idle }
+                    if outcome == .copiedToClipboard { self.flashAccessibilityWarning() }
                 }
             }
         case .command:
@@ -209,7 +211,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     if let result, !result.isEmpty {
                         self.lastTranscript = result
                         HistoryStore.shared.add(result)
-                        self.inserter.insert(result)
+                        if self.inserter.insert(result) == .copiedToClipboard {
+                            self.flashAccessibilityWarning()
+                        }
                     } else {
                         self.pill.flash(instruction.isEmpty
                             ? "Didn't catch that — try again"
@@ -369,7 +373,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func pasteLastTranscript() {
         guard let lastTranscript else { return }
-        inserter.insert(lastTranscript)
+        if inserter.insert(lastTranscript) == .copiedToClipboard {
+            flashAccessibilityWarning()
+        }
+    }
+
+    /// The ad-hoc-signing trap: after a rebuild macOS silently invalidates
+    /// the Accessibility grant while still showing it enabled. Tell the
+    /// user instead of failing silently.
+    private func flashAccessibilityWarning() {
+        pill.flash("No Accessibility permission — copied to clipboard. Re-toggle GeorgesWords in System Settings → Accessibility.", seconds: 6)
     }
 
     @objc private func openSettings() {

@@ -25,7 +25,7 @@ final class PillController {
 
     init() {
         panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 380, height: 44),
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 60),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -68,9 +68,9 @@ final class PillController {
     }
 
     /// Show a short informational message, then hide.
-    func flash(_ text: String) {
+    func flash(_ text: String, seconds: TimeInterval = 2.5) {
         show(.message(text))
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
             guard let self, case .message = self.model.phase else { return }
             self.hide()
         }
@@ -112,6 +112,9 @@ private struct PillView: View {
             case .message(let text):
                 Image(systemName: "info.circle")
                 Text(text)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(2)
+                    .frame(maxWidth: 360)
             }
         }
         .font(.system(size: 13, weight: .medium))

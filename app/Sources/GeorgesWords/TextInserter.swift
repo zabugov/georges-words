@@ -11,22 +11,33 @@ import ApplicationServices
 ///      clipboard afterwards.
 final class TextInserter {
 
+    enum Outcome {
+        /// Text was inserted into the focused app.
+        case inserted
+        /// No Accessibility permission — text was left on the clipboard
+        /// for a manual paste instead.
+        case copiedToClipboard
+    }
+
     private static let vKeyCode: CGKeyCode = 9
 
-    func insert(_ text: String) {
+    @discardableResult
+    func insert(_ text: String) -> Outcome {
         guard AXIsProcessTrusted() else {
             // Without Accessibility we can neither use the AX API nor
             // simulate ⌘V — leave the text on the clipboard so the user can
-            // paste manually.
+            // paste manually. This happens after every rebuild while we're
+            // ad-hoc signed: macOS silently invalidates the stale grant.
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
             NSLog("Accessibility permission missing — transcript left on clipboard.")
-            return
+            return .copiedToClipboard
         }
 
-        if insertViaAccessibility(text) { return }
+        if insertViaAccessibility(text) { return .inserted }
         insertViaPasteboard(text)
+        return .inserted
     }
 
     // MARK: - Strategy 1: Accessibility API
