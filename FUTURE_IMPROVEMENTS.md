@@ -57,6 +57,7 @@ When we start something from this list, move it out of here and into the work it
 - [ ] **7.2 (S)** **DMG packaging** so it installs like a normal Mac app.
 - [ ] **7.3 (M)** **Auto-updates** via Sparkle — for a binary-distributed app later. (The source checkout already self-updates: menu bar → Check for Updates… pulls, rebuilds, and relaunches.)
 - [ ] **7.6 (S)** **Latency benchmark script** — a repeatable measurement of transcribe/polish times across models, so speed work is data-driven.
+- [ ] **7.7 (M)** **Zero-terminal polish engine** — for installs on non-developer Macs (Zach's wife's, to start): the app itself downloads the standalone Ollama binary (MIT) into Application Support, runs `ollama serve` as a managed child process on a private port, and pulls the polish model via `/api/pull` with progress in the Health card. Reuses LLMFormatter unchanged; existing user-installed Ollama takes precedence. Alternatives if this sours: embed llama.cpp/MLX directly (L), or Apple Foundation Models on macOS 26+ (1.5). Part of the "installable by a normal human" milestone with 7.1 (Developer ID — needs Zach's $99 account), 7.2 (DMG from CI), and 5.2 (onboarding).
 
 ## Explicit non-goals
 
