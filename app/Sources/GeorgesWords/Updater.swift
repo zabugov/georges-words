@@ -19,6 +19,9 @@ final class Updater {
     /// Progress text for the menu bar (nil when finished).
     var onProgress: ((String?) -> Void)?
 
+    /// Short user-facing outcome notice ("You're up to date", …).
+    var onNotice: ((String) -> Void)?
+
     /// <repo>/app/build/GeorgesWords.app → <repo>
     private var repoRoot: URL? {
         let candidate = Bundle.main.bundleURL
@@ -54,10 +57,13 @@ final class Updater {
                 self?.onProgress?(nil)
                 switch result {
                 case .upToDate:
-                    Self.alert("You’re up to date", "No new changes on GitHub.")
+                    self?.onNotice?("You’re up to date — no new changes")
                 case .failed(let message):
-                    Self.alert("Update failed", message)
+                    self?.onNotice?("Update failed")
+                    Self.alert("Update failed", message + "\n\nFull log: ~/Library/Logs/GeorgesWords/update.log")
                 case .updated:
+                    // Greet the user from the new build so success is visible.
+                    UserDefaults.standard.set(true, forKey: "JustUpdated")
                     Self.relaunch(appURL: appURL)
                 }
             }
@@ -67,26 +73,53 @@ final class Updater {
     // MARK: - The update pipeline
 
     private static func performUpdate(repo: URL, progress: (String?) -> Void) -> UpdateResult {
-        progress("Update: pulling latest…")
-        let pull = run("/usr/bin/git", ["pull", "--ff-only"], cwd: repo)
+        log("=== Update check started ===")
+        progress("Checking for updates…")
+
+        // Compare commits rather than parsing `git pull` prose (which varies
+        // by git version and locale).
+        let before = run("/usr/bin/git", ["rev-parse", "HEAD"], cwd: repo, timeout: 30)
+        let pull = run("/usr/bin/git", ["pull", "--ff-only"], cwd: repo, timeout: 120)
+        log("git pull (status \(pull.status)):\n\(pull.output)")
         guard pull.status == 0 else {
             return .failed("git pull failed:\n\(tail(pull.output))")
         }
-        if pull.output.contains("Already up to date") {
+        let after = run("/usr/bin/git", ["rev-parse", "HEAD"], cwd: repo, timeout: 30)
+        if before.output == after.output {
+            log("Already up to date.")
             return .upToDate
         }
 
-        progress("Update: compiling (can take a few minutes)…")
+        progress("Update found — compiling (a few minutes)…")
         let build = run(
             "/bin/bash", ["app/build.sh"], cwd: repo,
-            extraEnvironment: ["GW_SKIP_OPEN": "1"]
+            extraEnvironment: ["GW_SKIP_OPEN": "1"],
+            timeout: 900
         )
+        log("build.sh (status \(build.status)):\n\(build.output)")
         guard build.status == 0 else {
             // build.sh compiles before it replaces the bundle, so a failed
             // build leaves the currently-running version intact on disk.
             return .failed("Build failed — still running the previous version.\n\n\(tail(build.output))")
         }
+        log("Update succeeded; relaunching.")
         return .updated
+    }
+
+    /// Append to ~/Library/Logs/GeorgesWords/update.log for diagnosis.
+    private static func log(_ message: String) {
+        let dir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Logs/GeorgesWords", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("update.log")
+        let line = "[\(Date().formatted(date: .abbreviated, time: .standard))] \(message)\n"
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(Data(line.utf8))
+            try? handle.close()
+        } else {
+            try? Data(line.utf8).write(to: url)
+        }
     }
 
     private static func relaunch(appURL: URL) {
@@ -103,7 +136,8 @@ final class Updater {
         _ executable: String,
         _ arguments: [String],
         cwd: URL,
-        extraEnvironment: [String: String] = [:]
+        extraEnvironment: [String: String] = [:],
+        timeout: TimeInterval
     ) -> (status: Int32, output: String) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
@@ -112,6 +146,8 @@ final class Updater {
         var environment = ProcessInfo.processInfo.environment
         // GUI apps get a minimal PATH; the toolchain lives in /usr/bin.
         environment["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin:" + (environment["PATH"] ?? "")
+        // Never let git sit waiting for credentials on stdin — fail instead.
+        environment["GIT_TERMINAL_PROMPT"] = "0"
         for (key, value) in extraEnvironment { environment[key] = value }
         process.environment = environment
 
@@ -123,10 +159,27 @@ final class Updater {
         } catch {
             return (127, error.localizedDescription)
         }
+
+        // Hard kill on timeout so a hung step can't wedge the updater silently.
+        var timedOut = false
+        let killer = DispatchWorkItem {
+            if process.isRunning {
+                timedOut = true
+                process.terminate()
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: killer)
+
         // Read before waiting so a chatty build can't fill and deadlock the pipe.
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
-        return (process.terminationStatus, String(data: data, encoding: .utf8) ?? "")
+        killer.cancel()
+
+        let output = String(data: data, encoding: .utf8) ?? ""
+        if timedOut {
+            return (1, output + "\n[timed out after \(Int(timeout)) s]")
+        }
+        return (process.terminationStatus, output)
     }
 
     private static func tail(_ output: String, lines: Int = 15) -> String {

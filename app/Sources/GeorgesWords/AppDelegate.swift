@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let statusMenuItem = NSMenuItem(title: "Starting…", action: nil, keyEquivalent: "")
     private let modelMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let timingMenuItem = NSMenuItem(title: "Last: —", action: nil, keyEquivalent: "")
+    private let updateMenuItem = NSMenuItem(title: "Check for Updates…", action: nil, keyEquivalent: "")
     private var settingsWindow: NSWindow?
     private var historyWindow: NSWindow?
 
@@ -63,8 +64,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             if let text {
                 self.statusMenuItem.title = text
+                self.updateMenuItem.title = "Updating…"
+                self.pill.flash(text, seconds: 3)
             } else {
+                self.updateMenuItem.title = "Check for Updates…"
                 self.updateStatusUI()
+            }
+        }
+        updater.onNotice = { [weak self] text in
+            self?.pill.flash(text, seconds: 4)
+        }
+        // Confirmation from the new build after a successful self-update.
+        if UserDefaults.standard.bool(forKey: "JustUpdated") {
+            UserDefaults.standard.set(false, forKey: "JustUpdated")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                self?.pill.flash("George’s Words updated to the latest version ✓", seconds: 4)
             }
         }
 
@@ -350,9 +364,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
-        let updateItem = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
-        updateItem.target = self
-        menu.addItem(updateItem)
+        updateMenuItem.action = #selector(checkForUpdates)
+        updateMenuItem.target = self
+        menu.addItem(updateMenuItem)
 
         menu.addItem(NSMenuItem(title: "Quit George's Words", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
