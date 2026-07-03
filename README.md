@@ -35,7 +35,7 @@ First run:
 
 The speech model, hotkey (Fn, Right ⌘, or Right ⌥), AI polish, personal dictionary, and snippets live in the main window — open it from the Dock or via the menu-bar icon → **Open George's Words**.
 
-**Updating:** **Check for Updates…** (in the main window's Home tab, the app menu, or the menu-bar icon) pulls the latest from GitHub, rebuilds, and relaunches — no terminal needed after the first install.
+**Updating:** **Check for Updates** (bottom-left of the main window's sidebar; also in the app menu and menu-bar icon) pulls the latest from GitHub, rebuilds, and relaunches — no terminal needed after the first install. Progress and the outcome show right there under the button.
 
 ### Recommended: stable signing (do this once)
 

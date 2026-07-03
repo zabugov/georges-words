@@ -8,8 +8,15 @@ enum MainSection: String, CaseIterable, Identifiable {
     case dictionary
     case snippets
     case settings
+    case about
 
     var id: String { rawValue }
+
+    /// What's listed in the sidebar. About is deliberately not here — it's
+    /// reached through the ? button in the sidebar footer.
+    static var sidebarSections: [MainSection] {
+        [.home, .history, .dictionary, .snippets, .settings]
+    }
 
     var title: String {
         switch self {
@@ -18,6 +25,7 @@ enum MainSection: String, CaseIterable, Identifiable {
         case .dictionary: return "Dictionary"
         case .snippets: return "Snippets"
         case .settings: return "Settings"
+        case .about: return "About"
         }
     }
 
@@ -28,6 +36,7 @@ enum MainSection: String, CaseIterable, Identifiable {
         case .dictionary: return "character.book.closed"
         case .snippets: return "text.badge.plus"
         case .settings: return "gearshape"
+        case .about: return "questionmark.circle"
         }
     }
 }
@@ -52,6 +61,7 @@ final class AppStatus: ObservableObject {
     @Published var engineDescription = ""
     @Published var lastTiming: String?
     @Published var updateProgress: String?
+    @Published var updateNotice: String?
 
     var checkForUpdates: (() -> Void)?
 

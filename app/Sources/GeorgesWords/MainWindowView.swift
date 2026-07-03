@@ -2,16 +2,20 @@ import AppKit
 import SwiftUI
 
 /// The main app window: sidebar navigation between Home, History,
-/// Dictionary, Snippets, and Settings.
+/// Dictionary, Snippets, and Settings, with the update footer pinned to
+/// the bottom of the sidebar and About tucked behind its ? button.
 struct MainWindowView: View {
     @ObservedObject var status = AppStatus.shared
     @ObservedObject var settings = AppSettings.shared
 
     var body: some View {
         NavigationSplitView {
-            List(MainSection.allCases, selection: $status.selectedSection) { section in
+            List(MainSection.sidebarSections, selection: $status.selectedSection) { section in
                 Label(section.title, systemImage: section.symbol)
                     .tag(section)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                UpdateFooter(status: status)
             }
             .navigationSplitViewColumnWidth(min: 170, ideal: 190, max: 240)
         } detail: {
@@ -26,6 +30,8 @@ struct MainWindowView: View {
                 SnippetsView(settings: settings)
             case .settings:
                 SettingsView(settings: settings)
+            case .about:
+                AboutView(status: status, settings: settings)
             }
         }
         .frame(minWidth: 760, minHeight: 500)
@@ -45,9 +51,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 statCards
-                setupCard
                 recentDictations
-                footer
             }
             .padding(24)
             .frame(maxWidth: 680, alignment: .leading)
@@ -71,6 +75,13 @@ struct HomeView: View {
                     Text(status.statusText)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
+                }
+                // Tucked under the status line so it's easy to reference
+                // without being a section of its own.
+                if let timing = status.lastTiming {
+                    Text(timing)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
                 }
             }
         }
@@ -104,34 +115,6 @@ struct HomeView: View {
                 symbol: "clock.arrow.circlepath"
             )
         }
-    }
-
-    private var setupCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label {
-                Text("Hold **\(settings.hotkey.displayName)** in any text field and speak — release to insert. Quick-tap to dictate hands-free.")
-            } icon: {
-                Image(systemName: "keyboard")
-                    .foregroundStyle(.secondary)
-            }
-            Label {
-                Text(status.engineDescription)
-            } icon: {
-                Image(systemName: "cpu")
-                    .foregroundStyle(.secondary)
-            }
-            if let timing = status.lastTiming {
-                Label {
-                    Text(timing)
-                } icon: {
-                    Image(systemName: "stopwatch")
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var recentDictations: some View {
@@ -182,27 +165,110 @@ struct HomeView: View {
         }
     }
 
-    private var footer: some View {
-        HStack(spacing: 12) {
+}
+
+// MARK: - Sidebar update footer
+
+/// All update UI lives here, bottom-left of the sidebar: one button that
+/// becomes a spinner + live progress while an update runs, plus a short
+/// outcome notice and the version number.
+private struct UpdateFooter: View {
+    @ObservedObject var status: AppStatus
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Divider()
             if let progress = status.updateProgress {
-                ProgressView()
-                    .controlSize(.small)
-                Text(progress)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(progress)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                }
+                .padding(.top, 4)
             } else {
-                Button("Check for Updates…") { status.checkForUpdates?() }
-                Text("Version \(Self.version)")
+                Button {
+                    status.checkForUpdates?()
+                } label: {
+                    Label("Check for Updates", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .padding(.top, 4)
+            }
+            if let notice = status.updateNotice {
+                Text(notice)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Spacer()
-            Label("Audio and transcripts never leave this Mac", systemImage: "lock.shield")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            HStack {
+                Text("Version \(AboutView.version)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+                Button {
+                    status.selectedSection = .about
+                } label: {
+                    Image(systemName: "questionmark.circle")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help("How to use, privacy, and app info")
+            }
         }
-        .padding(.top, 4)
+        .padding(.horizontal, 10)
+        .padding(.bottom, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// MARK: - About
+
+/// The one place for informational bits: instructions, the privacy
+/// promise, engine details, version. Reached via the ? in the sidebar
+/// footer — deliberately out of the way of daily use.
+struct AboutView: View {
+    @ObservedObject var status: AppStatus
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        Form {
+            Section("How to dictate") {
+                Text("Hold \(settings.hotkey.displayName) in any text field, speak, and release — the polished text is inserted at your cursor.")
+                Text("Quick-tap \(settings.hotkey.displayName) to go hands-free: tap once to start, tap again to stop.")
+                Text("Press Esc while recording to cancel.")
+                Text("Command mode: select text anywhere, hold \(settings.commandHotkey.displayName), and speak an instruction — “make this shorter”, “make it a bulleted list”, “translate to French”. Requires the local LLM (Ollama).")
+            }
+
+            Section("Privacy") {
+                Label {
+                    Text("Audio and transcripts never leave this Mac. Transcription and polish run 100% on-device — no cloud services, no accounts, no telemetry.")
+                } icon: {
+                    Image(systemName: "lock.shield")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section("Engine") {
+                Text(status.engineDescription)
+                if settings.llmEnabled {
+                    Text("Polish model: \(settings.effectiveLLMModel) via Ollama (localhost)")
+                }
+                Text("Tip: set System Settings → Keyboard → “Press 🌐 key” to “Do Nothing” so holding Fn doesn’t open the emoji picker.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("App") {
+                LabeledContent("Version", value: Self.version)
+                Link("GitHub repository", destination: URL(string: "https://github.com/zabugov/georges-words")!)
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("About")
     }
 
-    private static var version: String {
+    static var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
     }
 }

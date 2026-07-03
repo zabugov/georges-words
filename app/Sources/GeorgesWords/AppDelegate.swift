@@ -86,16 +86,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         installEscMonitor()
 
+        // All update UI lives in the sidebar footer (UpdateFooter): the
+        // pill is for dictation feedback only. The menu-bar item still
+        // mirrors the phase so it can't be re-triggered mid-run.
         updater.onProgress = { [weak self] text in
             guard let self else { return }
             if let text {
                 self.statusMenuItem.title = text
-                // The menu item itself shows the live phase and is disabled
-                // so it can't be triggered again mid-run.
                 self.updateMenuItem.title = text
                 self.updateMenuItem.isEnabled = false
                 self.appStatus.updateProgress = text
-                self.pill.flash(text, seconds: 3)
             } else {
                 self.updateMenuItem.title = "Check for Updates…"
                 self.updateMenuItem.isEnabled = true
@@ -104,22 +104,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         updater.onNotice = { [weak self] text in
-            guard let self else { return }
-            self.pill.flash(text, seconds: 4)
-            // Surface the outcome in the window too, briefly.
-            self.appStatus.updateProgress = text
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
-                if self?.appStatus.updateProgress == text {
-                    self?.appStatus.updateProgress = nil
-                }
-            }
+            self?.showUpdateNotice(text)
         }
         // Confirmation from the new build after a successful self-update.
         if UserDefaults.standard.bool(forKey: "JustUpdated") {
             UserDefaults.standard.set(false, forKey: "JustUpdated")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                self?.pill.flash("George’s Words updated to the latest version ✓", seconds: 4)
-            }
+            showUpdateNotice("Updated to the latest version ✓")
         }
 
         installHotkeys()
@@ -479,7 +469,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainMenu.addItem(appMenuItem)
         let appMenu = NSMenu(title: "George's Words")
         appMenuItem.submenu = appMenu
-        appMenu.addItem(withTitle: "About George's Words", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        let aboutItem = appMenu.addItem(withTitle: "About George's Words", action: #selector(openAbout), keyEquivalent: "")
+        aboutItem.target = self
         appMenu.addItem(.separator())
         let settingsItem = appMenu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
@@ -646,6 +637,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openSettings() {
         openMainWindow(section: .settings)
+    }
+
+    @objc private func openAbout() {
+        openMainWindow(section: .about)
     }
 
     @objc private func checkForUpdates() {
