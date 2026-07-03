@@ -20,6 +20,10 @@ the "instant" feel of VoiceInk and Handy.
 3. **Whisper remains the default** until Parakeet has been validated in
    daily use on the owner's machine; flipping the default is a one-line
    change. Whisper also stays for its larger multilingual coverage.
+   > **Update 2026-07-03:** validated on the owner's machine (after fixing
+   > the FluidAudio 0.15 API call and an iCloud xattr signing race).
+   > Parakeet is now compiled in and the default engine; opt out with
+   > `GW_PARAKEET=0 ./app/build.sh`.
 4. Alongside: leading/trailing **silence trimming** before transcription
    and a **1 s warm-up inference** after model load (pays the ANE
    pipeline-compilation cost at launch, not on the first dictation).

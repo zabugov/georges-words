@@ -8,7 +8,6 @@ When we start something from this list, move it out of here and into the work it
 
 The gap that matters most — commercial feels instant.
 
-- [ ] **(M)** **Make Parakeet the default engine** once validated in daily use (shipped as a Settings option in ADR 0004; Whisper remains default).
 - [ ] **(L)** **Streaming transcription** — transcribe chunks *while* speaking (the live preview already does this crudely), so key-release only costs the final chunk + polish instead of the whole utterance. FluidAudio's `SlidingWindowAsrManager` is the candidate API.
 - [ ] **(M)** **Evaluate smaller/faster polish models** — `qwen2.5:1.5b`, `llama3.2:1b`, `gemma3:1b` — measure quality-vs-latency with a fixed test set of messy transcripts.
 - [ ] **(M)** **Apple Foundation Models** (macOS 26+) as the polish engine — Apple's built-in on-device ~3B model; would remove the Ollama install entirely for users on new macOS. Needs a macOS 26 SDK build path.

@@ -4,8 +4,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-if [ "${GW_PARAKEET:-}" = "1" ]; then
-    echo "==> Parakeet engine ENABLED (GW_PARAKEET=1) — pulling FluidAudio"
+if [ "${GW_PARAKEET:-}" = "0" ]; then
+    echo "==> Parakeet engine DISABLED (GW_PARAKEET=0) — Whisper-only build"
 fi
 
 echo "==> Building (first run downloads Swift dependencies — may take a few minutes)"
@@ -86,7 +86,4 @@ First-run checklist:
      icon shows an hourglass until it's ready, then a mic.
 
 Then: click into any text field, HOLD Fn, speak, release.
-
-Note: after a rebuild, macOS may require re-toggling the Accessibility
-permission (off and on again) because the app's ad-hoc signature changed.
 EOF

@@ -2,10 +2,10 @@
 import PackageDescription
 import Foundation
 
-// Parakeet (FluidAudio) is opt-in: it pulls in C/C++ dependencies that don't
-// build cleanly on every macOS SDK, and must never block the default build.
-// Enable it with:  GW_PARAKEET=1 ./app/build.sh
-let parakeetEnabled = ProcessInfo.processInfo.environment["GW_PARAKEET"] == "1"
+// Parakeet (FluidAudio) is ON by default — validated on the owner's machine
+// 2026-07-03. If its C/C++ deps ever break a build, opt out with:
+//   GW_PARAKEET=0 ./app/build.sh
+let parakeetEnabled = ProcessInfo.processInfo.environment["GW_PARAKEET"] != "0"
 
 var dependencies: [Package.Dependency] = [
     .package(url: "https://github.com/argmaxinc/WhisperKit.git", .upToNextMajor(from: "0.9.0"))

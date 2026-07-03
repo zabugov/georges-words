@@ -156,7 +156,8 @@ final class AppSettings: ObservableObject {
     ]
 
     private init() {
-        engine = SpeechEngine(rawValue: defaults.string(forKey: "Engine") ?? "") ?? .whisper
+        engine = SpeechEngine(rawValue: defaults.string(forKey: "Engine") ?? "")
+            ?? (SpeechEngine.parakeetAvailable ? .parakeet : .whisper)
         modelName = defaults.string(forKey: "ModelName") ?? "small.en"
         hotkey = HotkeyChoice(rawValue: defaults.string(forKey: "Hotkey") ?? "") ?? .fn
         launchAtLogin = SMAppService.mainApp.status == .enabled

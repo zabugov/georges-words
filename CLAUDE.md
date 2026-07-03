@@ -13,6 +13,13 @@
 - Note: the Desktop appears to be iCloud-synced (files show download icons in
   Finder). If git/build behaves bizarrely (stuck pulls, missing files),
   suspect iCloud evicting repo files before anything else.
+- A stable signing identity **"GeorgesWords Dev"** exists in Zach's login
+  keychain (created 2026-07-03 via `app/setup-signing.sh`); `build.sh` signs
+  with it, staging the bundle in a temp dir because iCloud re-stamps xattrs
+  in-place (codesign "detritus" failures otherwise). Permissions (mic/AX)
+  persist across rebuilds because of this — don't break it.
+- Parakeet (FluidAudio) compiles and runs on this machine and is the default
+  engine; `GW_PARAKEET=0` builds Whisper-only if it ever regresses.
 
 ## Project rules
 
