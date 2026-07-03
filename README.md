@@ -1,5 +1,7 @@
 # George's Words
 
+![CI](https://github.com/zabugov/georges-words/actions/workflows/ci.yml/badge.svg)
+
 A system-wide dictation app for macOS, in the spirit of [commercial Flow](https://example.com) — hold a key, speak anywhere, get clean formatted text — with one hard rule:
 
 > **Audio never leaves the laptop.** Transcription and formatting run 100% on-device.

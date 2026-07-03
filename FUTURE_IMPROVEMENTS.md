@@ -29,11 +29,9 @@ When we start something from this list, move it out of here and into the work it
 
 - [ ] **2.1 (S)** **Evaluate `distil-large-v3` as the default STT model** (currently `small.en`) — measure accuracy gain vs latency cost on real dictations.
 - [ ] **2.2 (M)** **Dictionary biasing in the speech model itself** — feed personal-dictionary terms to Whisper as a decoding prompt (WhisperKit `promptTokens`) so names come out right at transcription time, not just fixed afterwards. This is how commercial nails jargon on the first pass.
-- [ ] **2.4 (S)** **Spelled-out number normalization** — "twenty five percent" → "25%", "three thirty pm" → "3:30 PM". (Digit-adjacent cases like "50 percent" → "50%" are done; the spelled-out parsing remains.)
 
 ## 3. Formatting intelligence
 
-- [ ] **3.1 (M)** **Spoken punctuation & control commands** — "new line", "new paragraph", "quote … end quote" handled deterministically in the rule pass (never leave it to the LLM).
 - [ ] **3.2 (M)** **Per-app custom instructions** — let the user attach their own style notes to specific apps ("in Obsidian, use markdown headings"), extending the built-in tone profiles.
 - [ ] **3.3 (L)** **Personal style matching** — learn the user's tone from local samples of their writing (e.g. pasted examples) instead of generic casual/professional presets. commercial's "sounds like you" feature, done locally.
 - [ ] **3.4 (M)** **Better long-dictation structure** — paragraph splitting for multi-minute rambles; the current few-shot examples only cover 1–3 sentence utterances.
@@ -53,7 +51,6 @@ When we start something from this list, move it out of here and into the work it
 
 ## 6. Reliability & compatibility
 
-- [ ] **6.1 (M)** **Secure-input awareness** — detect password fields (`IsSecureEventInputEnabled`) and refuse to record/insert, with a pill explanation.
 - [ ] **6.2 (M)** **Per-app insertion quirks** — audit the AX path in Electron apps, terminals (trailing-newline behavior), Java apps, and browsers; maintain a fallback list.
 - [ ] **6.3 (M)** **Graceful degradation UI** — one place that shows why something isn't working (mic permission, AX permission, model missing, Ollama down) instead of NSLog.
 
@@ -62,8 +59,6 @@ When we start something from this list, move it out of here and into the work it
 - [ ] **7.1 (M)** **Developer ID signing + notarization** — removes Gatekeeper friction for distributing to other people. (Requires a $99/yr Apple Developer account. The local "re-grant Accessibility after every rebuild" annoyance is already solved by `app/setup-signing.sh`'s self-signed identity.)
 - [ ] **7.2 (S)** **DMG packaging** so it installs like a normal Mac app.
 - [ ] **7.3 (M)** **Auto-updates** via Sparkle — for a binary-distributed app later. (The source checkout already self-updates: menu bar → Check for Updates… pulls, rebuilds, and relaunches.)
-- [ ] **7.4 (M)** **CI on GitHub Actions** (macOS runner): build + tests on every push, so compile errors are caught without a manual `build.sh` run.
-- [ ] **7.5 (M)** **Unit tests** for the pure logic: `TranscriptCleaner`, `SnippetExpander`, LLM output sanity checks, history store.
 - [ ] **7.6 (S)** **Latency benchmark script** — a repeatable measurement of transcribe/polish times across models, so speed work is data-driven.
 
 ## Explicit non-goals

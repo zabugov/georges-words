@@ -35,6 +35,11 @@ let package = Package(
             dependencies: targetDependencies,
             path: "Sources/GeorgesWords",
             swiftSettings: swiftSettings
+        ),
+        .testTarget(
+            name: "GeorgesWordsTests",
+            dependencies: ["GeorgesWords"],
+            path: "Tests/GeorgesWordsTests"
         )
     ]
 )

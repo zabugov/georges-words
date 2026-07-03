@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import AVFoundation
+import Carbon.HIToolbox
 import Combine
 import SwiftUI
 
@@ -279,6 +280,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        // Secure input (password fields) blocks both our event monitors and
+        // AX insertion — refuse up front with an explanation instead of
+        // recording into a black hole.
+        if IsSecureEventInputEnabled() {
+            pill.flash("A password field is active — dictation is paused until it's dismissed", seconds: 3)
+            return
+        }
+
         if mode == .command {
             guard let selection = SelectionReader.read(), !selection.isEmpty else {
                 pill.flash("Select some text first, then hold \(settings.commandHotkey.displayName)")
@@ -428,10 +437,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         cleaned = expanded
 
         // Skip the LLM when a snippet fired (its expansion must be inserted
-        // verbatim) and for very short utterances (nothing to restructure,
-        // and skipping keeps them near-instant).
+        // verbatim), when spoken commands produced explicit line breaks
+        // (the polish pass writes single blocks and would flatten them),
+        // and for very short utterances (nothing to restructure, and
+        // skipping keeps them near-instant).
         let wordCount = cleaned.split(separator: " ").count
-        guard settings.llmEnabled, !snippetApplied, wordCount >= 5 else {
+        guard settings.llmEnabled, !snippetApplied, !cleaned.contains("\n"), wordCount >= 5 else {
             await updateTiming(transcribe: transcribeSeconds, polish: nil)
             return cleaned
         }
