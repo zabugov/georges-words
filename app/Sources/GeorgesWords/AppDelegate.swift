@@ -64,10 +64,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             if let text {
                 self.statusMenuItem.title = text
-                self.updateMenuItem.title = "Updating…"
+                // The menu item itself shows the live phase and is disabled
+                // so it can't be triggered again mid-run.
+                self.updateMenuItem.title = text
+                self.updateMenuItem.isEnabled = false
                 self.pill.flash(text, seconds: 3)
             } else {
                 self.updateMenuItem.title = "Check for Updates…"
+                self.updateMenuItem.isEnabled = true
                 self.updateStatusUI()
             }
         }
@@ -437,6 +441,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func checkForUpdates() {
+        guard !updater.isUpdating else { return }
+        // Instant feedback on click — the first background progress message
+        // may be a beat away while git starts up.
+        updateMenuItem.title = "Checking for updates…"
+        updateMenuItem.isEnabled = false
         updater.checkAndInstall()
     }
 
