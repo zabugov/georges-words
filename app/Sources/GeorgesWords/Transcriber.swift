@@ -56,7 +56,10 @@ actor Transcriber {
                 return tidy(results.map(\.text).joined(separator: " "))
             #if PARAKEET
             case .parakeet(let manager):
-                let result = try await manager.transcribe(samples)
+                // Fresh decoder state per utterance (state persistence
+                // across calls is only for streaming chunk mode).
+                var decoderState = TdtDecoderState.make()
+                let result = try await manager.transcribe(samples, decoderState: &decoderState)
                 return tidy(result.text)
             #endif
             }

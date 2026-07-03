@@ -16,7 +16,9 @@ var targetDependencies: [Target.Dependency] = [
 var swiftSettings: [SwiftSetting] = []
 
 if parakeetEnabled {
-    dependencies.append(.package(url: "https://github.com/FluidInference/FluidAudio.git", .upToNextMajor(from: "0.12.4")))
+    // Pinned to 0.15.x: pre-1.0 minor bumps change the API (0.12 → 0.15
+    // moved decoder state to the caller), so don't float across them.
+    dependencies.append(.package(url: "https://github.com/FluidInference/FluidAudio.git", "0.15.4"..<"0.16.0"))
     targetDependencies.append(.product(name: "FluidAudio", package: "FluidAudio"))
     swiftSettings.append(.define("PARAKEET"))
 }
