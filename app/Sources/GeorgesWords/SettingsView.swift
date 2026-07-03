@@ -121,44 +121,12 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Personal dictionary") {
-                TextEditor(text: $settings.dictionaryText)
-                    .font(.body.monospaced())
-                    .frame(height: 90)
-                Text("One term per line — names, jargon, product words. Their exact spelling is enforced in every transcript.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Snippets") {
-                ForEach($settings.snippets) { $snippet in
-                    HStack {
-                        TextField("Say…", text: $snippet.trigger)
-                        Image(systemName: "arrow.right")
-                            .foregroundStyle(.secondary)
-                        TextField("Insert…", text: $snippet.expansion)
-                        Button {
-                            settings.snippets.removeAll { $0.id == snippet.id }
-                        } label: {
-                            Image(systemName: "trash")
-                        }
-                        .buttonStyle(.borderless)
-                    }
-                }
-                Button("Add Snippet") {
-                    settings.snippets.append(Snippet(trigger: "", expansion: ""))
-                }
-                Text("Voice shortcuts: saying the trigger phrase inserts the expansion exactly as written — e.g. “my sign off” → your full email signature.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
             Section {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480, height: 660)
+        .navigationTitle("Settings")
         .task { await refreshOllama() }
     }
 

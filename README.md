@@ -12,6 +12,7 @@ A system-wide dictation app for macOS, in the spirit of [commercial Flow](https:
 - **Command mode** — select text anywhere, hold the command key (default Right ⌥), and speak an instruction: "make this shorter", "make it a bulleted list", "translate to French". The selection is replaced with the edit (requires Ollama).
 - **Snippets** — say a trigger phrase ("my sign off"), get your exact boilerplate inserted.
 - **History** — the last 200 transcripts, stored only on this Mac, one click to copy, one click to clear.
+- **A real app window** — open from the Dock: Home (status, usage stats, recent dictations, updates), History, Dictionary, Snippets, and Settings in one sidebar window. The menu-bar icon stays as the always-on recording indicator.
 
 Formatting is two-stage: instant rule-based cleanup always, plus an optional rewrite by a local LLM via [Ollama](https://ollama.com) — see below. See [`docs/research/`](docs/research/) for the commercial Flow deep-dive, [`docs/decisions/`](docs/decisions/) for the ADRs, and [`FUTURE_IMPROVEMENTS.md`](FUTURE_IMPROVEMENTS.md) for the backlog to full commercial Flow parity.
 
@@ -32,9 +33,9 @@ First run:
 3. Wait for the menu-bar hourglass to become a mic — the first launch downloads the speech model (one-time, ~500 MB; the only network use this app will ever make).
 4. Click into any text field, **hold Fn, speak, release.**
 
-The speech model, hotkey (Fn, Right ⌘, or Right ⌥), AI polish, and personal dictionary live in **Settings…** under the menu-bar icon.
+The speech model, hotkey (Fn, Right ⌘, or Right ⌥), AI polish, personal dictionary, and snippets live in the main window — open it from the Dock or via the menu-bar icon → **Open George's Words**.
 
-**Updating:** menu bar → **Check for Updates…** pulls the latest from GitHub, rebuilds, and relaunches — no terminal needed after the first install.
+**Updating:** **Check for Updates…** (in the main window's Home tab, the app menu, or the menu-bar icon) pulls the latest from GitHub, rebuilds, and relaunches — no terminal needed after the first install.
 
 ### Recommended: stable signing (do this once)
 
@@ -72,8 +73,8 @@ George's Words talks to Ollama at `localhost:11434` — an app-to-app call insid
 georges-words/
 ├── app/                 # macOS app (Swift Package + build.sh → .app bundle)
 │   └── Sources/GeorgesWords/
-│       ├── main.swift            # entry point (menu-bar accessory app)
-│       ├── AppDelegate.swift     # state machine + menu bar UI + wiring
+│       ├── main.swift            # entry point (regular Dock app)
+│       ├── AppDelegate.swift     # state machine + menus + windows + wiring
 │       ├── AppSettings.swift     # user prefs (model, hotkey, login item)
 │       ├── HotkeyMonitor.swift   # hold-key detection (global event monitor)
 │       ├── AudioRecorder.swift   # AVAudioEngine → 16 kHz mono + level meter
@@ -85,9 +86,12 @@ georges-words/
 │       ├── AppContext.swift      # frontmost-app bundle ID → tone profile
 │       ├── Snippets.swift        # voice shortcuts (trigger → expansion)
 │       ├── HistoryStore.swift    # local-only transcript history
-│       ├── HistoryView.swift     # history window
+│       ├── StatsStore.swift      # local-only usage counters
+│       ├── AppStatus.swift       # live app state published to the window
+│       ├── MainWindowView.swift  # main window: sidebar + Home dashboard
+│       ├── HistoryView.swift     # history tab
 │       ├── RecordingPill.swift   # floating pill + live preview
-│       └── SettingsView.swift    # SwiftUI settings window
+│       └── SettingsView.swift    # settings tab
 └── docs/
     ├── research/        # commercial Flow + local STT deep-dive
     └── decisions/       # Architecture decision records (ADRs)
@@ -104,4 +108,4 @@ global hotkey → mic capture → local STT model → local formatting pass → 
 
 1. **Local-first, always.** No audio or transcript leaves the machine. No accounts, no telemetry.
 2. **Latency is the product.** Target: text appears well under ~1s after you stop speaking.
-3. **Invisible until needed.** A menu-bar app with a hotkey — no windows to manage.
+3. **Invisible until needed.** Dictation is all hotkey — the window is there when you want history, stats, or settings, and closing it never stops dictation.

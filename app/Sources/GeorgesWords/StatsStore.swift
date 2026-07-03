@@ -1,35 +1,51 @@
 import Foundation
 
 /// Local-only usage counters — never leave the device.
-enum StatsStore {
+final class StatsStore: ObservableObject {
+
+    static let shared = StatsStore()
 
     private static let wordsKey = "Stats.totalWords"
     private static let dictationsKey = "Stats.totalDictations"
 
-    static func record(words: Int) {
+    @Published private(set) var totalWords: Int
+    @Published private(set) var totalDictations: Int
+
+    private init() {
         let defaults = UserDefaults.standard
-        defaults.set(defaults.integer(forKey: wordsKey) + words, forKey: wordsKey)
-        defaults.set(defaults.integer(forKey: dictationsKey) + 1, forKey: dictationsKey)
+        totalWords = defaults.integer(forKey: Self.wordsKey)
+        totalDictations = defaults.integer(forKey: Self.dictationsKey)
+    }
+
+    func record(words: Int) {
+        totalWords += words
+        totalDictations += 1
+        let defaults = UserDefaults.standard
+        defaults.set(totalWords, forKey: Self.wordsKey)
+        defaults.set(totalDictations, forKey: Self.dictationsKey)
+    }
+
+    /// Speaking ≈ 150 wpm vs typing ≈ 45 wpm.
+    var minutesSaved: Double {
+        Double(totalWords) * (1.0 / 45.0 - 1.0 / 150.0)
+    }
+
+    var timeSavedText: String {
+        if minutesSaved >= 90 {
+            return String(format: "%.1f h", minutesSaved / 60)
+        }
+        return "\(Int(minutesSaved.rounded())) min"
     }
 
     /// e.g. "3,412 words dictated · ~1.1 h saved"
-    static var summary: String {
-        let defaults = UserDefaults.standard
-        let words = defaults.integer(forKey: wordsKey)
-        guard words > 0 else { return "No dictations yet" }
+    var summary: String {
+        guard totalWords > 0 else { return "No dictations yet" }
+        return "\(Self.formatted(totalWords)) words dictated · ~\(timeSavedText) saved"
+    }
 
-        // Speaking ≈ 150 wpm vs typing ≈ 45 wpm.
-        let savedMinutes = Double(words) * (1.0 / 45.0 - 1.0 / 150.0)
-        let savedText: String
-        if savedMinutes >= 90 {
-            savedText = String(format: "~%.1f h saved", savedMinutes / 60)
-        } else {
-            savedText = "~\(Int(savedMinutes.rounded())) min saved"
-        }
-
+    static func formatted(_ value: Int) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
-        let wordsText = formatter.string(from: NSNumber(value: words)) ?? "\(words)"
-        return "\(wordsText) words dictated · \(savedText)"
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 }

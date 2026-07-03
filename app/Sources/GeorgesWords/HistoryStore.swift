@@ -37,6 +37,11 @@ final class HistoryStore: ObservableObject {
         save()
     }
 
+    func remove(id: UUID) {
+        entries.removeAll { $0.id == id }
+        save()
+    }
+
     func clear() {
         entries = []
         save()

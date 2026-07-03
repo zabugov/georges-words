@@ -22,12 +22,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem!
     private let statusMenuItem = NSMenuItem(title: "Starting…", action: nil, keyEquivalent: "")
-    private let modelMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-    private let timingMenuItem = NSMenuItem(title: "Last: —", action: nil, keyEquivalent: "")
-    private let statsMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let updateMenuItem = NSMenuItem(title: "Check for Updates…", action: nil, keyEquivalent: "")
-    private var settingsWindow: NSWindow?
-    private var historyWindow: NSWindow?
+    private var mainWindow: NSWindow?
+    private let appStatus = AppStatus.shared
 
     private let settings = AppSettings.shared
     private let recorder = AudioRecorder()
@@ -58,8 +55,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        buildMainMenu()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         buildMenu()
+        appStatus.checkForUpdates = { [weak self] in self?.checkForUpdates() }
         updateStatusUI()
 
         requestPermissions()
@@ -95,15 +94,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // so it can't be triggered again mid-run.
                 self.updateMenuItem.title = text
                 self.updateMenuItem.isEnabled = false
+                self.appStatus.updateProgress = text
                 self.pill.flash(text, seconds: 3)
             } else {
                 self.updateMenuItem.title = "Check for Updates…"
                 self.updateMenuItem.isEnabled = true
+                self.appStatus.updateProgress = nil
                 self.updateStatusUI()
             }
         }
         updater.onNotice = { [weak self] text in
-            self?.pill.flash(text, seconds: 4)
+            guard let self else { return }
+            self.pill.flash(text, seconds: 4)
+            // Surface the outcome in the window too, briefly.
+            self.appStatus.updateProgress = text
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+                if self?.appStatus.updateProgress == text {
+                    self?.appStatus.updateProgress = nil
+                }
+            }
         }
         // Confirmation from the new build after a successful self-update.
         if UserDefaults.standard.bool(forKey: "JustUpdated") {
@@ -117,6 +126,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         observeSettings()
 
         Task { await loadModel() }
+
+        // Opened by the user → show the window like a normal app. Started
+        // by login (or launchd) → stay in the background; the menu-bar icon
+        // is presence enough.
+        if !launchedAsLoginItem {
+            openMainWindow()
+        }
+    }
+
+    /// Dock icon clicked (or app re-opened) with no visible windows.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        openMainWindow()
+        return false
+    }
+
+    /// Closing the window must not quit — dictation keeps running.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
+    /// True when launchd started us as a login item: the initial 'oapp'
+    /// Apple Event carries propData 'lgit'. Four-char codes are spelled as
+    /// literals so this compiles without the Carbon constant headers.
+    private var launchedAsLoginItem: Bool {
+        guard let event = NSAppleEventManager.shared().currentAppleEvent else { return false }
+        return event.eventClass == AEEventClass(0x6165_7674) // 'aevt'
+            && event.eventID == AEEventID(0x6F61_7070)       // 'oapp'
+            && event.paramDescriptor(forKeyword: AEKeyword(0x7072_6474))? // 'prdt'
+                .enumCodeValue == OSType(0x6C67_6974)        // 'lgit'
     }
 
     // MARK: - Permissions
@@ -319,7 +357,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     if !text.isEmpty {
                         self.lastTranscript = text
                         HistoryStore.shared.add(text)
-                        StatsStore.record(words: text.split(separator: " ").count)
+                        StatsStore.shared.record(words: text.split(separator: " ").count)
                         outcome = self.inserter.insert(text)
                     }
                     // A model swap may have taken over the state meanwhile.
@@ -392,9 +430,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     private func updateTiming(transcribe: TimeInterval, polish: TimeInterval?) {
         if let polish {
-            timingMenuItem.title = String(format: "Last: %.1fs transcribe + %.1fs polish", transcribe, polish)
+            appStatus.lastTiming = String(format: "Last dictation: %.1f s transcribe + %.1f s polish", transcribe, polish)
         } else {
-            timingMenuItem.title = String(format: "Last: %.1fs transcribe (no polish)", transcribe)
+            appStatus.lastTiming = String(format: "Last dictation: %.1f s transcribe (no polish)", transcribe)
         }
     }
 
@@ -432,7 +470,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: - Menu bar UI
+    // MARK: - Main menu (Dock app)
+
+    private func buildMainMenu() {
+        let mainMenu = NSMenu()
+
+        let appMenuItem = NSMenuItem()
+        mainMenu.addItem(appMenuItem)
+        let appMenu = NSMenu(title: "George's Words")
+        appMenuItem.submenu = appMenu
+        appMenu.addItem(withTitle: "About George's Words", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(.separator())
+        let settingsItem = appMenu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        let updatesItem = appMenu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        updatesItem.target = self
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Hide George's Words", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hideOthers = appMenu.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+        hideOthers.keyEquivalentModifierMask = [.command, .option]
+        appMenu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Quit George's Words", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+
+        let fileMenuItem = NSMenuItem()
+        mainMenu.addItem(fileMenuItem)
+        let fileMenu = NSMenu(title: "File")
+        fileMenuItem.submenu = fileMenu
+        fileMenu.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+
+        let editMenuItem = NSMenuItem()
+        mainMenu.addItem(editMenuItem)
+        let editMenu = NSMenu(title: "Edit")
+        editMenuItem.submenu = editMenu
+        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Delete", action: #selector(NSText.delete(_:)), keyEquivalent: "")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+
+        let windowMenuItem = NSMenuItem()
+        mainMenu.addItem(windowMenuItem)
+        let windowMenu = NSMenu(title: "Window")
+        windowMenuItem.submenu = windowMenu
+        windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        windowMenu.addItem(.separator())
+        windowMenu.addItem(withTitle: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
+        NSApp.windowsMenu = windowMenu
+
+        NSApp.mainMenu = mainMenu
+    }
+
+    // MARK: - Menu bar status item
 
     private func buildMenu() {
         let menu = NSMenu()
@@ -440,34 +533,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusMenuItem.isEnabled = false
         menu.addItem(statusMenuItem)
 
-        modelMenuItem.isEnabled = false
-        menu.addItem(modelMenuItem)
-
-        timingMenuItem.isEnabled = false
-        menu.addItem(timingMenuItem)
-
-        statsMenuItem.isEnabled = false
-        menu.addItem(statsMenuItem)
-
         menu.addItem(.separator())
+
+        let openItem = NSMenuItem(title: "Open George's Words", action: #selector(openMainWindowAction), keyEquivalent: "")
+        openItem.target = self
+        menu.addItem(openItem)
 
         let pasteLast = NSMenuItem(title: "Paste Last Transcript", action: #selector(pasteLastTranscript), keyEquivalent: "")
         pasteLast.target = self
         menu.addItem(pasteLast)
-
-        let historyItem = NSMenuItem(title: "History…", action: #selector(openHistory), keyEquivalent: "y")
-        historyItem.target = self
-        menu.addItem(historyItem)
-
-        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
-        settingsItem.target = self
-        menu.addItem(settingsItem)
 
         menu.addItem(.separator())
 
         updateMenuItem.action = #selector(checkForUpdates)
         updateMenuItem.target = self
         menu.addItem(updateMenuItem)
+
+        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: "")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+
+        menu.addItem(.separator())
 
         menu.addItem(NSMenuItem(title: "Quit George's Words", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
@@ -496,8 +582,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusItem.button?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: text)
         statusMenuItem.title = text
-        modelMenuItem.title = "Model: \(settings.engine == .parakeet ? "parakeet-tdt-0.6b-v3" : settings.modelName)"
-        statsMenuItem.title = StatsStore.summary
+
+        appStatus.statusText = text
+        appStatus.health = {
+            switch state {
+            case .loadingModel: return .loading
+            case .idle: return .ready
+            case .recording: return .recording
+            case .processing: return .processing
+            case .error: return .error
+            }
+        }()
+        appStatus.engineDescription = settings.engine == .parakeet
+            ? "Parakeet v3 (parakeet-tdt-0.6b-v3), fully on-device"
+            : "Whisper (\(settings.modelName)), fully on-device"
 
         switch state {
         case .recording:
@@ -525,17 +623,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pill.flash("No Accessibility permission — copied to clipboard. Re-toggle GeorgesWords in System Settings → Accessibility.", seconds: 6)
     }
 
-    @objc private func openSettings() {
-        if settingsWindow == nil {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(settings: settings)))
-            window.title = "George's Words Settings"
-            window.styleMask = [.titled, .closable]
-            window.isReleasedWhenClosed = false
-            settingsWindow = window
+    func openMainWindow(section: MainSection? = nil) {
+        if let section {
+            appStatus.selectedSection = section
         }
-        settingsWindow?.center()
+        if mainWindow == nil {
+            let window = NSWindow(contentViewController: NSHostingController(rootView: MainWindowView()))
+            window.title = "George's Words"
+            window.setContentSize(NSSize(width: 900, height: 580))
+            window.isReleasedWhenClosed = false
+            window.center()
+            window.setFrameAutosaveName("MainWindow")
+            mainWindow = window
+        }
         NSApp.activate(ignoringOtherApps: true)
-        settingsWindow?.makeKeyAndOrderFront(nil)
+        mainWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    @objc private func openMainWindowAction() {
+        openMainWindow()
+    }
+
+    @objc private func openSettings() {
+        openMainWindow(section: .settings)
     }
 
     @objc private func checkForUpdates() {
@@ -544,19 +654,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // may be a beat away while git starts up.
         updateMenuItem.title = "Checking for updates…"
         updateMenuItem.isEnabled = false
+        appStatus.updateProgress = "Checking for updates…"
         updater.checkAndInstall()
-    }
-
-    @objc private func openHistory() {
-        if historyWindow == nil {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: HistoryView(store: HistoryStore.shared)))
-            window.title = "History"
-            window.styleMask = [.titled, .closable]
-            window.isReleasedWhenClosed = false
-            historyWindow = window
-        }
-        historyWindow?.center()
-        NSApp.activate(ignoringOtherApps: true)
-        historyWindow?.makeKeyAndOrderFront(nil)
     }
 }
