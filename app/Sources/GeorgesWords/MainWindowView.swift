@@ -297,20 +297,99 @@ private struct StatCard: View {
 
 struct DictionaryView: View {
     @ObservedObject var settings: AppSettings
+    @ObservedObject private var status = AppStatus.shared
+    @ObservedObject private var corrections = CorrectionStore.shared
+    @State private var correctionDraft = ""
+    @State private var learnFeedback: String?
 
     var body: some View {
         Form {
+            Section("Suggestions") {
+                if corrections.suggestions.isEmpty {
+                    Text("When you fix a dictation right after it's inserted (or below), the app notices and suggests dictionary entries here. Nothing is added without your OK.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(corrections.suggestions) { suggestion in
+                        HStack(spacing: 6) {
+                            Text(suggestion.heard)
+                                .foregroundStyle(.secondary)
+                            Image(systemName: "arrow.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(suggestion.corrected)
+                            if suggestion.timesSeen > 1 {
+                                Text("×\(suggestion.timesSeen)")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            Spacer()
+                            Button("Add") {
+                                corrections.accept(suggestion, into: settings)
+                            }
+                            Button {
+                                corrections.dismiss(suggestion)
+                            } label: {
+                                Image(systemName: "xmark")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Dismiss — won't be suggested again")
+                        }
+                    }
+                }
+            }
+
             Section("Personal dictionary") {
                 TextEditor(text: $settings.dictionaryText)
                     .font(.body.monospaced())
-                    .frame(minHeight: 260)
-                Text("One term per line — names, jargon, product words. Their exact spelling is enforced in every transcript.")
+                    .frame(minHeight: 180)
+                Text("One entry per line. A plain term enforces its exact spelling (names, jargon, product words). A “heard -> Correct” line fixes a specific mishearing — accepting a suggestion writes one of these.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            }
+
+            Section("Fix the last transcript") {
+                if let last = status.lastTranscript {
+                    TextEditor(text: $correctionDraft)
+                        .font(.body)
+                        .frame(minHeight: 70)
+                    HStack {
+                        Button("Learn Corrections") {
+                            let substitutions = CorrectionDetector.substitutions(from: last, to: correctionDraft)
+                            for substitution in substitutions {
+                                corrections.add(
+                                    heard: substitution.heard,
+                                    corrected: substitution.corrected,
+                                    settings: settings
+                                )
+                            }
+                            learnFeedback = substitutions.isEmpty
+                                ? "No learnable word changes found."
+                                : "Found \(substitutions.count) — review under Suggestions above."
+                        }
+                        .disabled(correctionDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        if let learnFeedback {
+                            Text(learnFeedback)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Text("Edit the transcript to what it should have said, then Learn Corrections. Useful in apps where automatic detection can't read the text field.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Dictate something first — the transcript will appear here for fixing.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
         .navigationTitle("Dictionary")
+        .onAppear {
+            correctionDraft = status.lastTranscript ?? ""
+            learnFeedback = nil
+        }
     }
 }
 

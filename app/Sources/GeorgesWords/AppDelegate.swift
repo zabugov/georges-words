@@ -346,9 +346,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     var outcome: TextInserter.Outcome?
                     if !text.isEmpty {
                         self.lastTranscript = text
+                        self.appStatus.lastTranscript = text
                         HistoryStore.shared.add(text)
                         StatsStore.shared.record(words: text.split(separator: " ").count)
                         outcome = self.inserter.insert(text)
+                        if outcome == .inserted {
+                            self.scheduleCorrectionCheck(inserted: text, context: context)
+                        }
                     }
                     // A model swap may have taken over the state meanwhile.
                     if case .processing = self.state { self.state = .idle }
@@ -369,6 +373,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     if case .processing = self.state { self.state = .idle }
                     if let result, !result.isEmpty {
                         self.lastTranscript = result
+                        self.appStatus.lastTranscript = result
                         HistoryStore.shared.add(result)
                         if self.inserter.insert(result) == .copiedToClipboard {
                             self.flashAccessibilityWarning()
@@ -383,6 +388,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - Auto-learning dictionary (ADR 0005)
+
+    /// A few seconds after inserting, re-read the focused field and diff it
+    /// against what was inserted — the user's quick fixes become dictionary
+    /// suggestions. Entirely local, and bails out unless we're clearly still
+    /// looking at the same text in the same app.
+    private func scheduleCorrectionCheck(inserted: String, context: AppContext) {
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            await MainActor.run {
+                guard let self else { return }
+                // Same app still frontmost, and not mid-dictation.
+                guard AppContext.current().bundleID == context.bundleID else { return }
+                guard case .idle = self.state else { return }
+                guard let fieldText = FocusedFieldReader.read(), !fieldText.isEmpty else { return }
+                for substitution in CorrectionDetector.substitutions(from: inserted, to: fieldText) {
+                    CorrectionStore.shared.add(
+                        heard: substitution.heard,
+                        corrected: substitution.corrected,
+                        settings: self.settings
+                    )
+                }
+            }
+        }
+    }
+
     /// transcribe → rule cleanup → snippets → (optional) local-LLM polish.
     private func processDictation(samples: [Float], context: AppContext) async -> String {
         let transcribeStart = Date()
@@ -391,7 +422,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !raw.isEmpty else { return "" }
 
         let dictionary = settings.dictionaryTerms
-        var cleaned = cleaner.clean(raw, dictionary: dictionary)
+        var cleaned = cleaner.clean(raw, dictionary: dictionary, replacements: settings.dictionaryReplacements)
 
         let (expanded, snippetApplied) = SnippetExpander.apply(settings.snippets, to: cleaned)
         cleaned = expanded
@@ -534,6 +565,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pasteLast.target = self
         menu.addItem(pasteLast)
 
+        let correctLast = NSMenuItem(title: "Correct Last Transcript…", action: #selector(correctLastTranscript), keyEquivalent: "")
+        correctLast.target = self
+        menu.addItem(correctLast)
+
         menu.addItem(.separator())
 
         updateMenuItem.action = #selector(checkForUpdates)
@@ -641,6 +676,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openAbout() {
         openMainWindow(section: .about)
+    }
+
+    /// AX-read fallback: fix the last transcript by hand in the Dictionary
+    /// tab and the diff is learned from that.
+    @objc private func correctLastTranscript() {
+        openMainWindow(section: .dictionary)
     }
 
     /// Transient outcome text in the sidebar's update footer.

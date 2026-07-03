@@ -12,6 +12,7 @@ A system-wide dictation app for macOS, in the spirit of [commercial Flow](https:
 - **Command mode** — select text anywhere, hold the command key (default Right ⌥), and speak an instruction: "make this shorter", "make it a bulleted list", "translate to French". The selection is replaced with the edit (requires Ollama).
 - **Snippets** — say a trigger phrase ("my sign off"), get your exact boilerplate inserted.
 - **History** — the last 200 transcripts, stored only on this Mac, one click to copy, one click to clear.
+- **Auto-learning dictionary** — fix a misheard word right after dictating and the app notices (it re-reads the field via the Accessibility API and diffs), then suggests a one-click "heard -> Correct" dictionary entry. Nothing is added without your OK; see [ADR 0005](docs/decisions/0005-auto-learning-dictionary.md).
 - **A real app window** — open from the Dock: Home (status, usage stats, recent dictations, updates), History, Dictionary, Snippets, and Settings in one sidebar window. The menu-bar icon stays as the always-on recording indicator.
 
 Formatting is two-stage: instant rule-based cleanup always, plus an optional rewrite by a local LLM via [Ollama](https://ollama.com) — see below. See [`docs/research/`](docs/research/) for the commercial Flow deep-dive, [`docs/decisions/`](docs/decisions/) for the ADRs, and [`FUTURE_IMPROVEMENTS.md`](FUTURE_IMPROVEMENTS.md) for the backlog to full commercial Flow parity.
@@ -82,6 +83,7 @@ georges-words/
 │       ├── TextInserter.swift    # AX-API insertion → clipboard ⌘V fallback
 │       ├── SelectionReader.swift # read selected text (AX → ⌘C fallback)
 │       ├── TranscriptCleaner.swift # stage 1: rule-based cleanup + dictionary
+│       ├── CorrectionLearner.swift # auto-learning dictionary (ADR 0005)
 │       ├── LLMFormatter.swift    # stage 2: local LLM rewrite + command mode
 │       ├── AppContext.swift      # frontmost-app bundle ID → tone profile
 │       ├── Snippets.swift        # voice shortcuts (trigger → expansion)

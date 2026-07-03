@@ -132,16 +132,41 @@ final class AppSettings: ObservableObject {
         return trimmed.isEmpty ? Self.defaultLLMModel : trimmed
     }
 
-    /// Personal dictionary, one term per line (exact spellings to enforce).
+    /// Personal dictionary, one entry per line. A plain line enforces that
+    /// term's exact spelling; a "heard -> Correct" line rewrites a specific
+    /// mishearing (the auto-learning dictionary emits these — ADR 0005).
     @Published var dictionaryText: String {
         didSet { defaults.set(dictionaryText, forKey: "Dictionary") }
     }
 
+    /// Spellings to enforce: plain lines, plus the correct side of every
+    /// mapping (so the LLM pass also knows these words).
     var dictionaryTerms: [String] {
         dictionaryText
             .split(separator: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+            .map { line in
+                Self.parseReplacement(line)?.correct ?? line
+            }
+    }
+
+    /// The "heard -> Correct" mappings, applied in the rule-based pass.
+    var dictionaryReplacements: [(heard: String, correct: String)] {
+        dictionaryText
+            .split(separator: "\n")
+            .compactMap { Self.parseReplacement(String($0)) }
+    }
+
+    private static func parseReplacement(_ line: String) -> (heard: String, correct: String)? {
+        for arrow in ["->", "→"] {
+            guard let range = line.range(of: arrow) else { continue }
+            let heard = line[..<range.lowerBound].trimmingCharacters(in: .whitespaces)
+            let correct = line[range.upperBound...].trimmingCharacters(in: .whitespaces)
+            guard !heard.isEmpty, !correct.isEmpty else { return nil }
+            return (heard, correct)
+        }
+        return nil
     }
 
     /// Hold this key with text selected to speak an edit instruction.

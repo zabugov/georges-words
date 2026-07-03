@@ -60,6 +60,7 @@ final class AppStatus: ObservableObject {
     @Published var statusText = "Starting…"
     @Published var engineDescription = ""
     @Published var lastTiming: String?
+    @Published var lastTranscript: String?
     @Published var updateProgress: String?
     @Published var updateNotice: String?
 

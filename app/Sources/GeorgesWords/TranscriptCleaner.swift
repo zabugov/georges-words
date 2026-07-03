@@ -10,7 +10,7 @@ struct TranscriptCleaner {
         options: [.caseInsensitive]
     )
 
-    func clean(_ text: String, dictionary: [String]) -> String {
+    func clean(_ text: String, dictionary: [String], replacements: [(heard: String, correct: String)] = []) -> String {
         var result = text
 
         result = Self.fillerPattern.stringByReplacingMatches(
@@ -18,6 +18,17 @@ struct TranscriptCleaner {
             range: NSRange(result.startIndex..., in: result),
             withTemplate: ""
         )
+
+        // Learned mishearing fixes: "coober netties" -> "Kubernetes".
+        for replacement in replacements {
+            let escaped = NSRegularExpression.escapedPattern(for: replacement.heard)
+            guard let regex = try? NSRegularExpression(pattern: #"\b\#(escaped)\b"#, options: [.caseInsensitive]) else { continue }
+            result = regex.stringByReplacingMatches(
+                in: result,
+                range: NSRange(result.startIndex..., in: result),
+                withTemplate: NSRegularExpression.escapedTemplate(for: replacement.correct)
+            )
+        }
 
         // Enforce the exact spelling/casing of personal dictionary terms.
         for term in dictionary where !term.isEmpty {
