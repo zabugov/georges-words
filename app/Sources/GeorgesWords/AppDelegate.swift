@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private let statusMenuItem = NSMenuItem(title: "Starting…", action: nil, keyEquivalent: "")
     private let modelMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let timingMenuItem = NSMenuItem(title: "Last: —", action: nil, keyEquivalent: "")
     private var settingsWindow: NSWindow?
     private var historyWindow: NSWindow?
 
@@ -153,6 +154,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if mode == .dictation && settings.previewEnabled {
                 startPreviewLoop()
             }
+            // Load the LLM / prime its prompt cache while the user speaks,
+            // so the polish pass starts hot.
+            if settings.llmEnabled {
+                llmFormatter.warmUpIfStale(model: settings.llmModel)
+            }
         } catch {
             state = .error("Microphone error: \(error.localizedDescription)")
         }
@@ -214,7 +220,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// transcribe → rule cleanup → snippets → (optional) local-LLM polish.
     private func processDictation(samples: [Float], context: AppContext) async -> String {
+        let transcribeStart = Date()
         let raw = await transcriber.transcribe(samples)
+        let transcribeSeconds = Date().timeIntervalSince(transcribeStart)
         guard !raw.isEmpty else { return "" }
 
         let dictionary = settings.dictionaryTerms
@@ -227,17 +235,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // verbatim) and for very short utterances (nothing to restructure,
         // and skipping keeps them near-instant).
         let wordCount = cleaned.split(separator: " ").count
-        guard settings.llmEnabled, !snippetApplied, wordCount >= 5 else { return cleaned }
+        guard settings.llmEnabled, !snippetApplied, wordCount >= 5 else {
+            await updateTiming(transcribe: transcribeSeconds, polish: nil)
+            return cleaned
+        }
 
-        if let polished = await llmFormatter.format(
+        let polishStart = Date()
+        let polished = await llmFormatter.format(
             cleaned,
             tone: context.tone,
             dictionary: dictionary,
             model: settings.llmModel
-        ) {
-            return polished
+        )
+        await updateTiming(transcribe: transcribeSeconds, polish: Date().timeIntervalSince(polishStart))
+        return polished ?? cleaned
+    }
+
+    @MainActor
+    private func updateTiming(transcribe: TimeInterval, polish: TimeInterval?) {
+        if let polish {
+            timingMenuItem.title = String(format: "Last: %.1fs transcribe + %.1fs polish", transcribe, polish)
+        } else {
+            timingMenuItem.title = String(format: "Last: %.1fs transcribe (no polish)", transcribe)
         }
-        return cleaned
     }
 
     // MARK: - Live preview
@@ -284,6 +304,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         modelMenuItem.isEnabled = false
         menu.addItem(modelMenuItem)
+
+        timingMenuItem.isEnabled = false
+        menu.addItem(timingMenuItem)
 
         menu.addItem(.separator())
 

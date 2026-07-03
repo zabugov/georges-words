@@ -9,16 +9,16 @@ enum ToneProfile {
     case technical     // editors & terminals
     case neutral
 
-    var promptLine: String {
+    var styleDescription: String {
         switch self {
         case .casual:
-            return "Style: a casual chat message — contractions and a relaxed tone are fine, keep it light."
+            return "a casual chat message — contractions and a relaxed tone are fine, keep it light"
         case .professional:
-            return "Style: professional writing — complete sentences, clear and courteous."
+            return "professional writing — complete sentences, clear and courteous"
         case .technical:
-            return "Style: technical text — preserve code identifiers, file names, commands, and jargon exactly as spoken."
+            return "technical text — preserve code identifiers, file names, commands, and jargon exactly as spoken"
         case .neutral:
-            return "Style: clean, neutral prose."
+            return "clean, neutral prose"
         }
     }
 }
