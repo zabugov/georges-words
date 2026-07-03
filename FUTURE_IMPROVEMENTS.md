@@ -6,10 +6,12 @@ When we start something from this list, move it out of here and into the work it
 
 ## 1. Speed & responsiveness
 
-The gap that matters most — commercial feels instant.
+**Baseline as of 2026-07-03 (Parakeet + qwen2.5:3b on Zach's machine): 0.2 s transcribe + 1.4 s polish.** Transcription is solved; the LLM polish is ~90% of the remaining wait. Analysis from the 07-03 session:
 
-- [ ] **(L)** **Streaming transcription** — transcribe chunks *while* speaking (the live preview already does this crudely), so key-release only costs the final chunk + polish instead of the whole utterance. FluidAudio's `SlidingWindowAsrManager` is the candidate API.
-- [ ] **(M)** **Evaluate smaller/faster polish models** — `qwen2.5:1.5b`, `llama3.2:1b`, `gemma3:1b` — measure quality-vs-latency with a fixed test set of messy transcripts.
+- [ ] **(S)** **Ollama experiment — smaller polish model.** Run `ollama pull qwen2.5:1.5b`, set it in Settings → AI polish, and compare: should roughly halve the 1.4 s polish. If self-corrections/rewrites get worse, revert the field to `qwen2.5:3b` (30-second undo). If quality holds, consider making it the default and also try `llama3.2:1b` / `gemma3:1b`.
+- [ ] **(M)** **Speculative polish — the recommended next build.** While recording, whenever the speaker goes quiet ~1 s, speculatively polish the transcript-so-far in the background; on key release, if nothing more was said, the polished result is already ready → text appears near-instantly. Keep talking → discard the speculation (local compute, costs nothing). Architecturally just a cache in front of the existing pipeline: a miss falls back to today's behavior, never worse. Gets ~90% of the "streaming" benefit for ~10% of the work.
+- [ ] **(L)** **True streaming polish** — polish sentence-by-sentence *while* speaking. Parked until real usage demands it (long-form dictation): hard problems include self-corrections spanning sentence boundaries ("…Tuesday. Wait, no, Friday"), tone consistency across separately-polished fragments, and sentence segmentation on unstable ASR output. Weeks of tuning, real quality risk.
+- ~~Streaming transcription~~ — **obsolete**: it existed to hide multi-second transcription, and Parakeet does full utterances in 0.2 s. Building it (FluidAudio `SlidingWindowAsrManager`, chunk stitching, word-revision handling) would be days of work to save a fifth of a second.
 - [ ] **(M)** **Apple Foundation Models** (macOS 26+) as the polish engine — Apple's built-in on-device ~3B model; would remove the Ollama install entirely for users on new macOS. Needs a macOS 26 SDK build path.
 
 ## 2. Accuracy
