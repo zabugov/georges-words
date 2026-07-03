@@ -154,10 +154,11 @@ final class LLMFormatter {
         guard !warmUpInFlight else { return }
         warmUpInFlight = true
         Task { [weak self] in
+            guard let self else { return }
             var messages = Self.prefixMessages()
             messages.append(["role": "user", "content": "STYLE: clean, neutral prose\nTRANSCRIPT: ok"])
-            _ = await self?.chat(messages: messages, model: model, maxTokens: 1, timeout: 30)
-            await MainActor.run { self?.warmUpInFlight = false }
+            _ = await self.chat(messages: messages, model: model, maxTokens: 1, timeout: 30)
+            await MainActor.run { self.warmUpInFlight = false }
         }
     }
 

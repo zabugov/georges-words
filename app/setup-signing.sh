@@ -25,12 +25,11 @@ openssl req -x509 -newkey rsa:2048 \
   -addext "keyUsage=critical,digitalSignature" \
   -addext "extendedKeyUsage=critical,codeSigning" 2>/dev/null
 
-openssl pkcs12 -export \
-  -inkey "$TMP_DIR/key.pem" -in "$TMP_DIR/cert.pem" \
-  -out "$TMP_DIR/cert.p12" -passout pass:georges 2>/dev/null
-
 echo "==> Importing into your login keychain"
-security import "$TMP_DIR/cert.p12" -k "$KEYCHAIN" -P georges -T /usr/bin/codesign
+# Import key and cert as separate PEMs — PKCS12 bundles from modern OpenSSL
+# use algorithms macOS's keychain importer rejects ("MAC verification failed").
+security import "$TMP_DIR/key.pem" -k "$KEYCHAIN" -T /usr/bin/codesign
+security import "$TMP_DIR/cert.pem" -k "$KEYCHAIN"
 
 echo "==> Marking it trusted for code signing (macOS will ask for your password)"
 security add-trusted-cert -r trustRoot -p codeSign -k "$KEYCHAIN" "$TMP_DIR/cert.pem"

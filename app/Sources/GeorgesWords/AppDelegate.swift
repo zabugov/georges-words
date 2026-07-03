@@ -332,10 +332,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             commandSelection = nil
             Task {
                 let instruction = await self.transcriber.transcribe(samples)
-                var result: String?
+                var edited: String?
                 if !instruction.isEmpty && !selection.isEmpty {
-                    result = await self.llmFormatter.applyCommand(instruction, to: selection, model: self.settings.effectiveLLMModel)
+                    edited = await self.llmFormatter.applyCommand(instruction, to: selection, model: self.settings.effectiveLLMModel)
                 }
+                let result = edited
                 await MainActor.run {
                     if case .processing = self.state { self.state = .idle }
                     if let result, !result.isEmpty {

@@ -32,6 +32,10 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 cp ".build/release/GeorgesWords" "$APP_DIR/Contents/MacOS/GeorgesWords"
 cp "Info.plist" "$APP_DIR/Contents/Info.plist"
 
+# iCloud/Finder stamp extended attributes onto files, which codesign rejects
+# ("resource fork … detritus not allowed"). Strip them before signing.
+xattr -cr "$APP_DIR" 2>/dev/null || true
+
 IDENTITY="GeorgesWords Dev"
 if ! security find-identity -v -p codesigning 2>/dev/null | grep -q "$IDENTITY"; then
     echo "==> No stable signing identity yet — creating one now (one-time)."
