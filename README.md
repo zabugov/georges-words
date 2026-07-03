@@ -6,7 +6,7 @@ A system-wide dictation app for macOS, in the spirit of [commercial Flow](https:
 
 ## Status
 
-🚧 **M1 — walking skeleton.** Hold Fn → speak → release → transcribed text is pasted at your cursor, fully on-device. See [`docs/research/`](docs/research/) for the commercial Flow deep-dive that informs the design, and [`docs/decisions/`](docs/decisions/) for the ADRs.
+🚧 **M2 — insertion & UX polish.** Hold a hotkey → speak → release → text appears at your cursor, fully on-device. Now with direct Accessibility-API insertion (clipboard paste as fallback), a floating recording pill with live mic levels, a Settings window (model picker, hotkey picker, launch at login). See [`docs/research/`](docs/research/) for the commercial Flow deep-dive that informs the design, and [`docs/decisions/`](docs/decisions/) for the ADRs.
 
 ## Quick start (on your Mac)
 
@@ -25,7 +25,7 @@ First run:
 3. Wait for the menu-bar hourglass to become a mic — the first launch downloads the speech model (one-time, ~500 MB; the only network use this app will ever make).
 4. Click into any text field, **hold Fn, speak, release.**
 
-To use a bigger/better model: `defaults write com.georges.words ModelName "distil-large-v3"` and relaunch. If the hotkey stops responding after a rebuild, toggle the Accessibility permission off and on (ad-hoc signing quirk).
+The speech model and hotkey (Fn, Right ⌘, or Right ⌥) can be changed in **Settings…** from the menu-bar icon. If the hotkey stops responding after a rebuild, toggle the Accessibility permission off and on (ad-hoc signing quirk).
 
 ## What it will do
 
@@ -42,11 +42,14 @@ georges-words/
 ├── app/                 # macOS app (Swift Package + build.sh → .app bundle)
 │   └── Sources/GeorgesWords/
 │       ├── main.swift            # entry point (menu-bar accessory app)
-│       ├── AppDelegate.swift     # state machine + menu bar UI
-│       ├── HotkeyMonitor.swift   # hold-Fn detection (global event monitor)
-│       ├── AudioRecorder.swift   # AVAudioEngine → 16 kHz mono Float32
+│       ├── AppDelegate.swift     # state machine + menu bar UI + wiring
+│       ├── AppSettings.swift     # user prefs (model, hotkey, login item)
+│       ├── HotkeyMonitor.swift   # hold-key detection (global event monitor)
+│       ├── AudioRecorder.swift   # AVAudioEngine → 16 kHz mono + level meter
 │       ├── Transcriber.swift     # WhisperKit (CoreML / Neural Engine)
-│       └── TextInserter.swift    # clipboard + simulated ⌘V (AX API in M2)
+│       ├── TextInserter.swift    # AX-API insertion → clipboard ⌘V fallback
+│       ├── RecordingPill.swift   # floating non-activating status pill
+│       └── SettingsView.swift    # SwiftUI settings window
 └── docs/
     ├── research/        # commercial Flow + local STT deep-dive
     └── decisions/       # Architecture decision records (ADRs)

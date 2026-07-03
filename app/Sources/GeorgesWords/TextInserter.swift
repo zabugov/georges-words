@@ -1,28 +1,72 @@
 import AppKit
 import ApplicationServices
 
-/// Inserts text at the cursor of whatever app has focus.
+/// Inserts text at the cursor of whatever app has focus, using the same
+/// chain commercial Flow uses:
 ///
-/// M1 approach: put the text on the pasteboard and simulate ⌘V, then restore
-/// the user's previous clipboard. (M2 will add direct Accessibility-API
-/// insertion with this as the fallback, matching commercial Flow's chain.)
+///   1. Direct Accessibility-API insertion into the focused element
+///      (replaces the current selection; inserts at the caret when the
+///      selection is empty). Cleanest: no clipboard involvement at all.
+///   2. Fallback: clipboard + simulated ⌘V, restoring the user's previous
+///      clipboard afterwards.
 final class TextInserter {
 
     private static let vKeyCode: CGKeyCode = 9
 
     func insert(_ text: String) {
-        let pasteboard = NSPasteboard.general
-
         guard AXIsProcessTrusted() else {
-            // Without Accessibility we can't simulate ⌘V — leave the text on
-            // the clipboard so the user can paste manually.
+            // Without Accessibility we can neither use the AX API nor
+            // simulate ⌘V — leave the text on the clipboard so the user can
+            // paste manually.
+            let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
             NSLog("Accessibility permission missing — transcript left on clipboard.")
             return
         }
 
+        if insertViaAccessibility(text) { return }
+        insertViaPasteboard(text)
+    }
+
+    // MARK: - Strategy 1: Accessibility API
+
+    private func insertViaAccessibility(_ text: String) -> Bool {
+        let systemWide = AXUIElementCreateSystemWide()
+
+        var focusedRef: AnyObject?
+        guard AXUIElementCopyAttributeValue(
+            systemWide,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedRef
+        ) == .success,
+            let focusedRef,
+            CFGetTypeID(focusedRef) == AXUIElementGetTypeID()
+        else { return false }
+
+        let element = focusedRef as! AXUIElement
+
+        var settable = DarwinBoolean(false)
+        guard AXUIElementIsAttributeSettable(
+            element,
+            kAXSelectedTextAttribute as CFString,
+            &settable
+        ) == .success, settable.boolValue
+        else { return false }
+
+        return AXUIElementSetAttributeValue(
+            element,
+            kAXSelectedTextAttribute as CFString,
+            text as CFString
+        ) == .success
+    }
+
+    // MARK: - Strategy 2: clipboard + simulated ⌘V
+
+    private func insertViaPasteboard(_ text: String) {
+        let pasteboard = NSPasteboard.general
         let savedClipboard = pasteboard.string(forType: .string)
+
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
 

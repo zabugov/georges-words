@@ -9,12 +9,10 @@ final class Transcriber {
 
     private var whisperKit: WhisperKit?
 
-    /// Override with: defaults write com.georges.words ModelName "distil-large-v3"
-    var modelName: String {
-        UserDefaults.standard.string(forKey: "ModelName") ?? "small.en"
-    }
+    var modelName: String { AppSettings.shared.modelName }
 
     func load() async throws {
+        whisperKit = nil
         whisperKit = try await WhisperKit(WhisperKitConfig(model: modelName))
     }
 

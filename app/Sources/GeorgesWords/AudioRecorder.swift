@@ -16,6 +16,9 @@ final class AudioRecorder {
     private var samples: [Float] = []
     private let lock = NSLock()
 
+    /// Called on the main thread with a 0…1 loudness estimate while recording.
+    var onLevel: ((Float) -> Void)?
+
     func start() throws {
         lock.lock()
         samples.removeAll(keepingCapacity: true)
@@ -65,8 +68,18 @@ final class AudioRecorder {
         }
         guard conversionError == nil, let channel = converted.floatChannelData?[0] else { return }
 
+        let frameCount = Int(converted.frameLength)
         lock.lock()
-        samples.append(contentsOf: UnsafeBufferPointer(start: channel, count: Int(converted.frameLength)))
+        samples.append(contentsOf: UnsafeBufferPointer(start: channel, count: frameCount))
         lock.unlock()
+
+        if let onLevel, frameCount > 0 {
+            var sum: Float = 0
+            for i in 0..<frameCount { sum += channel[i] * channel[i] }
+            let rms = (sum / Float(frameCount)).squareRoot()
+            // Map typical speech RMS (~0.01–0.2) into a lively 0…1 range.
+            let level = min(1, rms * 8)
+            DispatchQueue.main.async { onLevel(level) }
+        }
     }
 }

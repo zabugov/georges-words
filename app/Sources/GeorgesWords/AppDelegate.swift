@@ -1,6 +1,8 @@
 import AppKit
 import ApplicationServices
 import AVFoundation
+import Combine
+import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
@@ -14,11 +16,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem!
     private let statusMenuItem = NSMenuItem(title: "Starting…", action: nil, keyEquivalent: "")
+    private let modelMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private var settingsWindow: NSWindow?
 
+    private let settings = AppSettings.shared
     private let recorder = AudioRecorder()
     private let transcriber = Transcriber()
     private let inserter = TextInserter()
+    private let pill = PillController()
     private var hotkey: HotkeyMonitor?
+    private var cancellables = Set<AnyCancellable>()
 
     private var lastTranscript: String?
 
@@ -33,10 +40,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         requestPermissions()
 
-        hotkey = HotkeyMonitor(
-            onPress: { [weak self] in self?.startDictation() },
-            onRelease: { [weak self] in self?.stopDictation() }
-        )
+        recorder.onLevel = { [weak self] level in
+            self?.pill.updateLevel(level)
+        }
+
+        installHotkey()
+        observeSettings()
 
         Task { await loadModel() }
     }
@@ -50,14 +59,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSLog("Microphone access denied — dictation cannot work without it.")
             }
         }
-        // Accessibility: needed to observe the global hotkey and to paste into other apps.
+        // Accessibility: needed to observe the global hotkey and insert text.
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         AXIsProcessTrustedWithOptions(options)
+    }
+
+    // MARK: - Settings wiring
+
+    private func installHotkey() {
+        hotkey = HotkeyMonitor(
+            hotkey: settings.hotkey,
+            onPress: { [weak self] in self?.startDictation() },
+            onRelease: { [weak self] in self?.stopDictation() }
+        )
+    }
+
+    private func observeSettings() {
+        settings.$hotkey
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.installHotkey() }
+            .store(in: &cancellables)
+
+        settings.$modelName
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { await self.loadModel() }
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Model
 
     private func loadModel() async {
+        await MainActor.run {
+            // A model swap can land mid-recording; don't leave the mic running.
+            if case .recording = self.state { _ = self.recorder.stop() }
+            self.state = .loadingModel
+        }
         do {
             try await transcriber.load()
             await MainActor.run { self.state = .idle }
@@ -94,7 +136,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.lastTranscript = text
                     self.inserter.insert(text)
                 }
-                self.state = .idle
+                // A model swap may have taken over the state meanwhile.
+                if case .transcribing = self.state { self.state = .idle }
             }
         }
     }
@@ -107,15 +150,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusMenuItem.isEnabled = false
         menu.addItem(statusMenuItem)
 
-        let modelItem = NSMenuItem(title: "Model: \(transcriber.modelName)", action: nil, keyEquivalent: "")
-        modelItem.isEnabled = false
-        menu.addItem(modelItem)
+        modelMenuItem.isEnabled = false
+        menu.addItem(modelMenuItem)
 
         menu.addItem(.separator())
 
         let pasteLast = NSMenuItem(title: "Paste Last Transcript", action: #selector(pasteLastTranscript), keyEquivalent: "")
         pasteLast.target = self
         menu.addItem(pasteLast)
+
+        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
 
         menu.addItem(.separator())
 
@@ -133,7 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             text = "Downloading / loading model…"
         case .idle:
             symbol = "mic"
-            text = "Ready — hold Fn and speak"
+            text = "Ready — hold \(settings.hotkey.displayName) and speak"
         case .recording:
             symbol = "mic.fill"
             text = "Recording…"
@@ -146,10 +192,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusItem.button?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: text)
         statusMenuItem.title = text
+        modelMenuItem.title = "Model: \(settings.modelName)"
+
+        switch state {
+        case .recording: pill.show(.listening)
+        case .transcribing: pill.show(.transcribing)
+        default: pill.hide()
+        }
     }
+
+    // MARK: - Actions
 
     @objc private func pasteLastTranscript() {
         guard let lastTranscript else { return }
         inserter.insert(lastTranscript)
+    }
+
+    @objc private func openSettings() {
+        if settingsWindow == nil {
+            let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(settings: settings)))
+            window.title = "George's Words Settings"
+            window.styleMask = [.titled, .closable]
+            window.isReleasedWhenClosed = false
+            settingsWindow = window
+        }
+        settingsWindow?.center()
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.makeKeyAndOrderFront(nil)
     }
 }

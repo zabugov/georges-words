@@ -1,27 +1,28 @@
 import AppKit
 
-/// Watches the Fn key globally: press starts dictation, release stops it.
+/// Watches a chosen modifier key globally: press starts dictation, release
+/// stops it. Requires the Accessibility permission.
 ///
-/// Requires the Accessibility permission. Note: macOS may also assign the
-/// Fn/🌐 key to emoji/dictation — set System Settings → Keyboard →
-/// "Press 🌐 key" to "Do Nothing" for the cleanest experience.
+/// For Fn, macOS may also assign the key to emoji/dictation — set
+/// System Settings → Keyboard → "Press 🌐 key" to "Do Nothing".
 final class HotkeyMonitor {
-
-    private static let fnKeyCode: UInt16 = 63
 
     private var globalMonitor: Any?
     private var localMonitor: Any?
-    private var fnIsDown = false
+    private var keyIsDown = false
 
-    init(onPress: @escaping () -> Void, onRelease: @escaping () -> Void) {
+    init(hotkey: HotkeyChoice, onPress: @escaping () -> Void, onRelease: @escaping () -> Void) {
+        let keyCode = hotkey.keyCode
+        let flag = hotkey.flag
+
         let handler: (NSEvent) -> Void = { [weak self] event in
-            guard let self, event.keyCode == Self.fnKeyCode else { return }
-            let isDown = event.modifierFlags.contains(.function)
-            if isDown && !self.fnIsDown {
-                self.fnIsDown = true
+            guard let self, event.keyCode == keyCode else { return }
+            let isDown = event.modifierFlags.contains(flag)
+            if isDown && !self.keyIsDown {
+                self.keyIsDown = true
                 onPress()
-            } else if !isDown && self.fnIsDown {
-                self.fnIsDown = false
+            } else if !isDown && self.keyIsDown {
+                self.keyIsDown = false
                 onRelease()
             }
         }
