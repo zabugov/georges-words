@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The main app window: sidebar navigation between Home, History,
 /// Dictionary, Snippets, and Settings, with the update footer pinned to
-/// the bottom of the sidebar and About tucked behind its ? button.
+/// the bottom of the sidebar and About behind the ? in Home's toolbar.
 struct MainWindowView: View {
     @ObservedObject var status = AppStatus.shared
     @ObservedObject var settings = AppSettings.shared
@@ -58,6 +58,16 @@ struct HomeView: View {
             .frame(maxWidth: .infinity, alignment: .center)
         }
         .navigationTitle("George's Words")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    status.selectedSection = .about
+                } label: {
+                    Label("About", systemImage: "questionmark.circle")
+                }
+                .help("How to use, privacy, and app info")
+            }
+        }
     }
 
     private var header: some View {
@@ -201,20 +211,9 @@ private struct UpdateFooter: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            HStack {
-                Text("Version \(AboutView.version)")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                Spacer()
-                Button {
-                    status.selectedSection = .about
-                } label: {
-                    Image(systemName: "questionmark.circle")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
-                .help("How to use, privacy, and app info")
-            }
+            Text("Version \(AboutView.version)")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 10)
         .padding(.bottom, 10)

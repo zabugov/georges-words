@@ -13,7 +13,7 @@ enum MainSection: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     /// What's listed in the sidebar. About is deliberately not here — it's
-    /// reached through the ? button in the sidebar footer.
+    /// reached through the ? button top-right of Home (or the App menu).
     static var sidebarSections: [MainSection] {
         [.home, .history, .dictionary, .snippets, .settings]
     }
