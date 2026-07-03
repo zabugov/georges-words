@@ -33,13 +33,18 @@ cp ".build/release/GeorgesWords" "$APP_DIR/Contents/MacOS/GeorgesWords"
 cp "Info.plist" "$APP_DIR/Contents/Info.plist"
 
 IDENTITY="GeorgesWords Dev"
+if ! security find-identity -v -p codesigning 2>/dev/null | grep -q "$IDENTITY"; then
+    echo "==> No stable signing identity yet — creating one now (one-time)."
+    echo "    macOS may ask for your login password; that's expected."
+    ./setup-signing.sh || true
+fi
+
 if security find-identity -v -p codesigning 2>/dev/null | grep -q "$IDENTITY"; then
     echo "==> Signing with '$IDENTITY' (stable identity — permissions survive rebuilds)"
     codesign --force --deep --sign "$IDENTITY" "$APP_DIR"
 else
-    echo "==> Signing (ad-hoc)."
-    echo "    Tip: run ./app/setup-signing.sh once, and macOS will stop asking you"
-    echo "    to re-grant Accessibility after every rebuild."
+    echo "!! Signing ad-hoc — macOS WILL reset Microphone/Accessibility permissions"
+    echo "!! on every rebuild. Run ./app/setup-signing.sh manually to fix this."
     codesign --force --deep --sign - "$APP_DIR"
 fi
 
