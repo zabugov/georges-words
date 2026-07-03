@@ -30,6 +30,11 @@ struct TranscriptCleaner {
             )
         }
 
+        // Common spoken-number forms.
+        result = result.replacingOccurrences(of: #"(\d+)\s+percent\b"#, with: "$1%", options: .regularExpression)
+        result = result.replacingOccurrences(of: #"(\d+)\s+dollars\b"#, with: "\\$$1", options: .regularExpression)
+        result = result.replacingOccurrences(of: #"(\d+)\s+degrees\b"#, with: "$1°", options: .regularExpression)
+
         // Tidy whitespace: collapse runs, remove space before punctuation.
         result = result.replacingOccurrences(of: #"\s{2,}"#, with: " ", options: .regularExpression)
         result = result.replacingOccurrences(of: #"\s+([,.!?;:])"#, with: "$1", options: .regularExpression)

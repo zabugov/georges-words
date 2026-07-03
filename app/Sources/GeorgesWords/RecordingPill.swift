@@ -49,13 +49,40 @@ final class PillController {
             model.previewText = ""
         }
         position()
-        panel.orderFrontRegardless()
+
+        if panel.isVisible {
+            panel.alphaValue = 1
+            panel.orderFrontRegardless()
+        } else if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            panel.alphaValue = 1
+            panel.orderFrontRegardless()
+        } else {
+            panel.alphaValue = 0
+            panel.orderFrontRegardless()
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.18
+                panel.animator().alphaValue = 1
+            }
+        }
     }
 
     func hide() {
-        panel.orderOut(nil)
         model.level = 0
         model.previewText = ""
+        guard panel.isVisible else { return }
+
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            panel.orderOut(nil)
+        } else {
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.18
+                self.panel.animator().alphaValue = 0
+            }, completionHandler: { [weak self] in
+                guard let self else { return }
+                self.panel.orderOut(nil)
+                self.panel.alphaValue = 1
+            })
+        }
     }
 
     func updateLevel(_ level: Float) {
@@ -77,7 +104,12 @@ final class PillController {
     }
 
     private func position() {
-        guard let screen = NSScreen.main else { return }
+        // Follow the display the user is working on (where the mouse is),
+        // not just the primary screen.
+        let mouse = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }
+            ?? NSScreen.main
+        guard let screen else { return }
         let frame = screen.visibleFrame
         let size = panel.frame.size
         panel.setFrameOrigin(NSPoint(

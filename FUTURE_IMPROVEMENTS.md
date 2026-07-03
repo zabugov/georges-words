@@ -18,7 +18,7 @@ The gap that matters most — commercial feels instant.
 - [ ] **(S)** **Evaluate `distil-large-v3` as the default STT model** (currently `small.en`) — measure accuracy gain vs latency cost on real dictations.
 - [ ] **(M)** **Dictionary biasing in the speech model itself** — feed personal-dictionary terms to Whisper as a decoding prompt (WhisperKit `promptTokens`) so names come out right at transcription time, not just fixed afterwards. This is how commercial nails jargon on the first pass.
 - [ ] **(M/L)** **Auto-learning dictionary** — learn from the user's corrections so misheard words come out right next time. Not trivial: the app inserts text into *other* apps and then loses sight of it, so noticing a correction requires re-reading the focused text field (Accessibility API) a few seconds after insertion and diffing it against what was inserted. Sketch: after each insertion, snapshot the inserted string; ~5 s later read the field's value via AX, align the two, and extract word-level substitutions (e.g. "coober netties" → "Kubernetes"); collect candidates locally and surface them in Settings as one-click "add to dictionary" suggestions (auto-adding risks learning garbage). Fallback for apps where AX reads fail: a "Correct last transcript…" menu action where the user pastes/edits the right version and the diff is learned from that. All local, per ADR 0001.
-- [ ] **(S)** **Number/date/format normalization** in the rule pass — "twenty five percent" → "25%", "three thirty pm" → "3:30 PM" (Whisper does some of this; catch the rest).
+- [ ] **(S)** **Spelled-out number normalization** — "twenty five percent" → "25%", "three thirty pm" → "3:30 PM". (Digit-adjacent cases like "50 percent" → "50%" are done; the spelled-out parsing remains.)
 
 ## 3. Formatting intelligence
 
@@ -31,18 +31,13 @@ The gap that matters most — commercial feels instant.
 ## 4. Feature parity with commercial Flow
 
 - [ ] **(M)** **Multilingual dictation** — switch to a multilingual STT model with language auto-detect; commercial supports 100+ languages with mid-sentence switching.
-- [ ] **(S)** **Hands-free toggle mode** — tap-to-start / tap-to-stop as an alternative to hold-to-talk (commercial has both).
-- [ ] **(S)** **Esc cancels an in-progress dictation** (discard recording without inserting).
 - [ ] **(M)** **Snippets with placeholders** — "my intro ⟨name⟩" → expansion with a tab-through blank.
 - [ ] **(M)** **Command-mode follow-ups** — after an edit, speak another instruction that applies to the same text ("now make it friendlier") without reselecting.
-- [ ] **(S)** **Basic usage stats** — words dictated, time saved vs typing (commercial's dashboard), computed and stored locally.
 
 ## 5. UX & fit-and-finish
 
 - [ ] **(S)** **App icon** (menu bar + app bundle).
 - [ ] **(M)** **First-run onboarding window** — walk through mic/Accessibility permissions, the 🌐-key setting, model download progress, and a "try it here" practice field. Currently the printed checklist in `build.sh` does this job poorly.
-- [ ] **(S)** **Pill polish** — animate in/out, handle multiple displays (follow the screen with the focused window, not `NSScreen.main`), respect Reduce Motion.
-- [ ] **(S)** **Menu bar icon animation** while recording (level-reactive, like commercial's).
 - [ ] **(M)** **Settings redesign into tabs** (General / Formatting / Dictionary / Snippets / Advanced) as the option count grows.
 - [ ] **(M)** **Arbitrary hotkey capture** — record any key/combo in Settings instead of the fixed three choices.
 
@@ -50,8 +45,6 @@ The gap that matters most — commercial feels instant.
 
 - [ ] **(M)** **Secure-input awareness** — detect password fields (`IsSecureEventInputEnabled`) and refuse to record/insert, with a pill explanation.
 - [ ] **(M)** **Per-app insertion quirks** — audit the AX path in Electron apps, terminals (trailing-newline behavior), Java apps, and browsers; maintain a fallback list.
-- [ ] **(S)** **Clipboard restore robustness** — preserve non-string pasteboard contents (images, rich text) across the paste fallback, not just plain text.
-- [ ] **(S)** **Input-device changes** — handle AirPods connecting/disconnecting mid-session without a stale audio engine.
 - [ ] **(M)** **Graceful degradation UI** — one place that shows why something isn't working (mic permission, AX permission, model missing, Ollama down) instead of NSLog.
 
 ## 7. Distribution & maintenance

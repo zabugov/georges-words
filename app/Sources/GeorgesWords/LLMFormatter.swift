@@ -63,6 +63,10 @@ final class LLMFormatter {
          "We're deploying VoiceInk to Kubernetes tomorrow."),
         ("STYLE: a casual chat message\nTRANSCRIPT: we need three things first the budget second the timeline and third the staffing plan",
          "We need three things:\n1. The budget\n2. The timeline\n3. The staffing plan"),
+        ("STYLE: technical text — preserve code identifiers, file names, commands, and jargon exactly as spoken\nTRANSCRIPT: run git status then git pull dash dash ff only",
+         "Run `git status`, then `git pull --ff-only`."),
+        ("STYLE: professional writing — complete sentences, clear and courteous\nTRANSCRIPT: hi sarah thanks for the notes um two things first i agree we should push the launch also can you send the final deck before friday",
+         "Hi Sarah,\n\nThanks for the notes. Two things: first, I agree we should push the launch. Also, can you send the final deck before Friday?"),
     ]
 
     private static func prefixMessages() -> [[String: String]] {

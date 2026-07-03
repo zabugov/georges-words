@@ -76,7 +76,18 @@ final class TextInserter {
 
     private func insertViaPasteboard(_ text: String) {
         let pasteboard = NSPasteboard.general
-        let savedClipboard = pasteboard.string(forType: .string)
+
+        // Snapshot ALL current contents — rich text, images, file
+        // references — not just the plain-string representation.
+        let saved: [[NSPasteboard.PasteboardType: Data]] = (pasteboard.pasteboardItems ?? []).map { item in
+            var copy: [NSPasteboard.PasteboardType: Data] = [:]
+            for type in item.types {
+                if let data = item.data(forType: type) {
+                    copy[type] = data
+                }
+            }
+            return copy
+        }
 
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
@@ -87,9 +98,15 @@ final class TextInserter {
         // what the user had on it.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             pasteboard.clearContents()
-            if let savedClipboard {
-                pasteboard.setString(savedClipboard, forType: .string)
+            guard !saved.isEmpty else { return }
+            let items = saved.map { entry -> NSPasteboardItem in
+                let item = NSPasteboardItem()
+                for (type, data) in entry {
+                    item.setData(data, forType: type)
+                }
+                return item
             }
+            pasteboard.writeObjects(items)
         }
     }
 

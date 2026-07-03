@@ -41,6 +41,21 @@ final class AudioRecorder {
     /// Called on the main thread with a 0…1 loudness estimate while recording.
     var onLevel: ((Float) -> Void)?
 
+    /// Called on the main thread when the audio hardware configuration
+    /// changes (e.g. AirPods connect/disconnect) — a recording in flight is
+    /// using a stale engine graph at that point.
+    var onConfigurationChange: (() -> Void)?
+
+    init() {
+        NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: .main
+        ) { [weak self] _ in
+            self?.onConfigurationChange?()
+        }
+    }
+
     func start() throws {
         lock.lock()
         samples.removeAll(keepingCapacity: true)

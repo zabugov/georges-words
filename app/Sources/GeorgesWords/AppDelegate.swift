@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let statusMenuItem = NSMenuItem(title: "Starting…", action: nil, keyEquivalent: "")
     private let modelMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let timingMenuItem = NSMenuItem(title: "Last: —", action: nil, keyEquivalent: "")
+    private let statsMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let updateMenuItem = NSMenuItem(title: "Check for Updates…", action: nil, keyEquivalent: "")
     private var settingsWindow: NSWindow?
     private var historyWindow: NSWindow?
@@ -45,6 +46,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var commandSelection: String?
     private var lastTranscript: String?
 
+    // Quick-tap toggle (hands-free) state.
+    private var pressStartedAt: Date?
+    private var toggleLatched = false
+    private var ignoreNextRelease = false
+    private var escMonitorGlobal: Any?
+    private var escMonitorLocal: Any?
+
     private var state: State = .loadingModel {
         didSet { updateStatusUI() }
     }
@@ -57,8 +65,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         requestPermissions()
 
         recorder.onLevel = { [weak self] level in
-            self?.pill.updateLevel(level)
+            guard let self else { return }
+            self.pill.updateLevel(level)
+            // Menu-bar icon dances with the voice while recording.
+            if case .recording = self.state {
+                let image = NSImage(
+                    systemSymbolName: "waveform",
+                    variableValue: Double(min(1, level * 1.2)),
+                    accessibilityDescription: "Recording"
+                ) ?? NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Recording")
+                self.statusItem.button?.image = image
+            }
         }
+
+        recorder.onConfigurationChange = { [weak self] in
+            guard let self, case .recording = self.state else { return }
+            // The engine graph is stale once the input device changes
+            // (AirPods connected/disconnected) — cancel cleanly.
+            self.cancelRecording(message: "Audio device changed — dictation cancelled")
+        }
+
+        installEscMonitor()
 
         updater.onProgress = { [weak self] text in
             guard let self else { return }
@@ -174,7 +201,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Recording
 
+    private func installEscMonitor() {
+        let handle: (NSEvent) -> Bool = { [weak self] event in
+            guard let self, event.keyCode == 53, case .recording = self.state else { return false }
+            self.cancelRecording(message: "Cancelled")
+            return true
+        }
+        escMonitorGlobal = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { _ = handle($0) }
+        escMonitorLocal = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            handle(event) ? nil : event
+        }
+    }
+
+    /// Discard the in-progress recording without inserting anything.
+    private func cancelRecording(message: String) {
+        guard case .recording = state else { return }
+        previewTask?.cancel()
+        _ = recorder.stop()
+        toggleLatched = false
+        ignoreNextRelease = false
+        commandSelection = nil
+        state = .idle
+        pill.flash(message, seconds: 1.5)
+    }
+
     private func beginRecording(_ mode: Mode) {
+        // Second press while latched = the stop signal for toggle mode.
+        if toggleLatched, case .recording = state, self.mode == mode {
+            toggleLatched = false
+            ignoreNextRelease = true
+            finishRecording(mode)
+            return
+        }
+
         guard case .idle = state else { return }
 
         if mode == .command {
@@ -186,6 +245,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         self.mode = mode
+        pressStartedAt = Date()
         do {
             try recorder.start()
             SoundFeedback.recordingStarted()
@@ -203,7 +263,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Hotkey release: either finish, or — for a quick tap — latch into
+    /// hands-free toggle mode (tap again to stop).
     private func endRecording(_ mode: Mode) {
+        if ignoreNextRelease {
+            ignoreNextRelease = false
+            return
+        }
+        guard case .recording = state, self.mode == mode else { return }
+        if toggleLatched { return }
+        if let pressStartedAt, Date().timeIntervalSince(pressStartedAt) < 0.35 {
+            toggleLatched = true
+            return
+        }
+        finishRecording(mode)
+    }
+
+    private func finishRecording(_ mode: Mode) {
         guard case .recording = state, self.mode == mode else { return }
         previewTask?.cancel()
         let samples = AudioTrim.trimSilence(recorder.stop())
@@ -228,6 +304,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     if !text.isEmpty {
                         self.lastTranscript = text
                         HistoryStore.shared.add(text)
+                        StatsStore.record(words: text.split(separator: " ").count)
                         outcome = self.inserter.insert(text)
                     }
                     // A model swap may have taken over the state meanwhile.
@@ -352,6 +429,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         timingMenuItem.isEnabled = false
         menu.addItem(timingMenuItem)
 
+        statsMenuItem.isEnabled = false
+        menu.addItem(statsMenuItem)
+
         menu.addItem(.separator())
 
         let pasteLast = NSMenuItem(title: "Paste Last Transcript", action: #selector(pasteLastTranscript), keyEquivalent: "")
@@ -400,6 +480,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: text)
         statusMenuItem.title = text
         modelMenuItem.title = "Model: \(settings.engine == .parakeet ? "parakeet-tdt-0.6b-v3" : settings.modelName)"
+        statsMenuItem.title = StatsStore.summary
 
         switch state {
         case .recording:
