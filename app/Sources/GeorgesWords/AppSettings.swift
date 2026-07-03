@@ -78,6 +78,25 @@ final class AppSettings: ObservableObject {
             .filter { !$0.isEmpty }
     }
 
+    /// Hold this key with text selected to speak an edit instruction.
+    @Published var commandHotkey: HotkeyChoice {
+        didSet { defaults.set(commandHotkey.rawValue, forKey: "CommandHotkey") }
+    }
+
+    /// Show a live partial transcript in the pill while speaking.
+    @Published var previewEnabled: Bool {
+        didSet { defaults.set(previewEnabled, forKey: "PreviewEnabled") }
+    }
+
+    /// Voice shortcuts: say the trigger, get the expansion.
+    @Published var snippets: [Snippet] {
+        didSet {
+            if let data = try? JSONEncoder().encode(snippets) {
+                defaults.set(data, forKey: "Snippets")
+            }
+        }
+    }
+
     static let modelOptions: [(name: String, label: String)] = [
         ("base.en", "base.en — fastest, rough accuracy (~150 MB)"),
         ("small.en", "small.en — good balance (default, ~500 MB)"),
@@ -92,6 +111,14 @@ final class AppSettings: ObservableObject {
         llmEnabled = defaults.object(forKey: "LLMEnabled") as? Bool ?? true
         llmModel = defaults.string(forKey: "LLMModel") ?? "qwen2.5:3b"
         dictionaryText = defaults.string(forKey: "Dictionary") ?? ""
+        commandHotkey = HotkeyChoice(rawValue: defaults.string(forKey: "CommandHotkey") ?? "") ?? .rightOption
+        previewEnabled = defaults.object(forKey: "PreviewEnabled") as? Bool ?? true
+        if let data = defaults.data(forKey: "Snippets"),
+           let saved = try? JSONDecoder().decode([Snippet].self, from: data) {
+            snippets = saved
+        } else {
+            snippets = []
+        }
     }
 
     private func applyLaunchAtLogin() {

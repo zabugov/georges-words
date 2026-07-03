@@ -41,6 +41,14 @@ final class AudioRecorder {
         try engine.start()
     }
 
+    /// Copy of the samples captured so far — used by the live-preview loop
+    /// while recording continues.
+    func snapshot() -> [Float] {
+        lock.lock()
+        defer { lock.unlock() }
+        return samples
+    }
+
     func stop() -> [Float] {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()

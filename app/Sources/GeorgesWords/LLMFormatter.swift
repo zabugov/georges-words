@@ -108,6 +108,62 @@ final class LLMFormatter {
         return true
     }
 
+    // MARK: - Command mode
+
+    private static let commandSystemPrompt = """
+    You are a text editor. Each user message contains an INSTRUCTION and a TEXT. \
+    Apply the instruction to the text. Reply with the edited text only — no preamble, \
+    no quotes, no explanations. If the instruction is unclear, return the text unchanged.
+    """
+
+    private static let commandFewShot: [(String, String)] = [
+        ("INSTRUCTION: make this shorter\nTEXT: I just wanted to reach out and see if maybe you had a chance to look at the document I sent over last week.",
+         "Did you get a chance to look at the document I sent last week?"),
+        ("INSTRUCTION: make it a bulleted list\nTEXT: We need the budget, the timeline and the staffing plan.",
+         "- The budget\n- The timeline\n- The staffing plan"),
+        ("INSTRUCTION: translate to french\nTEXT: See you tomorrow at noon.",
+         "À demain à midi."),
+    ]
+
+    /// Command mode: apply a spoken instruction to the selected text.
+    /// Unlike the cleanup pass there is no length sanity check — commands
+    /// like "expand on this" legitimately grow the text.
+    func applyCommand(_ instruction: String, to text: String, model: String) async -> String? {
+        var messages: [[String: String]] = [
+            ["role": "system", "content": Self.commandSystemPrompt]
+        ]
+        for (input, output) in Self.commandFewShot {
+            messages.append(["role": "user", "content": input])
+            messages.append(["role": "assistant", "content": output])
+        }
+        messages.append(["role": "user", "content": "INSTRUCTION: \(instruction)\nTEXT: \(text)"])
+
+        let body: [String: Any] = [
+            "model": model,
+            "messages": messages,
+            "stream": false,
+            "options": ["temperature": 0.2],
+        ]
+
+        var request = URLRequest(url: Self.endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 20
+        guard let data = try? JSONSerialization.data(withJSONObject: body) else { return nil }
+        request.httpBody = data
+
+        do {
+            let (responseData, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200,
+                  let decoded = try? JSONDecoder().decode(ChatResponse.self, from: responseData)
+            else { return nil }
+            let output = decoded.message.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            return output.isEmpty ? nil : output
+        } catch {
+            return nil
+        }
+    }
+
     /// Quick availability probe for the Settings UI.
     static func ollamaIsRunning() async -> Bool {
         var request = URLRequest(url: URL(string: "http://127.0.0.1:11434/api/version")!)

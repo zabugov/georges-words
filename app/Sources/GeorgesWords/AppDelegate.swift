@@ -10,14 +10,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case loadingModel
         case idle
         case recording
-        case transcribing
+        case processing
         case error(String)
+    }
+
+    /// What the current recording is for.
+    private enum Mode {
+        case dictation
+        case command
     }
 
     private var statusItem: NSStatusItem!
     private let statusMenuItem = NSMenuItem(title: "Starting…", action: nil, keyEquivalent: "")
     private let modelMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private var settingsWindow: NSWindow?
+    private var historyWindow: NSWindow?
 
     private let settings = AppSettings.shared
     private let recorder = AudioRecorder()
@@ -26,9 +33,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let llmFormatter = LLMFormatter()
     private let inserter = TextInserter()
     private let pill = PillController()
-    private var hotkey: HotkeyMonitor?
+    private var dictationHotkey: HotkeyMonitor?
+    private var commandHotkey: HotkeyMonitor?
     private var cancellables = Set<AnyCancellable>()
+    private var previewTask: Task<Void, Never>?
 
+    private var mode: Mode = .dictation
+    private var commandSelection: String?
     private var lastTranscript: String?
 
     private var state: State = .loadingModel {
@@ -46,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.pill.updateLevel(level)
         }
 
-        installHotkey()
+        installHotkeys()
         observeSettings()
 
         Task { await loadModel() }
@@ -61,26 +72,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSLog("Microphone access denied — dictation cannot work without it.")
             }
         }
-        // Accessibility: needed to observe the global hotkey and insert text.
+        // Accessibility: needed to observe the global hotkeys and insert text.
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         AXIsProcessTrustedWithOptions(options)
     }
 
     // MARK: - Settings wiring
 
-    private func installHotkey() {
-        hotkey = HotkeyMonitor(
+    private func installHotkeys() {
+        dictationHotkey = HotkeyMonitor(
             hotkey: settings.hotkey,
-            onPress: { [weak self] in self?.startDictation() },
-            onRelease: { [weak self] in self?.stopDictation() }
+            onPress: { [weak self] in self?.beginRecording(.dictation) },
+            onRelease: { [weak self] in self?.endRecording(.dictation) }
         )
+        // Command mode is disabled when both features share a key.
+        if settings.commandHotkey != settings.hotkey {
+            commandHotkey = HotkeyMonitor(
+                hotkey: settings.commandHotkey,
+                onPress: { [weak self] in self?.beginRecording(.command) },
+                onRelease: { [weak self] in self?.endRecording(.command) }
+            )
+        } else {
+            commandHotkey = nil
+        }
     }
 
     private func observeSettings() {
         settings.$hotkey
+            .combineLatest(settings.$commandHotkey)
             .dropFirst()
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.installHotkey() }
+            .sink { [weak self] _, _ in self?.installHotkeys() }
             .store(in: &cancellables)
 
         settings.$modelName
@@ -100,6 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         await MainActor.run {
             // A model swap can land mid-recording; don't leave the mic running.
             if case .recording = self.state { _ = self.recorder.stop() }
+            self.previewTask?.cancel()
             self.state = .loadingModel
         }
         do {
@@ -110,54 +133,101 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: - Dictation flow
+    // MARK: - Recording
 
-    private func startDictation() {
+    private func beginRecording(_ mode: Mode) {
         guard case .idle = state else { return }
+
+        if mode == .command {
+            guard let selection = SelectionReader.read(), !selection.isEmpty else {
+                pill.flash("Select some text first, then hold \(settings.commandHotkey.displayName)")
+                return
+            }
+            commandSelection = selection
+        }
+
+        self.mode = mode
         do {
             try recorder.start()
             state = .recording
+            if mode == .dictation && settings.previewEnabled {
+                startPreviewLoop()
+            }
         } catch {
             state = .error("Microphone error: \(error.localizedDescription)")
         }
     }
 
-    private func stopDictation() {
-        guard case .recording = state else { return }
+    private func endRecording(_ mode: Mode) {
+        guard case .recording = state, self.mode == mode else { return }
+        previewTask?.cancel()
         let samples = recorder.stop()
+
         // Ignore accidental taps shorter than ~0.3 s of audio (16 kHz mono).
         guard samples.count > 4800 else {
             state = .idle
             return
         }
+
         // Capture the target app now, while it is still frontmost.
         let context = AppContext.current()
-        state = .transcribing
-        Task {
-            let text = await self.processTranscript(samples: samples, context: context)
-            await MainActor.run {
-                if !text.isEmpty {
-                    self.lastTranscript = text
-                    self.inserter.insert(text)
+        state = .processing
+
+        switch mode {
+        case .dictation:
+            Task {
+                let text = await self.processDictation(samples: samples, context: context)
+                await MainActor.run {
+                    if !text.isEmpty {
+                        self.lastTranscript = text
+                        HistoryStore.shared.add(text)
+                        self.inserter.insert(text)
+                    }
+                    // A model swap may have taken over the state meanwhile.
+                    if case .processing = self.state { self.state = .idle }
                 }
-                // A model swap may have taken over the state meanwhile.
-                if case .transcribing = self.state { self.state = .idle }
+            }
+        case .command:
+            let selection = commandSelection ?? ""
+            commandSelection = nil
+            Task {
+                let instruction = await self.transcriber.transcribe(samples)
+                var result: String?
+                if !instruction.isEmpty && !selection.isEmpty {
+                    result = await self.llmFormatter.applyCommand(instruction, to: selection, model: self.settings.llmModel)
+                }
+                await MainActor.run {
+                    if case .processing = self.state { self.state = .idle }
+                    if let result, !result.isEmpty {
+                        self.lastTranscript = result
+                        HistoryStore.shared.add(result)
+                        self.inserter.insert(result)
+                    } else {
+                        self.pill.flash(instruction.isEmpty
+                            ? "Didn't catch that — try again"
+                            : "Command mode needs Ollama running")
+                    }
+                }
             }
         }
     }
 
-    /// transcribe → rule cleanup → (optional) local-LLM polish.
-    private func processTranscript(samples: [Float], context: AppContext) async -> String {
+    /// transcribe → rule cleanup → snippets → (optional) local-LLM polish.
+    private func processDictation(samples: [Float], context: AppContext) async -> String {
         let raw = await transcriber.transcribe(samples)
         guard !raw.isEmpty else { return "" }
 
         let dictionary = settings.dictionaryTerms
-        let cleaned = cleaner.clean(raw, dictionary: dictionary)
+        var cleaned = cleaner.clean(raw, dictionary: dictionary)
 
-        // Very short utterances don't need a rewrite, and skipping the LLM
-        // keeps them near-instant.
+        let (expanded, snippetApplied) = SnippetExpander.apply(settings.snippets, to: cleaned)
+        cleaned = expanded
+
+        // Skip the LLM when a snippet fired (its expansion must be inserted
+        // verbatim) and for very short utterances (nothing to restructure,
+        // and skipping keeps them near-instant).
         let wordCount = cleaned.split(separator: " ").count
-        guard settings.llmEnabled, wordCount >= 5 else { return cleaned }
+        guard settings.llmEnabled, !snippetApplied, wordCount >= 5 else { return cleaned }
 
         if let polished = await llmFormatter.format(
             cleaned,
@@ -168,6 +238,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return polished
         }
         return cleaned
+    }
+
+    // MARK: - Live preview
+
+    /// While recording, periodically transcribe the audio-so-far and show it
+    /// in the pill. The Transcriber actor serializes these with the final
+    /// pass, so they can never collide.
+    private func startPreviewLoop() {
+        previewTask?.cancel()
+        previewTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                guard let self, !Task.isCancelled else { return }
+
+                let stillRecording = await MainActor.run { () -> Bool in
+                    if case .recording = self.state { return true }
+                    return false
+                }
+                guard stillRecording else { return }
+
+                let snapshot = self.recorder.snapshot()
+                // Need at least 1 s of audio; stop previewing past 30 s to
+                // keep re-transcription cost bounded.
+                guard snapshot.count > 16_000, snapshot.count < 16_000 * 30 else { continue }
+
+                let text = await self.transcriber.transcribe(snapshot)
+                guard !Task.isCancelled, !text.isEmpty else { continue }
+                await MainActor.run {
+                    if case .recording = self.state {
+                        self.pill.updatePreview(text)
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Menu bar UI
@@ -186,6 +290,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let pasteLast = NSMenuItem(title: "Paste Last Transcript", action: #selector(pasteLastTranscript), keyEquivalent: "")
         pasteLast.target = self
         menu.addItem(pasteLast)
+
+        let historyItem = NSMenuItem(title: "History…", action: #selector(openHistory), keyEquivalent: "y")
+        historyItem.target = self
+        menu.addItem(historyItem)
 
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
@@ -210,10 +318,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             text = "Ready — hold \(settings.hotkey.displayName) and speak"
         case .recording:
             symbol = "mic.fill"
-            text = "Recording…"
-        case .transcribing:
+            text = mode == .dictation ? "Recording…" : "Recording command…"
+        case .processing:
             symbol = "ellipsis.circle"
-            text = "Transcribing…"
+            text = mode == .dictation ? "Transcribing…" : "Applying edit…"
         case .error(let message):
             symbol = "exclamationmark.triangle"
             text = message
@@ -223,9 +331,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         modelMenuItem.title = "Model: \(settings.modelName)"
 
         switch state {
-        case .recording: pill.show(.listening)
-        case .transcribing: pill.show(.transcribing)
-        default: pill.hide()
+        case .recording:
+            pill.show(mode == .dictation ? .listening : .commandListening)
+        case .processing:
+            pill.show(mode == .dictation ? .transcribing : .commandWorking)
+        default:
+            pill.hide()
         }
     }
 
@@ -247,5 +358,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow?.center()
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    @objc private func openHistory() {
+        if historyWindow == nil {
+            let window = NSWindow(contentViewController: NSHostingController(rootView: HistoryView(store: HistoryStore.shared)))
+            window.title = "History"
+            window.styleMask = [.titled, .closable]
+            window.isReleasedWhenClosed = false
+            historyWindow = window
+        }
+        historyWindow?.center()
+        NSApp.activate(ignoringOtherApps: true)
+        historyWindow?.makeKeyAndOrderFront(nil)
     }
 }

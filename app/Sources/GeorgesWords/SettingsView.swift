@@ -17,7 +17,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Hotkey") {
+            Section("Hotkeys") {
                 Picker("Hold to dictate", selection: $settings.hotkey) {
                     ForEach(HotkeyChoice.allCases) { choice in
                         Text(choice.displayName).tag(choice)
@@ -28,6 +28,24 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+                Picker("Hold for command mode", selection: $settings.commandHotkey) {
+                    ForEach(HotkeyChoice.allCases) { choice in
+                        Text(choice.displayName).tag(choice)
+                    }
+                }
+                if settings.commandHotkey == settings.hotkey {
+                    Text("⚠️ Same key as dictation — command mode is disabled until you pick a different key.")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                } else {
+                    Text("Select text anywhere, hold \(settings.commandHotkey.displayName), and speak an instruction — “make this shorter”, “make it a bulleted list”, “translate to French”. Requires the local LLM (Ollama).")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Toggle("Live preview while speaking", isOn: $settings.previewEnabled)
+                Text("Shows a rolling transcript in the pill as you talk. Costs some extra compute while recording.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             Section("AI polish (local)") {
@@ -64,12 +82,35 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Snippets") {
+                ForEach($settings.snippets) { $snippet in
+                    HStack {
+                        TextField("Say…", text: $snippet.trigger)
+                        Image(systemName: "arrow.right")
+                            .foregroundStyle(.secondary)
+                        TextField("Insert…", text: $snippet.expansion)
+                        Button {
+                            settings.snippets.removeAll { $0.id == snippet.id }
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+                Button("Add Snippet") {
+                    settings.snippets.append(Snippet(trigger: "", expansion: ""))
+                }
+                Text("Voice shortcuts: saying the trigger phrase inserts the expansion exactly as written — e.g. “my sign off” → your full email signature.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             Section {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 620)
+        .frame(width: 480, height: 660)
         .task { ollamaRunning = await LLMFormatter.ollamaIsRunning() }
     }
 }

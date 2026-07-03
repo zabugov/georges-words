@@ -5,11 +5,14 @@ import WhisperKit
 ///
 /// The model is downloaded once from Hugging Face on first launch and cached
 /// locally; transcription itself is always fully offline.
-final class Transcriber {
+///
+/// An actor so calls serialize: the live-preview loop and the final
+/// transcription can never run through the model concurrently.
+actor Transcriber {
 
     private var whisperKit: WhisperKit?
 
-    var modelName: String { AppSettings.shared.modelName }
+    nonisolated var modelName: String { AppSettings.shared.modelName }
 
     func load() async throws {
         whisperKit = nil

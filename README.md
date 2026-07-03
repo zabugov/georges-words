@@ -6,7 +6,14 @@ A system-wide dictation app for macOS, in the spirit of [commercial Flow](https:
 
 ## Status
 
-🚧 **M3 — the formatting layer.** Hold a hotkey → speak → release → *polished* text appears at your cursor, fully on-device: filler words stripped, self-corrections applied ("Tuesday — no wait, Friday" → "Friday"), personal-dictionary spellings enforced, and tone matched to the app you're dictating into (casual in Slack, professional in Mail, literal in editors/terminals). Formatting is two-stage: instant rule-based cleanup always, plus an optional rewrite by a local LLM via [Ollama](https://ollama.com) — see below. See [`docs/research/`](docs/research/) for the commercial Flow deep-dive and [`docs/decisions/`](docs/decisions/) for the ADRs.
+🚧 **M4 — power features.** The full loop: hold a hotkey → speak → release → *polished* text appears at your cursor, fully on-device — filler words stripped, self-corrections applied ("Tuesday — no wait, Friday" → "Friday"), personal-dictionary spellings enforced, tone matched to the app you're dictating into. Plus:
+
+- **Live preview** — a rolling transcript appears in the pill *while* you speak.
+- **Command mode** — select text anywhere, hold the command key (default Right ⌥), and speak an instruction: "make this shorter", "make it a bulleted list", "translate to French". The selection is replaced with the edit (requires Ollama).
+- **Snippets** — say a trigger phrase ("my sign off"), get your exact boilerplate inserted.
+- **History** — the last 200 transcripts, stored only on this Mac, one click to copy, one click to clear.
+
+Formatting is two-stage: instant rule-based cleanup always, plus an optional rewrite by a local LLM via [Ollama](https://ollama.com) — see below. See [`docs/research/`](docs/research/) for the commercial Flow deep-dive and [`docs/decisions/`](docs/decisions/) for the ADRs.
 
 ## Quick start (on your Mac)
 
@@ -59,10 +66,14 @@ georges-words/
 │       ├── AudioRecorder.swift   # AVAudioEngine → 16 kHz mono + level meter
 │       ├── Transcriber.swift     # WhisperKit (CoreML / Neural Engine)
 │       ├── TextInserter.swift    # AX-API insertion → clipboard ⌘V fallback
+│       ├── SelectionReader.swift # read selected text (AX → ⌘C fallback)
 │       ├── TranscriptCleaner.swift # stage 1: rule-based cleanup + dictionary
-│       ├── LLMFormatter.swift    # stage 2: local LLM rewrite via Ollama
+│       ├── LLMFormatter.swift    # stage 2: local LLM rewrite + command mode
 │       ├── AppContext.swift      # frontmost-app bundle ID → tone profile
-│       ├── RecordingPill.swift   # floating non-activating status pill
+│       ├── Snippets.swift        # voice shortcuts (trigger → expansion)
+│       ├── HistoryStore.swift    # local-only transcript history
+│       ├── HistoryView.swift     # history window
+│       ├── RecordingPill.swift   # floating pill + live preview
 │       └── SettingsView.swift    # SwiftUI settings window
 └── docs/
     ├── research/        # commercial Flow + local STT deep-dive

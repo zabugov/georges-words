@@ -6,14 +6,18 @@ import SwiftUI
 /// dictated into.
 final class PillController {
 
-    enum Phase {
+    enum Phase: Equatable {
         case listening
+        case commandListening
         case transcribing
+        case commandWorking
+        case message(String)
     }
 
     final class Model: ObservableObject {
         @Published var phase: Phase = .listening
         @Published var level: Float = 0
+        @Published var previewText: String = ""
     }
 
     private let panel: NSPanel
@@ -21,7 +25,7 @@ final class PillController {
 
     init() {
         panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 200, height: 44),
+            contentRect: NSRect(x: 0, y: 0, width: 380, height: 44),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -38,7 +42,12 @@ final class PillController {
 
     func show(_ phase: Phase) {
         model.phase = phase
-        if phase == .transcribing { model.level = 0 }
+        if phase != .listening && phase != .commandListening {
+            model.level = 0
+        }
+        if phase == .listening || phase == .commandListening {
+            model.previewText = ""
+        }
         position()
         panel.orderFrontRegardless()
     }
@@ -46,10 +55,25 @@ final class PillController {
     func hide() {
         panel.orderOut(nil)
         model.level = 0
+        model.previewText = ""
     }
 
     func updateLevel(_ level: Float) {
         model.level = level
+    }
+
+    /// Live partial transcript while recording.
+    func updatePreview(_ text: String) {
+        model.previewText = text
+    }
+
+    /// Show a short informational message, then hide.
+    func flash(_ text: String) {
+        show(.message(text))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            guard let self, case .message = self.model.phase else { return }
+            self.hide()
+        }
     }
 
     private func position() {
@@ -69,13 +93,25 @@ private struct PillView: View {
     var body: some View {
         HStack(spacing: 10) {
             switch model.phase {
-            case .listening:
-                LevelBars(level: model.level)
-                Text("Listening…")
+            case .listening, .commandListening:
+                LevelBars(level: model.level, color: model.phase == .listening ? .red : .purple)
+                if model.previewText.isEmpty {
+                    Text(model.phase == .listening ? "Listening…" : "Command…")
+                } else {
+                    Text(model.previewText)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                        .frame(maxWidth: 280)
+                }
             case .transcribing:
-                ProgressView()
-                    .controlSize(.small)
+                ProgressView().controlSize(.small)
                 Text("Polishing…")
+            case .commandWorking:
+                ProgressView().controlSize(.small)
+                Text("Editing…")
+            case .message(let text):
+                Image(systemName: "info.circle")
+                Text(text)
             }
         }
         .font(.system(size: 13, weight: .medium))
@@ -90,6 +126,7 @@ private struct PillView: View {
 /// Five bars that dance with the microphone level.
 private struct LevelBars: View {
     let level: Float
+    var color: Color = .red
 
     // Each bar responds to the level a little differently so the meter
     // looks alive rather than mechanical.
@@ -99,7 +136,7 @@ private struct LevelBars: View {
         HStack(spacing: 3) {
             ForEach(0..<5, id: \.self) { index in
                 Capsule()
-                    .fill(Color.red)
+                    .fill(color)
                     .frame(width: 3, height: barHeight(index))
                     .animation(.easeOut(duration: 0.1), value: level)
             }
