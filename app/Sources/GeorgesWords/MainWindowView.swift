@@ -50,6 +50,7 @@ struct HomeView: View {
     @State private var ollamaRunning: Bool?
     @State private var ollamaModels: [String]?
     @State private var recheckTick = 0
+    @ObservedObject private var managedEngine = ManagedOllama.shared
 
     var body: some View {
         ScrollView {
@@ -195,6 +196,8 @@ struct HomeView: View {
 
         if !settings.llmEnabled {
             rows.append(HealthRow(id: "polish", level: .ok, title: "AI polish", detail: "Off — rule-based cleanup only"))
+        } else if let managedRow {
+            rows.append(managedRow)
         } else if ollamaRunning == nil {
             rows.append(HealthRow(id: "polish", level: .warn, title: "AI polish", detail: "Checking Ollama…"))
         } else if ollamaRunning == false {
@@ -214,6 +217,33 @@ struct HomeView: View {
         }
 
         return rows
+    }
+
+    /// The managed engine's (7.7) live state, when it's doing something
+    /// worth showing. nil = fall back to the normal Ollama checks.
+    private var managedRow: HealthRow? {
+        guard settings.managedPolishEnabled else { return nil }
+        let model = settings.effectiveLLMModel
+        switch managedEngine.phase {
+        case .off, .deferringToUserOllama:
+            return nil
+        case .downloadingEngine:
+            return HealthRow(id: "polish", level: .warn, title: "AI polish", detail: "Downloading the polish engine (~120 MB, one-time)…")
+        case .startingEngine:
+            return HealthRow(id: "polish", level: .warn, title: "AI polish", detail: "Starting the managed polish engine…")
+        case .downloadingModel(let percent):
+            let suffix = percent.map { " — \($0)%" } ?? "…"
+            return HealthRow(id: "polish", level: .warn, title: "AI polish", detail: "Downloading \(model)\(suffix)")
+        case .ready:
+            return HealthRow(id: "polish", level: .ok, title: "AI polish", detail: "\(model) via the managed engine, ready")
+        case .failed(let message):
+            return HealthRow(
+                id: "polish", level: .warn, title: "AI polish",
+                detail: "Managed engine: \(message) Dictation still works with rule-based cleanup.",
+                fixTitle: "Retry",
+                fix: { ManagedOllama.shared.ensureReady(model: model) }
+            )
+        }
     }
 
     private var healthCard: some View {

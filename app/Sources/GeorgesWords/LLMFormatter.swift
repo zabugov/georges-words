@@ -20,7 +20,13 @@ import Foundation
 /// caller falls back to the rule-cleaned transcript.
 final class LLMFormatter {
 
-    private static let endpoint = URL(string: "http://127.0.0.1:11434/api/chat")!
+    /// The standard user-installed Ollama.
+    static let defaultBaseURL = URL(string: "http://127.0.0.1:11434")!
+
+    /// Where the app talks to Ollama. The managed engine (7.7) repoints
+    /// this to its private port when — and only when — it is active.
+    static var baseURL = defaultBaseURL
+
     private static let keepAlive = "30m"
 
     private var lastActivity: Date?
@@ -250,7 +256,7 @@ final class LLMFormatter {
             ],
         ]
 
-        var request = URLRequest(url: Self.endpoint)
+        var request = URLRequest(url: Self.baseURL.appendingPathComponent("api/chat"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = timeout
@@ -273,7 +279,7 @@ final class LLMFormatter {
 
     /// Quick availability probe for the Settings UI.
     static func ollamaIsRunning() async -> Bool {
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:11434/api/version")!)
+        var request = URLRequest(url: baseURL.appendingPathComponent("api/version"))
         request.timeoutInterval = 2
         guard let (_, response) = try? await URLSession.shared.data(for: request) else { return false }
         return (response as? HTTPURLResponse)?.statusCode == 200
@@ -286,7 +292,7 @@ final class LLMFormatter {
             struct Model: Decodable { let name: String }
             let models: [Model]
         }
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:11434/api/tags")!)
+        var request = URLRequest(url: baseURL.appendingPathComponent("api/tags"))
         request.timeoutInterval = 3
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200,

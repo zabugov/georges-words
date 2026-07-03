@@ -116,6 +116,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installHotkeys()
         observeSettings()
 
+        // 7.7: opt-in managed polish engine. No-op while the toggle is off.
+        if settings.managedPolishEnabled {
+            ManagedOllama.shared.ensureReady(model: settings.effectiveLLMModel)
+        }
+
         Task { await loadModel() }
 
         // Opened by the user → show the window like a normal app. Started
@@ -135,6 +140,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Closing the window must not quit — dictation keeps running.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Never leave the managed polish engine running as an orphan.
+        ManagedOllama.shared.shutdown()
     }
 
     /// True when launchd started us as a login item: the initial 'oapp'
@@ -207,6 +217,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] _ in
                 guard let self else { return }
                 Task { await self.loadModel() }
+            }
+            .store(in: &cancellables)
+
+        settings.$managedPolishEnabled
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self else { return }
+                ManagedOllama.shared.setEnabled(enabled, model: self.settings.effectiveLLMModel)
             }
             .store(in: &cancellables)
     }

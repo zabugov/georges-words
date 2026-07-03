@@ -13,6 +13,12 @@ The outstanding work to bring George's Words to commercial Flow's level of polis
 > 2. **`qwen2.5:1.5b` as the polish model** — initial impression good; confirm
 >    speed ("Last: … polish" in the menu) and quality hold up vs `qwen2.5:3b`,
 >    then record the verdict here.
+> 3. **Managed polish engine (7.7, shipped OFF by default)** — with your own
+>    Ollama running, flip Settings → "Manage the polish engine automatically"
+>    on: nothing should change (Health shows it deferring). Then quit Ollama
+>    and Recheck: the app should download its own engine + model with
+>    progress in the Health card. Toggle off = instant revert; full
+>    uninstall = delete Application Support → GeorgesWords → PolishEngine.
 
 When we start something from this list, move it out of here and into the work itself (commit/ADR); when new gaps show up in daily use, add them. Items carry stable numbers (e.g. **5.1**) so we can refer to them — when an item leaves the list, retire its number rather than renumbering the rest.
 
@@ -56,7 +62,6 @@ When we start something from this list, move it out of here and into the work it
 - [ ] **7.1 (M)** **Developer ID signing + notarization** — removes Gatekeeper friction for distributing to other people. (Requires a $99/yr Apple Developer account. The local "re-grant Accessibility after every rebuild" annoyance is already solved by `app/setup-signing.sh`'s self-signed identity.) The DMG pipeline already exists (`.github/workflows/release.yml`, built 2026-07-03) with commented-out signing/notarization steps — this item is: create the account, export the Developer ID cert, add the four repo secrets, uncomment the two steps.
 - [ ] **7.3 (M)** **Auto-updates** via Sparkle — for a binary-distributed app later. (The source checkout already self-updates: menu bar → Check for Updates… pulls, rebuilds, and relaunches.)
 - [ ] **7.6 (S)** **Latency benchmark script** — a repeatable measurement of transcribe/polish times across models, so speed work is data-driven.
-- [ ] **7.7 (M)** **Zero-terminal polish engine** — for installs on non-developer Macs (Zach's wife's, to start): the app itself downloads the standalone Ollama binary (MIT) into Application Support, runs `ollama serve` as a managed child process on a private port, and pulls the polish model via `/api/pull` with progress in the Health card. Reuses LLMFormatter unchanged; existing user-installed Ollama takes precedence. Alternatives if this sours: embed llama.cpp/MLX directly (L), or Apple Foundation Models on macOS 26+ (1.5). Part of the "installable by a normal human" milestone with 7.1 (Developer ID — needs Zach's $99 account), 7.2 (DMG from CI), and 5.2 (onboarding).
 
 ## Explicit non-goals
 

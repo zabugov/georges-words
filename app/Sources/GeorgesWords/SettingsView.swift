@@ -134,6 +134,12 @@ struct SettingsView: View {
                     Task { await refreshOllama() }
                 }
 
+                Toggle("Manage the polish engine automatically (experimental)", isOn: $settings.managedPolishEnabled)
+                    .disabled(!settings.llmEnabled)
+                Text("For Macs without Ollama: the app downloads its own copy (~120 MB, one-time), runs it privately on port 11499, and fetches the polish model itself — no Terminal. Does nothing while a normal Ollama is running. Turn off to stop it instantly; its files live in Application Support → GeorgesWords → PolishEngine and can simply be deleted.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
                 Text("Fixes self-corrections (“Tuesday — no wait, Friday”), sentence structure, and tone, matched to the app you’re dictating into. Runs entirely on this Mac via Ollama (localhost); nothing is sent anywhere. Download more models with “ollama pull <name>”, then Refresh.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
