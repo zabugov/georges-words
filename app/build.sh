@@ -4,6 +4,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+if [ "${GW_PARAKEET:-}" = "1" ]; then
+    echo "==> Parakeet engine ENABLED (GW_PARAKEET=1) — pulling FluidAudio"
+fi
+
 echo "==> Building (first run downloads Swift dependencies — may take a few minutes)"
 if ! swift build -c release; then
     # "could not build module '_DarwinFoundation…'" and similar module errors

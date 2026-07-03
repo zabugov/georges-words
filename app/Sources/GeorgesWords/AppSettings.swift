@@ -49,6 +49,20 @@ enum SpeechEngine: String, CaseIterable, Identifiable {
         case .whisper: return "Whisper (WhisperKit)"
         }
     }
+
+    /// Whether Parakeet was compiled into this build (GW_PARAKEET=1).
+    static var parakeetAvailable: Bool {
+        #if PARAKEET
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    /// Engines selectable in this build.
+    static var available: [SpeechEngine] {
+        parakeetAvailable ? allCases : [.whisper]
+    }
 }
 
 /// User preferences, persisted to UserDefaults, observable from SwiftUI.

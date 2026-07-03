@@ -1,13 +1,16 @@
 import Foundation
-import FluidAudio
 import WhisperKit
+#if PARAKEET
+import FluidAudio
+#endif
 
 /// On-device speech-to-text with a choice of engines:
 ///
 /// - **Parakeet** (NVIDIA parakeet-tdt-0.6b-v3 via FluidAudio, CoreML/ANE):
 ///   dramatically faster, top of the Open ASR Leaderboard; English + 24
-///   European languages + Japanese.
-/// - **Whisper** (via WhisperKit, CoreML/ANE): the battle-tested fallback,
+///   European languages + Japanese. Compiled in only when the app is built
+///   with `GW_PARAKEET=1` (its C/C++ deps don't build on every SDK).
+/// - **Whisper** (via WhisperKit, CoreML/ANE): the battle-tested default,
 ///   with model-size choices.
 ///
 /// Models are downloaded once from Hugging Face on first use and cached
@@ -19,7 +22,9 @@ actor Transcriber {
 
     private enum Backend {
         case whisper(WhisperKit)
+        #if PARAKEET
         case parakeet(AsrManager)
+        #endif
     }
 
     private var backend: Backend?
@@ -28,15 +33,17 @@ actor Transcriber {
 
     func load() async throws {
         backend = nil
-        switch AppSettings.shared.engine {
-        case .parakeet:
+        #if PARAKEET
+        if AppSettings.shared.engine == .parakeet {
             let models = try await AsrModels.downloadAndLoad(version: .v3)
             let manager = AsrManager(config: .default)
             try await manager.loadModels(models)
             backend = .parakeet(manager)
-        case .whisper:
-            backend = .whisper(try await WhisperKit(WhisperKitConfig(model: modelName)))
+            await warmUp()
+            return
         }
+        #endif
+        backend = .whisper(try await WhisperKit(WhisperKitConfig(model: modelName)))
         await warmUp()
     }
 
@@ -47,9 +54,11 @@ actor Transcriber {
             case .whisper(let whisperKit):
                 let results = try await whisperKit.transcribe(audioArray: samples)
                 return tidy(results.map(\.text).joined(separator: " "))
+            #if PARAKEET
             case .parakeet(let manager):
                 let result = try await manager.transcribe(samples)
                 return tidy(result.text)
+            #endif
             }
         } catch {
             NSLog("Transcription failed: \(error.localizedDescription)")
