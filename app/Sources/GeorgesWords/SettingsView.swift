@@ -46,6 +46,7 @@ struct SettingsView: View {
                 Text("Shows a rolling transcript in the pill as you talk. Costs some extra compute while recording.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                Toggle("Sound on record start/stop", isOn: $settings.soundsEnabled)
             }
 
             Section("AI polish (local)") {

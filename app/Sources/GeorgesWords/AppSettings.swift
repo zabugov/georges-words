@@ -88,6 +88,11 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(previewEnabled, forKey: "PreviewEnabled") }
     }
 
+    /// Play a sound when recording starts and stops.
+    @Published var soundsEnabled: Bool {
+        didSet { defaults.set(soundsEnabled, forKey: "SoundsEnabled") }
+    }
+
     /// Voice shortcuts: say the trigger, get the expansion.
     @Published var snippets: [Snippet] {
         didSet {
@@ -113,6 +118,7 @@ final class AppSettings: ObservableObject {
         dictionaryText = defaults.string(forKey: "Dictionary") ?? ""
         commandHotkey = HotkeyChoice(rawValue: defaults.string(forKey: "CommandHotkey") ?? "") ?? .rightOption
         previewEnabled = defaults.object(forKey: "PreviewEnabled") as? Bool ?? true
+        soundsEnabled = defaults.object(forKey: "SoundsEnabled") as? Bool ?? true
         if let data = defaults.data(forKey: "Snippets"),
            let saved = try? JSONDecoder().decode([Snippet].self, from: data) {
             snippets = saved

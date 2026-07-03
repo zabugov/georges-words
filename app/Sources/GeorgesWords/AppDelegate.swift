@@ -150,6 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.mode = mode
         do {
             try recorder.start()
+            SoundFeedback.recordingStarted()
             state = .recording
             if mode == .dictation && settings.previewEnabled {
                 startPreviewLoop()
@@ -168,6 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard case .recording = state, self.mode == mode else { return }
         previewTask?.cancel()
         let samples = recorder.stop()
+        SoundFeedback.recordingStopped()
 
         // Ignore accidental taps shorter than ~0.3 s of audio (16 kHz mono).
         guard samples.count > 4800 else {

@@ -42,7 +42,6 @@ The gap that matters most — commercial feels instant.
 ## 5. UX & fit-and-finish
 
 - [ ] **(S)** **App icon** (menu bar + app bundle).
-- [ ] **(S)** **Start/stop sounds** — subtle audio cues on record start and text insertion (with a mute toggle).
 - [ ] **(M)** **First-run onboarding window** — walk through mic/Accessibility permissions, the 🌐-key setting, model download progress, and a "try it here" practice field. Currently the printed checklist in `build.sh` does this job poorly.
 - [ ] **(S)** **Pill polish** — animate in/out, handle multiple displays (follow the screen with the focused window, not `NSScreen.main`), respect Reduce Motion.
 - [ ] **(S)** **Menu bar icon animation** while recording (level-reactive, like commercial's).
