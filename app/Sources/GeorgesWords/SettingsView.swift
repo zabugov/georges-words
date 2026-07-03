@@ -55,21 +55,16 @@ struct SettingsView: View {
             }
 
             Section("Hotkeys") {
-                Picker("Hold to dictate", selection: $settings.hotkey) {
-                    ForEach(HotkeyChoice.allCases) { choice in
-                        Text(choice.displayName).tag(choice)
-                    }
-                }
+                HotkeyRecorderField(title: "Hold to dictate", spec: $settings.hotkey)
                 if settings.hotkey == .fn {
                     Text("Tip: set System Settings → Keyboard → “Press 🌐 key” to “Do Nothing” so holding Fn doesn’t open the emoji picker.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-                Picker("Hold for command mode", selection: $settings.commandHotkey) {
-                    ForEach(HotkeyChoice.allCases) { choice in
-                        Text(choice.displayName).tag(choice)
-                    }
-                }
+                HotkeyRecorderField(title: "Hold for command mode", spec: $settings.commandHotkey)
+                Text("Click Change… and press any key — modifier and function keys work best. Letter keys still type into the focused app while held.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 if settings.commandHotkey == settings.hotkey {
                     Text("⚠️ Same key as dictation — command mode is disabled until you pick a different key.")
                         .font(.footnote)
@@ -186,6 +181,35 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .navigationTitle("Settings")
         .task { await refreshOllama() }
+    }
+
+    private struct HotkeyRecorderField: View {
+        let title: String
+        @Binding var spec: HotkeySpec
+        @StateObject private var capture = HotkeyCapture()
+
+        var body: some View {
+            LabeledContent(title) {
+                HStack(spacing: 8) {
+                    Text(capture.isRecording ? "Press any key… (Esc to cancel)" : spec.displayName)
+                        .foregroundStyle(capture.isRecording ? .secondary : .primary)
+                    Button(capture.isRecording ? "Cancel" : "Change…") {
+                        if capture.isRecording {
+                            capture.cancel()
+                        } else {
+                            capture.begin { spec = $0 }
+                        }
+                    }
+                    Menu("Presets") {
+                        Button("Fn (🌐)") { spec = .fn }
+                        Button("Right ⌘") { spec = .rightCommand }
+                        Button("Right ⌥") { spec = .rightOption }
+                    }
+                    .fixedSize()
+                }
+            }
+            .onDisappear { capture.cancel() }
+        }
     }
 
     private func refreshOllama() async {

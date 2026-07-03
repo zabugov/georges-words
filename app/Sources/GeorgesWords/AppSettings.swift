@@ -2,40 +2,6 @@ import AppKit
 import Combine
 import ServiceManagement
 
-/// Which key you hold to dictate.
-enum HotkeyChoice: String, CaseIterable, Identifiable {
-    case fn
-    case rightCommand
-    case rightOption
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .fn: return "Fn (🌐)"
-        case .rightCommand: return "Right ⌘"
-        case .rightOption: return "Right ⌥"
-        }
-    }
-
-    var keyCode: UInt16 {
-        switch self {
-        case .fn: return 63
-        case .rightCommand: return 54
-        case .rightOption: return 61
-        }
-    }
-
-    /// The modifier flag that is set while the key is held.
-    var flag: NSEvent.ModifierFlags {
-        switch self {
-        case .fn: return .function
-        case .rightCommand: return .command
-        case .rightOption: return .option
-        }
-    }
-}
-
 /// Which on-device speech-to-text engine transcribes the audio.
 enum SpeechEngine: String, CaseIterable, Identifiable {
     case parakeet
@@ -107,8 +73,12 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(modelName, forKey: "ModelName") }
     }
 
-    @Published var hotkey: HotkeyChoice {
-        didSet { defaults.set(hotkey.rawValue, forKey: "Hotkey") }
+    @Published var hotkey: HotkeySpec {
+        didSet {
+            if let data = try? JSONEncoder().encode(hotkey) {
+                defaults.set(data, forKey: "HotkeySpec")
+            }
+        }
     }
 
     @Published var launchAtLogin: Bool {
@@ -179,8 +149,12 @@ final class AppSettings: ObservableObject {
     }
 
     /// Hold this key with text selected to speak an edit instruction.
-    @Published var commandHotkey: HotkeyChoice {
-        didSet { defaults.set(commandHotkey.rawValue, forKey: "CommandHotkey") }
+    @Published var commandHotkey: HotkeySpec {
+        didSet {
+            if let data = try? JSONEncoder().encode(commandHotkey) {
+                defaults.set(data, forKey: "CommandHotkeySpec")
+            }
+        }
     }
 
     /// Show a live partial transcript in the pill while speaking.
@@ -239,13 +213,24 @@ final class AppSettings: ObservableObject {
         engine = SpeechEngine(rawValue: defaults.string(forKey: "Engine") ?? "")
             ?? (SpeechEngine.parakeetAvailable ? .parakeet : .whisper)
         modelName = defaults.string(forKey: "ModelName") ?? "small.en"
-        hotkey = HotkeyChoice(rawValue: defaults.string(forKey: "Hotkey") ?? "") ?? .fn
+        if let data = defaults.data(forKey: "HotkeySpec"),
+           let saved = try? JSONDecoder().decode(HotkeySpec.self, from: data) {
+            hotkey = saved
+        } else {
+            // Migrate the pre-5.4 three-choice setting.
+            hotkey = HotkeySpec.legacy(defaults.string(forKey: "Hotkey")) ?? .fn
+        }
         launchAtLogin = SMAppService.mainApp.status == .enabled
         llmEnabled = defaults.object(forKey: "LLMEnabled") as? Bool ?? true
         polishStrength = PolishStrength(rawValue: defaults.string(forKey: "PolishStrength") ?? "") ?? .light
         llmModel = defaults.string(forKey: "LLMModel") ?? Self.defaultLLMModel
         dictionaryText = defaults.string(forKey: "Dictionary") ?? ""
-        commandHotkey = HotkeyChoice(rawValue: defaults.string(forKey: "CommandHotkey") ?? "") ?? .rightOption
+        if let data = defaults.data(forKey: "CommandHotkeySpec"),
+           let saved = try? JSONDecoder().decode(HotkeySpec.self, from: data) {
+            commandHotkey = saved
+        } else {
+            commandHotkey = HotkeySpec.legacy(defaults.string(forKey: "CommandHotkey")) ?? .rightOption
+        }
         previewEnabled = defaults.object(forKey: "PreviewEnabled") as? Bool ?? true
         soundsEnabled = defaults.object(forKey: "SoundsEnabled") as? Bool ?? true
         if let data = defaults.data(forKey: "Snippets"),

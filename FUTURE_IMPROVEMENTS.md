@@ -34,7 +34,6 @@ When we start something from this list, move it out of here and into the work it
 ## 3. Formatting intelligence
 
 - [ ] **3.3 (L)** **Personal style matching** — learn the user's tone from local samples of their writing (e.g. pasted examples) instead of generic casual/professional presets. commercial's "sounds like you" feature, done locally.
-- [ ] **3.4 (M)** **Better long-dictation structure** — paragraph splitting for multi-minute rambles; the current few-shot examples only cover 1–3 sentence utterances.
 - [ ] **3.5 (S)** **Grow the few-shot bank** from real-world failures — keep a small corpus of messy-transcript → ideal-output pairs and iterate on it as bad cleanups are noticed.
 
 ## 4. Feature parity with commercial Flow
@@ -47,7 +46,6 @@ When we start something from this list, move it out of here and into the work it
 
 - [ ] **5.2 (M)** **First-run onboarding window** — walk through mic/Accessibility permissions, the 🌐-key setting, model download progress, and a "try it here" practice field. Currently the printed checklist in `build.sh` does this job poorly.
 - [ ] **5.3 (M)** **Settings redesign into tabs** (General / Formatting / Dictionary / Snippets / Advanced) as the option count grows.
-- [ ] **5.4 (M)** **Arbitrary hotkey capture** — record any key/combo in Settings instead of the fixed three choices.
 
 ## 6. Reliability & compatibility
 
