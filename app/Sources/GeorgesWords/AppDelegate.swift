@@ -271,7 +271,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Load the LLM / prime its prompt cache while the user speaks,
             // so the polish pass starts hot.
             if settings.llmEnabled {
-                llmFormatter.warmUpIfStale(model: settings.effectiveLLMModel)
+                llmFormatter.warmUpIfStale(model: settings.effectiveLLMModel, strength: settings.polishStrength)
             }
         } catch {
             state = .error("Microphone error: \(error.localizedDescription)")
@@ -382,7 +382,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             cleaned,
             tone: context.tone,
             dictionary: dictionary,
-            model: settings.effectiveLLMModel
+            model: settings.effectiveLLMModel,
+            strength: settings.polishStrength
         )
         await updateTiming(transcribe: transcribeSeconds, polish: Date().timeIntervalSince(polishStart))
         return polished ?? cleaned

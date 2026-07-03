@@ -23,7 +23,6 @@ When we start something from this list, move it out of here and into the work it
 
 ## 3. Formatting intelligence
 
-- [ ] **(M)** **Polish strength setting — "keep my words" mode (owner request 2026-07-03).** The current polish rewords too aggressively; the prompt asks for "polished written text," which invites paraphrasing. Add a Settings choice like **Light (default): keep my exact words** — remove ums/uhs and false starts, fix punctuation/capitalization, apply self-corrections, and nothing else — vs **Full: restructure for clarity** (today's behavior). Implementation: two prompt variants with their own few-shot examples; the Light examples must show outputs that are word-for-word identical to the input minus fillers, so the model learns that NOT changing text is the correct answer. Consider a sanity check that rejects Light-mode outputs whose word overlap with the input drops too low.
 - [ ] **(M)** **Spoken punctuation & control commands** — "new line", "new paragraph", "quote … end quote" handled deterministically in the rule pass (never leave it to the LLM).
 - [ ] **(M)** **Per-app custom instructions** — let the user attach their own style notes to specific apps ("in Obsidian, use markdown headings"), extending the built-in tone profiles.
 - [ ] **(L)** **Personal style matching** — learn the user's tone from local samples of their writing (e.g. pasted examples) instead of generic casual/professional presets. commercial's "sounds like you" feature, done locally.

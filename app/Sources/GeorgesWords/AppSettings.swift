@@ -65,6 +65,21 @@ enum SpeechEngine: String, CaseIterable, Identifiable {
     }
 }
 
+/// How aggressively the LLM polish pass may edit.
+enum PolishStrength: String, CaseIterable, Identifiable {
+    case light
+    case full
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .light: return "Keep my words — fillers & punctuation only"
+        case .full: return "Rewrite for clarity"
+        }
+    }
+}
+
 /// User preferences, persisted to UserDefaults, observable from SwiftUI.
 final class AppSettings: ObservableObject {
 
@@ -94,6 +109,11 @@ final class AppSettings: ObservableObject {
     /// Stage-2 formatting: rewrite transcripts with a local LLM via Ollama.
     @Published var llmEnabled: Bool {
         didSet { defaults.set(llmEnabled, forKey: "LLMEnabled") }
+    }
+
+    /// Light = preserve the speaker's exact wording; Full = restructure.
+    @Published var polishStrength: PolishStrength {
+        didSet { defaults.set(polishStrength.rawValue, forKey: "PolishStrength") }
     }
 
     static let defaultLLMModel = "qwen2.5:3b"
@@ -162,6 +182,7 @@ final class AppSettings: ObservableObject {
         hotkey = HotkeyChoice(rawValue: defaults.string(forKey: "Hotkey") ?? "") ?? .fn
         launchAtLogin = SMAppService.mainApp.status == .enabled
         llmEnabled = defaults.object(forKey: "LLMEnabled") as? Bool ?? true
+        polishStrength = PolishStrength(rawValue: defaults.string(forKey: "PolishStrength") ?? "") ?? .light
         llmModel = defaults.string(forKey: "LLMModel") ?? Self.defaultLLMModel
         dictionaryText = defaults.string(forKey: "Dictionary") ?? ""
         commandHotkey = HotkeyChoice(rawValue: defaults.string(forKey: "CommandHotkey") ?? "") ?? .rightOption

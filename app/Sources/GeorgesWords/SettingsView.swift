@@ -66,6 +66,18 @@ struct SettingsView: View {
             Section("AI polish (local)") {
                 Toggle("Polish transcripts with a local LLM", isOn: $settings.llmEnabled)
 
+                Picker("Polish style", selection: $settings.polishStrength) {
+                    ForEach(PolishStrength.allCases) { strength in
+                        Text(strength.displayName).tag(strength)
+                    }
+                }
+                .disabled(!settings.llmEnabled)
+                Text(settings.polishStrength == .light
+                     ? "Removes ums/uhs and false starts, fixes punctuation, applies self-corrections — otherwise keeps your exact words. Outputs that stray from your wording are rejected."
+                     : "Restructures sentences and matches tone to the app you're dictating into. May reword what you said.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
                 if ollamaRunning == nil {
                     Text("Checking for Ollama…")
                         .font(.footnote)
