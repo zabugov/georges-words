@@ -56,6 +56,28 @@ final class AppSettings: ObservableObject {
         didSet { applyLaunchAtLogin() }
     }
 
+    /// Stage-2 formatting: rewrite transcripts with a local LLM via Ollama.
+    @Published var llmEnabled: Bool {
+        didSet { defaults.set(llmEnabled, forKey: "LLMEnabled") }
+    }
+
+    /// Ollama model tag used for the polish pass.
+    @Published var llmModel: String {
+        didSet { defaults.set(llmModel, forKey: "LLMModel") }
+    }
+
+    /// Personal dictionary, one term per line (exact spellings to enforce).
+    @Published var dictionaryText: String {
+        didSet { defaults.set(dictionaryText, forKey: "Dictionary") }
+    }
+
+    var dictionaryTerms: [String] {
+        dictionaryText
+            .split(separator: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
     static let modelOptions: [(name: String, label: String)] = [
         ("base.en", "base.en — fastest, rough accuracy (~150 MB)"),
         ("small.en", "small.en — good balance (default, ~500 MB)"),
@@ -67,6 +89,9 @@ final class AppSettings: ObservableObject {
         modelName = defaults.string(forKey: "ModelName") ?? "small.en"
         hotkey = HotkeyChoice(rawValue: defaults.string(forKey: "Hotkey") ?? "") ?? .fn
         launchAtLogin = SMAppService.mainApp.status == .enabled
+        llmEnabled = defaults.object(forKey: "LLMEnabled") as? Bool ?? true
+        llmModel = defaults.string(forKey: "LLMModel") ?? "qwen2.5:3b"
+        dictionaryText = defaults.string(forKey: "Dictionary") ?? ""
     }
 
     private func applyLaunchAtLogin() {

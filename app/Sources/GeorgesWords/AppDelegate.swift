@@ -22,6 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settings = AppSettings.shared
     private let recorder = AudioRecorder()
     private let transcriber = Transcriber()
+    private let cleaner = TranscriptCleaner()
+    private let llmFormatter = LLMFormatter()
     private let inserter = TextInserter()
     private let pill = PillController()
     private var hotkey: HotkeyMonitor?
@@ -128,9 +130,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             state = .idle
             return
         }
+        // Capture the target app now, while it is still frontmost.
+        let context = AppContext.current()
         state = .transcribing
         Task {
-            let text = await transcriber.transcribe(samples)
+            let text = await self.processTranscript(samples: samples, context: context)
             await MainActor.run {
                 if !text.isEmpty {
                     self.lastTranscript = text
@@ -140,6 +144,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if case .transcribing = self.state { self.state = .idle }
             }
         }
+    }
+
+    /// transcribe → rule cleanup → (optional) local-LLM polish.
+    private func processTranscript(samples: [Float], context: AppContext) async -> String {
+        let raw = await transcriber.transcribe(samples)
+        guard !raw.isEmpty else { return "" }
+
+        let dictionary = settings.dictionaryTerms
+        let cleaned = cleaner.clean(raw, dictionary: dictionary)
+
+        // Very short utterances don't need a rewrite, and skipping the LLM
+        // keeps them near-instant.
+        let wordCount = cleaned.split(separator: " ").count
+        guard settings.llmEnabled, wordCount >= 5 else { return cleaned }
+
+        if let polished = await llmFormatter.format(
+            cleaned,
+            tone: context.tone,
+            dictionary: dictionary,
+            model: settings.llmModel
+        ) {
+            return polished
+        }
+        return cleaned
     }
 
     // MARK: - Menu bar UI

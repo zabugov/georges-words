@@ -6,7 +6,7 @@ A system-wide dictation app for macOS, in the spirit of [commercial Flow](https:
 
 ## Status
 
-🚧 **M2 — insertion & UX polish.** Hold a hotkey → speak → release → text appears at your cursor, fully on-device. Now with direct Accessibility-API insertion (clipboard paste as fallback), a floating recording pill with live mic levels, a Settings window (model picker, hotkey picker, launch at login). See [`docs/research/`](docs/research/) for the commercial Flow deep-dive that informs the design, and [`docs/decisions/`](docs/decisions/) for the ADRs.
+🚧 **M3 — the formatting layer.** Hold a hotkey → speak → release → *polished* text appears at your cursor, fully on-device: filler words stripped, self-corrections applied ("Tuesday — no wait, Friday" → "Friday"), personal-dictionary spellings enforced, and tone matched to the app you're dictating into (casual in Slack, professional in Mail, literal in editors/terminals). Formatting is two-stage: instant rule-based cleanup always, plus an optional rewrite by a local LLM via [Ollama](https://ollama.com) — see below. See [`docs/research/`](docs/research/) for the commercial Flow deep-dive and [`docs/decisions/`](docs/decisions/) for the ADRs.
 
 ## Quick start (on your Mac)
 
@@ -25,7 +25,18 @@ First run:
 3. Wait for the menu-bar hourglass to become a mic — the first launch downloads the speech model (one-time, ~500 MB; the only network use this app will ever make).
 4. Click into any text field, **hold Fn, speak, release.**
 
-The speech model and hotkey (Fn, Right ⌘, or Right ⌥) can be changed in **Settings…** from the menu-bar icon. If the hotkey stops responding after a rebuild, toggle the Accessibility permission off and on (ad-hoc signing quirk).
+The speech model, hotkey (Fn, Right ⌘, or Right ⌥), AI polish, and personal dictionary live in **Settings…** under the menu-bar icon. If the hotkey stops responding after a rebuild, toggle the Accessibility permission off and on (ad-hoc signing quirk).
+
+### Optional: full AI polish via a local LLM
+
+Dictation works out of the box with rule-based cleanup. For commercial-Flow-class rewriting (self-corrections, sentence restructuring, per-app tone), install [Ollama](https://ollama.com) and pull the default polish model:
+
+```sh
+brew install ollama        # or download from ollama.com
+ollama pull qwen2.5:3b
+```
+
+George's Words talks to Ollama at `localhost:11434` — an app-to-app call inside your Mac; no text goes to any network. If Ollama isn't running, the app silently falls back to rule-based cleanup. Never worse, sometimes much better.
 
 ## What it will do
 
@@ -48,6 +59,9 @@ georges-words/
 │       ├── AudioRecorder.swift   # AVAudioEngine → 16 kHz mono + level meter
 │       ├── Transcriber.swift     # WhisperKit (CoreML / Neural Engine)
 │       ├── TextInserter.swift    # AX-API insertion → clipboard ⌘V fallback
+│       ├── TranscriptCleaner.swift # stage 1: rule-based cleanup + dictionary
+│       ├── LLMFormatter.swift    # stage 2: local LLM rewrite via Ollama
+│       ├── AppContext.swift      # frontmost-app bundle ID → tone profile
 │       ├── RecordingPill.swift   # floating non-activating status pill
 │       └── SettingsView.swift    # SwiftUI settings window
 └── docs/
