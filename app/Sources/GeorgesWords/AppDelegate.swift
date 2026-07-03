@@ -234,7 +234,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        guard case .idle = state else { return }
+        // Never swallow a press silently — explain why it can't start yet.
+        switch state {
+        case .idle:
+            break
+        case .loadingModel:
+            pill.flash("Speech model is still loading — try again in a moment…", seconds: 2)
+            return
+        case .processing:
+            pill.flash("Finishing the previous dictation…", seconds: 2)
+            return
+        case .error(let message):
+            pill.flash(message, seconds: 4)
+            return
+        case .recording:
+            return
+        }
 
         if mode == .command {
             guard let selection = SelectionReader.read(), !selection.isEmpty else {
