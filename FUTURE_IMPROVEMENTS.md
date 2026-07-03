@@ -49,10 +49,10 @@ When we start something from this list, move it out of here and into the work it
 
 ## 5. UX & fit-and-finish
 
-- [ ] **5.1 (S)** **App icon** (menu bar + app bundle).
 - [ ] **5.2 (M)** **First-run onboarding window** — walk through mic/Accessibility permissions, the 🌐-key setting, model download progress, and a "try it here" practice field. Currently the printed checklist in `build.sh` does this job poorly.
 - [ ] **5.3 (M)** **Settings redesign into tabs** (General / Formatting / Dictionary / Snippets / Advanced) as the option count grows.
 - [ ] **5.4 (M)** **Arbitrary hotkey capture** — record any key/combo in Settings instead of the fixed three choices.
+- [ ] **5.5 (M)** **Become a Dock app, like commercial Flow** — drop `LSUIElement` and add a real main window with Dock presence. Some of what's currently crammed into the menu-bar dropdown and Settings (history, dictionary, stats…) could move into that window; which items move vs stay in the menu bar is to be figured out when we take this on. (5.1's bundle icon ships ahead of this and will appear in the Dock as-is.)
 
 ## 6. Reliability & compatibility
 

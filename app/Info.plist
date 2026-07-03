@@ -10,6 +10,8 @@
     <string>George's Words</string>
     <key>CFBundleExecutable</key>
     <string>GeorgesWords</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

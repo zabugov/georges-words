@@ -38,9 +38,10 @@ trap 'rm -rf "$STAGE_DIR"' EXIT
 STAGE_APP="$STAGE_DIR/GeorgesWords.app"
 
 echo "==> Assembling ${APP_DIR}"
-mkdir -p "$STAGE_APP/Contents/MacOS"
+mkdir -p "$STAGE_APP/Contents/MacOS" "$STAGE_APP/Contents/Resources"
 cp ".build/release/GeorgesWords" "$STAGE_APP/Contents/MacOS/GeorgesWords"
 cp "Info.plist" "$STAGE_APP/Contents/Info.plist"
+cp "icon/AppIcon.icns" "$STAGE_APP/Contents/Resources/AppIcon.icns"
 xattr -cr "$STAGE_APP" 2>/dev/null || true
 find "$STAGE_APP" -name "._*" -delete 2>/dev/null || true
 
