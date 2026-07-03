@@ -2,13 +2,25 @@
 
 The outstanding work to bring George's Words to commercial Flow's level of polish and functionality — everything not already shipped or actively in progress. Sourced from the [commercial Flow deep-dive](docs/research/competitive-research.md) feature inventory and observations from daily use. Effort: **S** (hours), **M** (days), **L** (a milestone).
 
+> **⏭️ Next session — testing pass (added late 2026-07-03):** two things shipped
+> at the end of the session with only a quick smoke test; exercise them properly
+> in daily use before building more:
+> 1. **"Keep my words" light polish (new default)** — verify ums/false starts are
+>    removed, self-corrections applied, and wording otherwise untouched across
+>    real dictations (Slack, email, longer rambles). Watch for the fidelity gate
+>    rejecting too often (polish silently falling back to rule-cleaned text —
+>    if suspicious, check Console for "Light polish rejected").
+> 2. **`qwen2.5:1.5b` as the polish model** — initial impression good; confirm
+>    speed ("Last: … polish" in the menu) and quality hold up vs `qwen2.5:3b`,
+>    then record the verdict here.
+
 When we start something from this list, move it out of here and into the work itself (commit/ADR); when new gaps show up in daily use, add them.
 
 ## 1. Speed & responsiveness
 
 **Baseline as of 2026-07-03 (Parakeet + qwen2.5:3b on Zach's machine): 0.2 s transcribe + 1.4 s polish.** Transcription is solved; the LLM polish is ~90% of the remaining wait. Analysis from the 07-03 session:
 
-- [ ] **(S)** **Ollama experiment — smaller polish model.** Run `ollama pull qwen2.5:1.5b`, set it in Settings → AI polish, and compare: should roughly halve the 1.4 s polish. If self-corrections/rewrites get worse, revert the field to `qwen2.5:3b` (30-second undo). If quality holds, consider making it the default and also try `llama3.2:1b` / `gemma3:1b`.
+- [ ] **(S)** **Smaller polish model — in progress.** `qwen2.5:1.5b` is pulled and selected (2026-07-03, "seems to be working well"); confirm over a few days of use (see testing note above), then consider trying `llama3.2:1b` / `gemma3:1b` for another speed step. Revert = pick `qwen2.5:3b` in the Settings dropdown.
 - [ ] **(M)** **Speculative polish — the recommended next build.** While recording, whenever the speaker goes quiet ~1 s, speculatively polish the transcript-so-far in the background; on key release, if nothing more was said, the polished result is already ready → text appears near-instantly. Keep talking → discard the speculation (local compute, costs nothing). Architecturally just a cache in front of the existing pipeline: a miss falls back to today's behavior, never worse. Gets ~90% of the "streaming" benefit for ~10% of the work.
 - [ ] **(L)** **True streaming polish** — polish sentence-by-sentence *while* speaking. Parked until real usage demands it (long-form dictation): hard problems include self-corrections spanning sentence boundaries ("…Tuesday. Wait, no, Friday"), tone consistency across separately-polished fragments, and sentence segmentation on unstable ASR output. Weeks of tuning, real quality risk.
 - ~~Streaming transcription~~ — **obsolete**: it existed to hide multi-second transcription, and Parakeet does full utterances in 0.2 s. Building it (FluidAudio `SlidingWindowAsrManager`, chunk stitching, word-revision handling) would be days of work to save a fifth of a second.
