@@ -154,42 +154,42 @@ struct OnboardingView: View {
 
         case .engine:
             page(
-                icon: "cpu",
-                title: "Speech engine",
-                subtitle: "The first launch downloads the speech model (one-time, ~600 MB). It runs on this Mac's Neural Engine — that download is the only network use dictation ever makes."
+                icon: "arrow.down.circle",
+                title: "Two quick downloads",
+                subtitle: "The app is downloading the two things it needs — one to turn your speech into words, and one to tidy those words up. This happens once, by itself."
             ) {
                 HStack(spacing: 8) {
-                    if status.health == .loading {
+                    if status.health == .ready {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("Turning speech into words — ready")
+                    } else {
                         ProgressView()
                             .controlSize(.small)
-                    } else {
-                        Image(systemName: status.health == .ready ? "checkmark.circle.fill" : "hourglass")
-                            .foregroundStyle(status.health == .ready ? .green : .orange)
+                        Text("Turning speech into words — downloading…")
                     }
-                    Text(status.health == .ready ? "Speech model ready" : status.statusText)
                 }
-                Divider()
                 HStack(spacing: 8) {
                     switch managedEngine.phase {
                     case .ready:
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(.green)
-                        Text("AI polish ready")
+                        Text("Tidying your words — ready")
                     case .failed:
                         Image(systemName: "exclamationmark.triangle")
                             .foregroundStyle(.orange)
-                        Text("AI polish setup hit a snag — see Troubleshooting later; dictation works regardless")
-                    case .off:
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(.secondary)
-                        Text("AI polish sets itself up automatically")
+                        Text("Tidying your words — having trouble, but you can dictate anyway")
+                    case .downloadingModel(let percent):
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Tidying your words — downloading\(percent.map { " (\($0)%)" } ?? "")…")
                     default:
                         ProgressView()
                             .controlSize(.small)
-                        Text("Setting up AI polish in the background…")
+                        Text("Tidying your words — downloading…")
                     }
                 }
-                Text("Polish tidies grammar and self-corrections with a small language model (~1 GB, downloaded once) — also fully on this Mac. Dictation works while it sets up, with basic cleanup in the meantime.")
+                Text("You don't have to wait — feel free to continue.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
