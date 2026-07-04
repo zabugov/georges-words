@@ -43,15 +43,18 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                Picker("Whisper model", selection: $settings.modelName) {
-                    ForEach(AppSettings.modelOptions, id: \.name) { option in
-                        Text(option.label).tag(option.name)
+                // Only meaningful when Whisper is the engine — hidden
+                // entirely otherwise, not just disabled.
+                if settings.engine == .whisper || !SpeechEngine.parakeetAvailable {
+                    Picker("Whisper model", selection: $settings.modelName) {
+                        ForEach(AppSettings.modelOptions, id: \.name) { option in
+                            Text(option.label).tag(option.name)
+                        }
                     }
+                    Text("Changing the model triggers a one-time download, then everything runs offline.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-                .disabled(SpeechEngine.parakeetAvailable && settings.engine != .whisper)
-                Text("Changing the model triggers a one-time download, then everything runs offline.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
 
             Section("Hotkeys") {

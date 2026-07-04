@@ -32,6 +32,8 @@ struct MainWindowView: View {
                 SnippetsView(settings: settings)
             case .settings:
                 SettingsView(settings: settings)
+            case .troubleshooting:
+                TroubleshootingView(status: status, settings: settings)
             case .about:
                 AboutView(status: status, settings: settings)
             }
@@ -47,31 +49,17 @@ struct HomeView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject private var stats = StatsStore.shared
     @ObservedObject private var history = HistoryStore.shared
-    @State private var ollamaRunning: Bool?
-    @State private var ollamaModels: [String]?
-    @State private var recheckTick = 0
-    @ObservedObject private var managedEngine = ManagedOllama.shared
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 statCards
-                healthCard
                 recentDictations
             }
             .padding(24)
             .frame(maxWidth: 680, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .task(id: recheckTick) {
-            ollamaRunning = nil
-            ollamaModels = nil
-            guard settings.llmEnabled else { return }
-            let running = await LLMFormatter.ollamaIsRunning()
-            ollamaRunning = running
-            guard running else { return }
-            ollamaModels = await LLMFormatter.installedModels()
         }
         .navigationTitle("George's Words")
         .toolbar {
@@ -143,7 +131,112 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Health (backlog 6.3): why isn't it working, in one place.
+    private var recentDictations: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Recent dictations")
+                    .font(.title3.bold())
+                Spacer()
+                if !history.entries.isEmpty {
+                    Button("See all") { status.selectedSection = .history }
+                }
+            }
+            if history.entries.isEmpty {
+                Text("Nothing yet — hold \(settings.hotkey.displayName) and speak. Transcripts stay on this Mac.")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
+                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(history.entries.prefix(3).enumerated()), id: \.element.id) { index, entry in
+                        if index > 0 { Divider() }
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(entry.text)
+                                    .lineLimit(2)
+                                Text(entry.date.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button {
+                                let pasteboard = NSPasteboard.general
+                                pasteboard.clearContents()
+                                pasteboard.setString(entry.text, forType: .string)
+                            } label: {
+                                Image(systemName: "doc.on.doc")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Copy")
+                        }
+                        .padding(.vertical, 10)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+            }
+        }
+    }
+
+}
+
+// MARK: - Troubleshooting (backlog 6.3): why isn't it working, in one place.
+
+struct TroubleshootingView: View {
+    @ObservedObject var status: AppStatus
+    @ObservedObject var settings: AppSettings
+    @ObservedObject private var managedEngine = ManagedOllama.shared
+    @State private var ollamaRunning: Bool?
+    @State private var ollamaModels: [String]?
+    @State private var recheckTick = 0
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(healthRows) { row in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Circle()
+                            .fill(color(for: row.level))
+                            .frame(width: 8, height: 8)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(row.title)
+                            if let detail = row.detail {
+                                Text(detail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        if let fixTitle = row.fixTitle, let fix = row.fix {
+                            Button(fixTitle, action: fix)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                Button("Recheck") { recheckTick += 1 }
+            } header: {
+                Text("Health checks")
+            }
+
+            Section {
+                Text("Dictation degrades gracefully: without Accessibility, transcripts go to the clipboard; without Ollama, you get rule-based cleanup instead of AI polish. Nothing here ever blocks the microphone-to-text path.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("Troubleshooting")
+        .task(id: recheckTick) {
+            ollamaRunning = nil
+            ollamaModels = nil
+            guard settings.llmEnabled else { return }
+            let running = await LLMFormatter.ollamaIsRunning()
+            ollamaRunning = running
+            guard running else { return }
+            ollamaModels = await LLMFormatter.installedModels()
+        }
+    }
 
     private struct HealthRow: Identifiable {
         enum Level {
@@ -246,39 +339,6 @@ struct HomeView: View {
         }
     }
 
-    private var healthCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Health")
-                    .font(.title3.bold())
-                Spacer()
-                Button("Recheck") { recheckTick += 1 }
-            }
-            ForEach(healthRows) { row in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Circle()
-                        .fill(color(for: row.level))
-                        .frame(width: 8, height: 8)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(row.title)
-                        if let detail = row.detail {
-                            Text(detail)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer()
-                    if let fixTitle = row.fixTitle, let fix = row.fix {
-                        Button(fixTitle, action: fix)
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
-    }
-
     private func color(for level: HealthRow.Level) -> Color {
         switch level {
         case .ok: return .green
@@ -292,55 +352,6 @@ struct HomeView: View {
             NSWorkspace.shared.open(url)
         }
     }
-
-    private var recentDictations: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Recent dictations")
-                    .font(.title3.bold())
-                Spacer()
-                if !history.entries.isEmpty {
-                    Button("See all") { status.selectedSection = .history }
-                }
-            }
-            if history.entries.isEmpty {
-                Text("Nothing yet — hold \(settings.hotkey.displayName) and speak. Transcripts stay on this Mac.")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
-            } else {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(history.entries.prefix(3).enumerated()), id: \.element.id) { index, entry in
-                        if index > 0 { Divider() }
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(entry.text)
-                                    .lineLimit(2)
-                                Text(entry.date.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Button {
-                                let pasteboard = NSPasteboard.general
-                                pasteboard.clearContents()
-                                pasteboard.setString(entry.text, forType: .string)
-                            } label: {
-                                Image(systemName: "doc.on.doc")
-                            }
-                            .buttonStyle(.borderless)
-                            .help("Copy")
-                        }
-                        .padding(.vertical, 10)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
-            }
-        }
-    }
-
 }
 
 // MARK: - Sidebar update footer

@@ -8,14 +8,17 @@ enum MainSection: String, CaseIterable, Identifiable {
     case dictionary
     case snippets
     case settings
+    case troubleshooting
     case about
 
     var id: String { rawValue }
 
-    /// What's listed in the sidebar. About is deliberately not here — it's
-    /// reached through the ? button top-right of Home (or the App menu).
+    /// What's listed in the sidebar, in order — Troubleshooting sits last,
+    /// right above the pinned update footer. About is deliberately not
+    /// here; it's reached through the ? button top-right of Home (or the
+    /// App menu).
     static var sidebarSections: [MainSection] {
-        [.home, .history, .dictionary, .snippets, .settings]
+        [.home, .history, .dictionary, .snippets, .settings, .troubleshooting]
     }
 
     var title: String {
@@ -25,6 +28,7 @@ enum MainSection: String, CaseIterable, Identifiable {
         case .dictionary: return "Dictionary"
         case .snippets: return "Snippets"
         case .settings: return "Settings"
+        case .troubleshooting: return "Troubleshooting"
         case .about: return "About"
         }
     }
@@ -36,6 +40,7 @@ enum MainSection: String, CaseIterable, Identifiable {
         case .dictionary: return "character.book.closed"
         case .snippets: return "text.badge.plus"
         case .settings: return "gearshape"
+        case .troubleshooting: return "wrench.and.screwdriver"
         case .about: return "questionmark.circle"
         }
     }
