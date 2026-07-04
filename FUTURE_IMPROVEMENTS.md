@@ -54,10 +54,11 @@ When we start something from this list, move it out of here and into the work it
 ## 6. Reliability & compatibility
 
 - [ ] **6.2 (M)** **Per-app insertion quirks** — audit the AX path in Electron apps, terminals (trailing-newline behavior), Java apps, and browsers; maintain a fallback list.
+- [ ] **6.4 (S)** **Escape the iCloud repo trap** — second incident 2026-07-04: iCloud's file provider wedged mid-session, blocking all local git reads; the self-updater's pull hung to its 120 s timeout and even `git status` froze until a reboot (first incident was the codesign xattr race that forced temp-dir staging). Two-part fix: (a) move the checkout out of iCloud-synced Desktop (e.g. `~/georges-words` — permissions survive via the stable signing identity; update CLAUDE.md paths after); (b) updater polish: when the pull times out, say "this usually means iCloud has wedged the repo — see Troubleshooting" instead of a generic failure, and consider a pre-flight `git status` probe with a 5 s timeout so the spinner never runs long on a dead filesystem.
 
 ## 7. Distribution & maintenance
 
-- [ ] **7.1 (M)** **Developer ID signing + notarization** — removes Gatekeeper friction for distributing to other people. (Requires a $99/yr Apple Developer account. The local "re-grant Accessibility after every rebuild" annoyance is already solved by `app/setup-signing.sh`'s self-signed identity.) The DMG pipeline already exists (`.github/workflows/release.yml`, built 2026-07-03) with commented-out signing/notarization steps — this item is: create the account, export the Developer ID cert, add the four repo secrets, uncomment the two steps.
+- [ ] **7.1 (M→S)** **Developer ID signing + notarization — nearly done (2026-07-04).** Secrets are in, CI signs with hardened runtime + entitlements, DMGs build and submit cleanly; the only outstanding piece is Apple's notary queue clearing the first submission (sat "In Progress" for hours — a documented first-submission pattern; credentials verified good, no Invalid verdict). A retry loop re-runs `release.yml` every ~2 h until 2026-07-07 and push-notifies Zach on any terminal outcome. Close this item when the first Accepted verdict lands.
 - [ ] **7.3 (M)** **Auto-updates** via Sparkle — for a binary-distributed app later. (The source checkout already self-updates: menu bar → Check for Updates… pulls, rebuilds, and relaunches.)
 - [ ] **7.6 (S)** **Latency benchmark script** — a repeatable measurement of transcribe/polish times across models, so speed work is data-driven.
 
