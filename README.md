@@ -29,12 +29,7 @@ cd georges-words
 
 Requires macOS 14+ on Apple Silicon and the Xcode Command Line Tools (`xcode-select --install` if `swift` isn't found; if the build complains about missing SDKs, install full Xcode from the App Store).
 
-First run:
-
-1. Grant **Microphone** and **Accessibility** permissions when prompted.
-2. Set **System Settings → Keyboard → "Press 🌐 key" → Do Nothing** so holding Fn doesn't open the emoji picker.
-3. Wait for the menu-bar hourglass to become a mic — the first launch downloads the speech model (one-time, ~500 MB; the only network use this app will ever make).
-4. Click into any text field, **hold Fn, speak, release.**
+First run: an onboarding wizard walks through everything — the Microphone and Accessibility permissions, the 🌐-key setting (System Settings → Keyboard → "Press 🌐 key" → Do Nothing), the one-time speech-model download, optional automatic AI-polish setup, and a practice box to try your first dictation.
 
 The speech model, hotkey (Fn, Right ⌘, or Right ⌥), AI polish, personal dictionary, and snippets live in the main window — open it from the Dock or via the menu-bar icon → **Open George's Words**.
 

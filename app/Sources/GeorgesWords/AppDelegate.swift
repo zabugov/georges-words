@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let statusMenuItem = NSMenuItem(title: "Starting…", action: nil, keyEquivalent: "")
     private let updateMenuItem = NSMenuItem(title: "Check for Updates…", action: nil, keyEquivalent: "")
     private var mainWindow: NSWindow?
+    private var onboardingWindow: NSWindow?
     private let appStatus = AppStatus.shared
 
     private let settings = AppSettings.shared
@@ -62,7 +63,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appStatus.checkForUpdates = { [weak self] in self?.checkForUpdates() }
         updateStatusUI()
 
-        requestPermissions()
+        // First-run onboarding (5.2): on a fresh install, the wizard
+        // explains each permission before its system prompt appears.
+        // Installs that predate onboarding are grandfathered in.
+        let defaults = UserDefaults.standard
+        if !defaults.bool(forKey: "OnboardingCompleted"),
+           StatsStore.shared.totalDictations > 0 || !HistoryStore.shared.entries.isEmpty {
+            defaults.set(true, forKey: "OnboardingCompleted")
+        }
+        let needsOnboarding = !defaults.bool(forKey: "OnboardingCompleted")
+
+        if !needsOnboarding {
+            requestPermissions()
+        }
 
         recorder.onLevel = { [weak self] level in
             guard let self else { return }
@@ -125,10 +138,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Opened by the user → show the window like a normal app. Started
         // by login (or launchd) → stay in the background; the menu-bar icon
-        // is presence enough.
-        if !launchedAsLoginItem {
+        // is presence enough. Fresh install → the onboarding wizard instead.
+        if needsOnboarding {
+            showOnboarding()
+        } else if !launchedAsLoginItem {
             openMainWindow()
         }
+    }
+
+    // MARK: - Onboarding (backlog 5.2)
+
+    private func showOnboarding() {
+        if onboardingWindow == nil {
+            let view = OnboardingView(onFinish: { [weak self] in self?.completeOnboarding() })
+            let window = NSWindow(contentViewController: NSHostingController(rootView: view))
+            window.title = "Welcome to George's Words"
+            window.styleMask = [.titled, .closable]
+            window.isReleasedWhenClosed = false
+            onboardingWindow = window
+        }
+        onboardingWindow?.center()
+        NSApp.activate(ignoringOtherApps: true)
+        onboardingWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    private func completeOnboarding() {
+        UserDefaults.standard.set(true, forKey: "OnboardingCompleted")
+        onboardingWindow?.close()
+        onboardingWindow = nil
+        // Global event monitors registered before the Accessibility grant
+        // never receive events — install fresh ones now.
+        installHotkeys()
+        installEscMonitor()
+        openMainWindow()
     }
 
     /// Dock icon clicked (or app re-opened) with no visible windows.
@@ -256,6 +298,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Recording
 
     private func installEscMonitor() {
+        if let escMonitorGlobal { NSEvent.removeMonitor(escMonitorGlobal) }
+        if let escMonitorLocal { NSEvent.removeMonitor(escMonitorLocal) }
         let handle: (NSEvent) -> Bool = { [weak self] event in
             guard let self, event.keyCode == 53, case .recording = self.state else { return false }
             self.cancelRecording(message: "Cancelled")

@@ -50,7 +50,6 @@ When we start something from this list, move it out of here and into the work it
 
 ## 5. UX & fit-and-finish
 
-- [ ] **5.2 (M)** **First-run onboarding window** — walk through mic/Accessibility permissions, the 🌐-key setting, model download progress, and a "try it here" practice field. Currently the printed checklist in `build.sh` does this job poorly.
 - [ ] **5.3 (M)** **Settings redesign into tabs** (General / Formatting / Dictionary / Snippets / Advanced) as the option count grows.
 
 ## 6. Reliability & compatibility
