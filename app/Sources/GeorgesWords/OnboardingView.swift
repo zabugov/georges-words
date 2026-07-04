@@ -154,12 +154,14 @@ struct OnboardingView: View {
                 title: "Free up the fn key",
                 subtitle: "George's Words listens while you hold the fn key. By default macOS also uses that key for the emoji picker — one setting fixes the overlap."
             ) {
-                Text("In Keyboard settings, set **“Press 🌐 key to”** to **“Do Nothing”**.")
+                Text("In Keyboard settings, find **“Press 🌐 key to”** and choose **“Do Nothing”** — so it looks like this:")
+                GlobeKeyRowMock()
                 Button("Open Keyboard Settings") {
                     if let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") {
                         NSWorkspace.shared.open(url)
                     }
                 }
+                .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 Text("Prefer a different key? You can pick any key later in Settings → Hotkeys.")
                     .font(.callout)
@@ -345,19 +347,58 @@ struct PermissionRowMock: View {
         .frame(width: 320)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary, lineWidth: 1))
-        .overlay(alignment: .topTrailing) {
-            Text("EXAMPLE")
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Capsule().fill(.orange))
-                .rotationEffect(.degrees(8))
-                .offset(x: 12, y: -8)
+        .exampleSticker()
+    }
+}
+
+/// The Keyboard-settings row the 🌐-key page asks the user to change,
+/// shown in its finished state ("Do Nothing").
+struct GlobeKeyRowMock: View {
+    var body: some View {
+        HStack {
+            HStack(spacing: 4) {
+                Text("Press")
+                Image(systemName: "globe")
+                Text("key to")
+            }
+            Spacer()
+            HStack(spacing: 6) {
+                Text("Do Nothing")
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .controlColor)))
         }
-        .rotationEffect(.degrees(-2))
-        .allowsHitTesting(false)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(width: 320)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary, lineWidth: 1))
+        .exampleSticker()
+    }
+}
+
+extension View {
+    /// Illustration treatment for drawn Settings replicas: slight tilt,
+    /// an EXAMPLE tag, and no interactivity — a picture, not a control.
+    func exampleSticker() -> some View {
+        self
+            .overlay(alignment: .topTrailing) {
+                Text("EXAMPLE")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(.orange))
+                    .rotationEffect(.degrees(8))
+                    .offset(x: 12, y: -8)
+            }
+            .rotationEffect(.degrees(-2))
+            .allowsHitTesting(false)
+            .padding(.vertical, 4)
     }
 }
 
