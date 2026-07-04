@@ -156,7 +156,7 @@ struct OnboardingView: View {
             page(
                 icon: "arrow.down.circle",
                 title: "Two quick downloads",
-                subtitle: "The app is downloading the two things it needs — one to turn your speech into words, and one to tidy those words up. This happens once, by itself."
+                subtitle: "The app is downloading the two things it needs — one to turn your speech into words (about 600 MB), and one to tidy those words up (about 1 GB). This happens once, by itself."
             ) {
                 HStack(spacing: 8) {
                     if status.health == .ready {
