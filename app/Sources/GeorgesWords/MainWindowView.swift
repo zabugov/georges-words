@@ -410,6 +410,7 @@ private struct UpdateFooter: View {
 struct AboutView: View {
     @ObservedObject var status: AppStatus
     @ObservedObject var settings: AppSettings
+    @State private var versionTaps = 0
 
     var body: some View {
         Form {
@@ -440,9 +441,21 @@ struct AboutView: View {
             }
 
             Section("App") {
+                // Clicking the version five times reveals the testing-only
+                // factory reset — deliberately undiscoverable.
                 LabeledContent("Version", value: Self.version)
+                    .contentShape(Rectangle())
+                    .onTapGesture { versionTaps += 1 }
                 Button("Replay Welcome Tour") { status.replayOnboarding?() }
                 Link("GitHub repository", destination: URL(string: "https://github.com/zabugov/georges-words")!)
+                if versionTaps >= 5 {
+                    Button("Erase Everything & Quit", role: .destructive) {
+                        FactoryReset.perform()
+                    }
+                    Text("Fresh-install testing: wipes all settings, history, stats, the downloaded speech/polish files, and revokes the Microphone and Accessibility permissions, then quits. The next launch behaves exactly like a brand-new install — including ~1.6 GB of re-downloads.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
@@ -451,6 +464,37 @@ struct AboutView: View {
 
     static var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+    }
+}
+
+/// Testing-only: return the app to a factory-fresh state. Wipes defaults
+/// (settings, stats, onboarding flag), Application Support (history,
+/// corrections, the polish engine + models), revokes the TCC permissions
+/// via tccutil, and quits. Next launch = genuine first run.
+enum FactoryReset {
+
+    @MainActor
+    static func perform() {
+        // Stop the polish engine so its files aren't held open.
+        ManagedOllama.shared.shutdown()
+
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.georges.words"
+        for service in ["Microphone", "Accessibility"] {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+            process.arguments = ["reset", service, bundleID]
+            try? process.run()
+            process.waitUntilExit()
+        }
+
+        UserDefaults.standard.removePersistentDomain(forName: bundleID)
+        UserDefaults.standard.synchronize()
+
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("GeorgesWords", isDirectory: true)
+        try? FileManager.default.removeItem(at: appSupport)
+
+        NSApp.terminate(nil)
     }
 }
 
