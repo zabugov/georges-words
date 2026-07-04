@@ -28,6 +28,7 @@ struct OnboardingView: View {
     @State private var step: Step = .welcome
     @State private var micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
     @State private var axGranted = AXIsProcessTrusted()
+    @State private var fnKeyFreed = OnboardingView.fnKeyIsFreed()
     @State private var practiceText = ""
 
     var body: some View {
@@ -46,6 +47,7 @@ struct OnboardingView: View {
             while !Task.isCancelled {
                 micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
                 axGranted = AXIsProcessTrusted()
+                fnKeyFreed = Self.fnKeyIsFreed()
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
         }
@@ -164,16 +166,25 @@ struct OnboardingView: View {
                 title: "Free up the fn key",
                 subtitle: "George's Words listens while you hold the fn key. By default macOS also uses that key for the emoji picker — one setting fixes the overlap."
             ) {
-                Text("In Keyboard settings, find **“Press 🌐 key to”** and choose **“Do Nothing”** — so it looks like this:")
-                    .fixedSize(horizontal: false, vertical: true)
-                GlobeKeyRowMock()
-                Button("Open Keyboard Settings") {
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") {
-                        NSWorkspace.shared.open(url)
+                if fnKeyFreed {
+                    Label("The 🌐 key is set to “Do Nothing” — it's all yours", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                } else {
+                    Text("In Keyboard settings, find **“Press 🌐 key to”** and choose **“Do Nothing”** — so it looks like this:")
+                        .fixedSize(horizontal: false, vertical: true)
+                    GlobeKeyRowMock()
+                    Button("Open Keyboard Settings") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") {
+                            NSWorkspace.shared.open(url)
+                        }
                     }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    Text("Then come back — this page notices on its own.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
                 Text("Prefer a different key? You can pick any key later in Settings → Hotkeys.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -278,8 +289,18 @@ struct OnboardingView: View {
         switch step {
         case .microphone: return micStatus != .authorized
         case .accessibility: return !axGranted
+        case .globeKey: return !fnKeyFreed
         default: return false
         }
+    }
+
+    /// Whether "Press 🌐 key to" is set to "Do Nothing" (AppleFnUsageType
+    /// 0). macOS stores it in the HIToolbox domain, refreshed before each
+    /// read so the page updates live while System Settings is open.
+    static func fnKeyIsFreed() -> Bool {
+        CFPreferencesAppSynchronize("com.apple.HIToolbox" as CFString)
+        let value = CFPreferencesCopyAppValue("AppleFnUsageType" as CFString, "com.apple.HIToolbox" as CFString)
+        return (value as? Int) == 0
     }
 
     private var footer: some View {
