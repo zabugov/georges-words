@@ -46,16 +46,9 @@ By default each rebuild is ad-hoc signed, and macOS treats every rebuild as a *n
 
 After the *first* signed build, re-grant Accessibility one last time (System Settings → Privacy & Security → Accessibility → toggle GeorgesWords) and click "Always Allow" if macOS asks about keychain access during the build. Every rebuild after that keeps its permissions.
 
-### Optional: full AI polish via a local LLM
+### AI polish — automatic
 
-Dictation works out of the box with rule-based cleanup. For commercial-Flow-class rewriting (self-corrections, sentence restructuring, per-app tone), install [Ollama](https://ollama.com) and pull the default polish model:
-
-```sh
-brew install ollama        # or download from ollama.com
-ollama pull qwen2.5:3b
-```
-
-George's Words talks to Ollama at `localhost:11434` — an app-to-app call inside your Mac; no text goes to any network. If Ollama isn't running, the app silently falls back to rule-based cleanup. Never worse, sometimes much better.
+Full AI polish (self-corrections, sentence restructuring, per-app tone) sets itself up automatically: the app downloads and privately runs its own copy of the [Ollama](https://ollama.com) engine plus a small local model (~1 GB, one-time) — no Terminal, no separate installs. If you already run Ollama yourself, the app uses yours (`localhost:11434`) instead. Either way it's an app-to-app call inside your Mac; no text goes to any network, and if no engine is available yet, dictation falls back to rule-based cleanup. Never worse, sometimes much better.
 
 ## What it will do
 

@@ -3,12 +3,10 @@ import Foundation
 /// Backlog 7.7: a polish engine the app installs and runs itself, so a
 /// fresh Mac never needs Terminal or a separate Ollama install.
 ///
-/// Safety design (2026-07-03 — Zach wants zero risk to his working setup):
-/// - Does absolutely nothing unless the Settings toggle
-///   ("Manage the polish engine automatically") is on. Default: off.
-/// - Even when on, a user-installed Ollama at the standard port always
-///   wins — the managed engine only activates when 127.0.0.1:11434 is
-///   unreachable.
+/// This is the default polish path (promoted from experimental
+/// 2026-07-04 after passing Zach's live test):
+/// - A user-installed Ollama at the standard port always wins — the
+///   managed engine only activates when 127.0.0.1:11434 is unreachable.
 /// - Fully isolated: binary + models live in Application Support/
 ///   GeorgesWords/PolishEngine, the server runs on a private port
 ///   (11499), and the child process dies with the app. Turning the
@@ -148,7 +146,7 @@ final class ManagedOllama: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self, self.serverProcess === terminated else { return }
                 self.serverProcess = nil
-                guard AppSettings.shared.managedPolishEnabled else {
+                guard AppSettings.shared.llmEnabled else {
                     self.phase = .off
                     return
                 }

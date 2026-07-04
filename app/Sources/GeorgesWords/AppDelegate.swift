@@ -125,8 +125,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installHotkeys()
         observeSettings()
 
-        // 7.7: opt-in managed polish engine. No-op while the toggle is off.
-        if settings.managedPolishEnabled {
+        // The polish engine manages itself (7.7): a user-installed Ollama
+        // is used when present; otherwise the app runs its own.
+        if settings.llmEnabled {
             ManagedOllama.shared.ensureReady(model: settings.effectiveLLMModel)
         }
 
@@ -258,7 +259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
 
-        settings.$managedPolishEnabled
+        settings.$llmEnabled
             .dropFirst()
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
@@ -269,6 +270,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // (statically), so hop explicitly.
                 Task { @MainActor in
                     ManagedOllama.shared.setEnabled(enabled, model: model)
+                }
+            }
+            .store(in: &cancellables)
+
+        settings.$llmModel
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, self.settings.llmEnabled else { return }
+                let model = self.settings.effectiveLLMModel
+                // A newly picked model may need pulling on the managed engine.
+                Task { @MainActor in
+                    ManagedOllama.shared.ensureReady(model: model)
                 }
             }
             .store(in: &cancellables)

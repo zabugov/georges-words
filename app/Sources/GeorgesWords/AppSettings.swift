@@ -95,12 +95,6 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(polishStrength.rawValue, forKey: "PolishStrength") }
     }
 
-    /// 7.7: let the app install and run its own polish engine when no
-    /// user Ollama exists. Experimental — defaults to OFF, and the app
-    /// behaves exactly as before until it's turned on.
-    @Published var managedPolishEnabled: Bool {
-        didSet { defaults.set(managedPolishEnabled, forKey: "ManagedPolishEnabled") }
-    }
 
     static let defaultLLMModel = "qwen2.5:3b"
 
@@ -230,7 +224,6 @@ final class AppSettings: ObservableObject {
         launchAtLogin = SMAppService.mainApp.status == .enabled
         llmEnabled = defaults.object(forKey: "LLMEnabled") as? Bool ?? true
         polishStrength = PolishStrength(rawValue: defaults.string(forKey: "PolishStrength") ?? "") ?? .light
-        managedPolishEnabled = defaults.object(forKey: "ManagedPolishEnabled") as? Bool ?? false
         llmModel = defaults.string(forKey: "LLMModel") ?? Self.defaultLLMModel
         dictionaryText = defaults.string(forKey: "Dictionary") ?? ""
         if let data = defaults.data(forKey: "CommandHotkeySpec"),

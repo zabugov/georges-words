@@ -13,12 +13,11 @@ The outstanding work to bring George's Words to commercial Flow's level of polis
 > 2. **`qwen2.5:1.5b` as the polish model** — initial impression good; confirm
 >    speed ("Last: … polish" in the menu) and quality hold up vs `qwen2.5:3b`,
 >    then record the verdict here.
-> 3. **Managed polish engine (7.7, shipped OFF by default)** — with your own
->    Ollama running, flip Settings → "Manage the polish engine automatically"
->    on: nothing should change (Health shows it deferring). Then quit Ollama
->    and Recheck: the app should download its own engine + model with
->    progress in the Health card. Toggle off = instant revert; full
->    uninstall = delete Application Support → GeorgesWords → PolishEngine.
+> 3. **Managed polish engine (7.7 — now the default, validated 2026-07-04:**
+>    cold polish 2.8 s, warm 1.3 s with Ollama.app quit**)** — it prefers a
+>    running user Ollama, otherwise runs its own. Watch for regressions in
+>    daily use; full engine uninstall = delete Application Support →
+>    GeorgesWords → PolishEngine.
 
 When we start something from this list, move it out of here and into the work itself (commit/ADR); when new gaps show up in daily use, add them. Items carry stable numbers (e.g. **5.1**) so we can refer to them — when an item leaves the list, retire its number rather than renumbering the rest.
 

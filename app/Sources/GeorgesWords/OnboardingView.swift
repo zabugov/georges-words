@@ -151,15 +151,29 @@ struct OnboardingView: View {
                     Text(status.health == .ready ? "Speech model ready" : status.statusText)
                 }
                 Divider()
-                Toggle("Also set up AI polish automatically (recommended)", isOn: $settings.managedPolishEnabled)
-                Text("Downloads a small language model (~1 GB more, one-time) that tidies grammar and self-corrections — also fully on this Mac. Skip it and dictation still works with basic cleanup; you can turn it on anytime in Settings.")
+                HStack(spacing: 8) {
+                    switch managedEngine.phase {
+                    case .ready, .deferringToUserOllama:
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("AI polish ready")
+                    case .failed:
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundStyle(.orange)
+                        Text("AI polish setup hit a snag — see Troubleshooting later; dictation works regardless")
+                    case .off:
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(.secondary)
+                        Text("AI polish sets itself up automatically")
+                    default:
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Setting up AI polish in the background…")
+                    }
+                }
+                Text("Polish tidies grammar and self-corrections with a small language model (~1 GB, downloaded once) — also fully on this Mac. Dictation works while it sets up, with basic cleanup in the meantime.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                if settings.managedPolishEnabled, managedEngine.phase != .off, managedEngine.phase != .deferringToUserOllama {
-                    Text("Setting up in the background — progress lives in the Troubleshooting tab.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
             }
 
         case .practice:
