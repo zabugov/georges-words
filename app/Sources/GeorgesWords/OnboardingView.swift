@@ -77,7 +77,7 @@ struct OnboardingView: View {
             page(
                 icon: "mic",
                 title: "Microphone",
-                subtitle: "Needed to hear you while you hold the dictation key. Audio is transcribed on this Mac and never recorded to disk or sent anywhere."
+                subtitle: "Needed to hear you while you hold the fn key. Audio is turned into text on this Mac and never recorded to disk or sent anywhere."
             ) {
                 switch micStatus {
                 case .authorized:
