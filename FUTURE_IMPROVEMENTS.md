@@ -41,7 +41,6 @@ When we start something from this list, move it out of here and into the work it
 
 - [ ] **3.3 (L)** **Personal style matching** — learn the user's tone from local samples of their writing (e.g. pasted examples) instead of generic casual/professional presets. commercial's "sounds like you" feature, done locally.
 - [ ] **3.5 (S)** **Grow the few-shot bank** from real-world failures — keep a small corpus of messy-transcript → ideal-output pairs and iterate on it as bad cleanups are noticed.
-- [ ] **3.6 (S)** **Spoken commands "not working" — debug (Zach, 2026-07-03, first laptop test).** The cleaner logic passes CI tests through the full `clean()` pipeline, so check in order: (1) stale build — does the sidebar show Troubleshooting? If not, `git pull && ./app/build.sh`; (2) what does the History entry show verbatim? Literal "new line" words = cleaner missed it (need the exact raw phrasing — maybe the engine emitted "new-line"/"knew line"/an inserted article, since "a new line"/"the new line" is suppressed by design); real line break in History but not in the target app = insertion issue (single-line fields drop newlines — note which app); (3) controlled test in TextEdit: "first point new line second point" → two lines, and "she said quote ship it end quote" → real quotes. Fix is likely a one-line pattern tweak once the failing transcript is known.
 
 ## 4. Feature parity with commercial Flow
 
