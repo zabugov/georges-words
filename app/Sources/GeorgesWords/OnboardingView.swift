@@ -36,7 +36,7 @@ struct OnboardingView: View {
             footer
                 .padding(16)
         }
-        .frame(width: 560, height: 600)
+        .frame(width: 520)
         .task {
             // Live permission status while the wizard is open — grants
             // happen in System Settings, outside our control.
@@ -54,17 +54,24 @@ struct OnboardingView: View {
     private var content: some View {
         switch step {
         case .welcome:
-            page(
-                icon: nil,
-                title: "Welcome to George's Words",
-                subtitle: "Hold a key, speak, release — clean text appears wherever you're typing. Everything runs on this Mac: audio and transcripts never leave it. No account, no cloud."
-            ) {
+            VStack(spacing: 16) {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
-                    .frame(width: 96, height: 96)
-                Text("The next few steps take about two minutes: two macOS permissions, one keyboard setting, and a test run.")
+                    .frame(width: 110, height: 110)
+                Text("Welcome to George's Words.")
+                    .font(.title.bold())
+                FnKeycap()
+                Text("Talk instead of type. Hold down the **fn key** — the bottom-left corner of your keyboard — say what you want to write, and let go. Your words appear right where you were typing, spelled and punctuated properly.")
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Everything happens privately on this computer. Your voice never leaves it — nobody can hear what you say except you.")
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Setup takes about two minutes.")
+                    .font(.callout)
+                    .foregroundStyle(.tertiary)
             }
+            .frame(maxWidth: .infinity)
+            .multilineTextAlignment(.center)
 
         case .microphone:
             page(
@@ -119,8 +126,8 @@ struct OnboardingView: View {
         case .globeKey:
             page(
                 icon: "globe",
-                title: "Free up the 🌐 key",
-                subtitle: "The dictation key is Fn (🌐), bottom-left of the keyboard. By default macOS also uses it for the emoji picker — one setting fixes that."
+                title: "Free up the fn key",
+                subtitle: "George's Words listens while you hold the fn key. By default macOS also uses that key for the emoji picker — one setting fixes the overlap."
             ) {
                 Text("In Keyboard settings, set **“Press 🌐 key to”** to **“Do Nothing”**.")
                 Button("Open Keyboard Settings") {
@@ -204,7 +211,7 @@ struct OnboardingView: View {
         subtitle: String,
         @ViewBuilder extra: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(spacing: 14) {
             if let icon {
                 Image(systemName: icon)
                     .font(.system(size: 34))
@@ -217,7 +224,8 @@ struct OnboardingView: View {
                 .fixedSize(horizontal: false, vertical: true)
             extra()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
     }
 
     // MARK: - Navigation
@@ -251,5 +259,35 @@ struct OnboardingView: View {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") {
             NSWorkspace.shared.open(url)
         }
+    }
+}
+
+/// A drawn Mac fn keycap (🌐 bottom-left, "fn" top-right, like the real
+/// key) — crisper than a bitmap at any size and matches light/dark mode.
+struct FnKeycap: View {
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(nsColor: .controlBackgroundColor))
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(.quaternary, lineWidth: 1)
+            VStack {
+                HStack {
+                    Spacer()
+                    Text("fn")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                Spacer()
+                HStack {
+                    Image(systemName: "globe")
+                        .font(.system(size: 17))
+                    Spacer()
+                }
+            }
+            .padding(10)
+            .foregroundStyle(.secondary)
+        }
+        .frame(width: 68, height: 68)
+        .shadow(color: .black.opacity(0.12), radius: 1.5, y: 1)
     }
 }
