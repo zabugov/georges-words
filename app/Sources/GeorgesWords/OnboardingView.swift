@@ -90,6 +90,7 @@ struct OnboardingView: View {
                             }
                         }
                     }
+                    .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                 default:
                     VStack(alignment: .leading, spacing: 10) {
@@ -102,6 +103,7 @@ struct OnboardingView: View {
                     Button("Open Microphone Settings") {
                         Self.openPrivacyPane("Privacy_Microphone")
                     }
+                    .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     Text("Then come back to this window — it notices on its own and shows a green checkmark here. (If it doesn't update, quit the app and open it again.)")
                         .font(.callout)
@@ -135,6 +137,7 @@ struct OnboardingView: View {
                         AXIsProcessTrustedWithOptions(options)
                         Self.openPrivacyPane("Privacy_Accessibility")
                     }
+                    .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     Text("Then come back to this window — it notices on its own and shows a green checkmark here.")
                         .font(.callout)
@@ -250,6 +253,16 @@ struct OnboardingView: View {
 
     // MARK: - Navigation
 
+    /// True while the current page has an unfinished permission action —
+    /// its in-page button should be the only blue one on screen.
+    private var pageActionPending: Bool {
+        switch step {
+        case .microphone: return micStatus != .authorized
+        case .accessibility: return !axGranted
+        default: return false
+        }
+    }
+
     private var footer: some View {
         HStack {
             if step != .welcome {
@@ -264,14 +277,20 @@ struct OnboardingView: View {
             Text("\(step.rawValue + 1) of \(Step.allCases.count)")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
-            Button(step == .practice ? "Finish" : (step == .welcome ? "Get Started" : "Continue")) {
+            let primaryTitle = step == .practice ? "Finish" : (step == .welcome ? "Get Started" : "Continue")
+            let advance = {
                 if step == .practice {
                     onFinish()
                 } else {
                     step = Step(rawValue: step.rawValue + 1) ?? .practice
                 }
             }
-            .keyboardShortcut(.defaultAction)
+            if pageActionPending {
+                Button(primaryTitle, action: advance)
+            } else {
+                Button(primaryTitle, action: advance)
+                    .keyboardShortcut(.defaultAction)
+            }
         }
     }
 
