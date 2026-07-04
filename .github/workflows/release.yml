@@ -104,6 +104,9 @@ jobs:
             codesign --force --timestamp --sign "$SIGN_IDENTITY" "dist/GeorgesWords-$VERSION.dmg"
           fi
 
+      # Submit once, then poll with retries: first-account notarizations
+      # sit in Apple's queue for a long while, and a single --wait dies on
+      # any transient runner network blip (seen in run #3).
       - name: Notarize and staple
         if: env.HAS_NOTARY == 'true' && env.HAS_SIGNING == 'true'
         env:
@@ -111,9 +114,33 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
-          xcrun notarytool submit "dist/GeorgesWords-$VERSION.dmg" \
+          SUBMISSION_ID=$(xcrun notarytool submit "dist/GeorgesWords-$VERSION.dmg" \
             --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
-            --password "$APPLE_APP_PASSWORD" --wait
+            --password "$APPLE_APP_PASSWORD" --output-format json \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+          echo "Notary submission: $SUBMISSION_ID"
+          done=""
+          for attempt in 1 2 3 4; do
+            if xcrun notarytool wait "$SUBMISSION_ID" \
+              --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_APP_PASSWORD" --timeout 45m; then
+              done=1
+              break
+            fi
+            echo "wait attempt $attempt dropped (network blip?) — retrying in 30 s"
+            sleep 30
+          done
+          STATUS=$(xcrun notarytool info "$SUBMISSION_ID" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" --output-format json \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['status'])")
+          echo "Notary status: $STATUS"
+          if [ "$STATUS" != "Accepted" ]; then
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_APP_PASSWORD" || true
+            exit 1
+          fi
           xcrun stapler staple "dist/GeorgesWords-$VERSION.dmg"
 
       - name: Verify bundle structure

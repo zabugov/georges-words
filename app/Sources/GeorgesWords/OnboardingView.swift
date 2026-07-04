@@ -61,7 +61,7 @@ struct OnboardingView: View {
                 Text("Welcome to George's Words.")
                     .font(.title.bold())
                 FnKeycap()
-                Text("Talk instead of type. Hold down the **fn key** — the bottom-left corner of your keyboard — say what you want to write, and let go. Your words appear right where you were typing, spelled and punctuated properly.")
+                Text("Once this quick setup is done, you'll talk instead of type: hold down the **fn key** — the bottom-left corner of your keyboard — say what you want to write, and let go. Your words will appear right where you were typing, spelled and punctuated properly.")
                     .fixedSize(horizontal: false, vertical: true)
                 Text("Everything happens privately on this computer. Your voice never leaves it — nobody can hear what you say except you.")
                     .foregroundStyle(.secondary)
