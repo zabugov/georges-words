@@ -125,26 +125,31 @@ struct OnboardingView: View {
                         .foregroundStyle(.green)
                 } else {
                     VStack(alignment: .leading, spacing: 10) {
-                        stepRow(1, "Click **Open Accessibility Settings** below. The right page opens by itself.")
-                        stepRow(2, "Find **GeorgesWords** in the list of apps.")
-                        stepRow(3, "Click its switch so it turns blue and slides right — like this:")
-                    }
-                    .multilineTextAlignment(.leading)
-                    PermissionRowMock()
-                    VStack(alignment: .leading, spacing: 10) {
+                        stepRow(1, "Click **Ask for Access** below.")
+                        stepRow(2, "Your Mac will show a message — click **Open System Settings** on it.")
+                        stepRow(3, "Find **GeorgesWords** in the list and click its switch so it turns blue — like this:")
                         stepRow(4, "If your Mac asks for your login password, that's normal — enter it.")
                     }
                     .multilineTextAlignment(.leading)
-                    Button("Open Accessibility Settings") {
+                    PermissionRowMock()
+                    // One path only: the system dialog's own button opens the
+                    // right Settings page. Deep-linking ourselves at the same
+                    // time buried that dialog behind System Settings, where
+                    // it lingered unanswered (Zach hit exactly this).
+                    Button("Ask for Access") {
                         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
                         AXIsProcessTrustedWithOptions(options)
-                        Self.openPrivacyPane("Privacy_Accessibility")
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     Text("Then come back to this window — it notices on its own and shows a green checkmark here.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                    Button("No message appeared? Open the settings page directly") {
+                        Self.openPrivacyPane("Privacy_Accessibility")
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
                 }
             }
 
