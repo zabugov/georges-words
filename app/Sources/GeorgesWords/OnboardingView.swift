@@ -217,7 +217,7 @@ struct OnboardingView: View {
                     .frame(height: 100)
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
                 if practiceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text("A pill appears at the bottom of the screen while you speak. Quick-tap the key instead of holding to dictate hands-free.")
+                    Text("Your words will appear on the screen as you speak. When you let go, they'll be right where you would have typed them — but better.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 } else {
