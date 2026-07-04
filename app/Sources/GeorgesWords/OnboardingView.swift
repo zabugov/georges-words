@@ -153,7 +153,7 @@ struct OnboardingView: View {
                 Divider()
                 HStack(spacing: 8) {
                     switch managedEngine.phase {
-                    case .ready, .deferringToUserOllama:
+                    case .ready:
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                         Text("AI polish ready")

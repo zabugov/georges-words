@@ -295,32 +295,34 @@ struct TroubleshootingView: View {
         } else if let managedRow {
             rows.append(managedRow)
         } else if ollamaRunning == nil {
-            rows.append(HealthRow(id: "polish", level: .warn, title: "AI polish", detail: "Checking Ollama…"))
+            rows.append(HealthRow(id: "polish", level: .warn, title: "AI polish", detail: "Checking the polish engine…"))
         } else if ollamaRunning == false {
             rows.append(HealthRow(
                 id: "polish", level: .warn, title: "AI polish",
-                detail: "Ollama isn't running — dictation still works, with rule-based cleanup instead of the full polish",
-                fixTitle: "Get Ollama",
-                fix: { NSWorkspace.shared.open(URL(string: "https://ollama.com")!) }
+                detail: "The polish engine isn't running — Recheck starts it. Dictation still works meanwhile, with rule-based cleanup.",
+                fixTitle: "Recheck",
+                fix: { ManagedOllama.shared.ensureReady(model: settings.effectiveLLMModel) }
             ))
         } else if let models = ollamaModels, !models.contains(settings.effectiveLLMModel) {
             rows.append(HealthRow(
                 id: "polish", level: .warn, title: "AI polish",
-                detail: "Ollama is running but \(settings.effectiveLLMModel) isn't downloaded — run: ollama pull \(settings.effectiveLLMModel)"
+                detail: "\(settings.effectiveLLMModel) isn't downloaded yet — the engine fetches it automatically; Recheck to kick it",
+                fixTitle: "Recheck",
+                fix: { ManagedOllama.shared.ensureReady(model: settings.effectiveLLMModel) }
             ))
         } else {
-            rows.append(HealthRow(id: "polish", level: .ok, title: "AI polish", detail: "\(settings.effectiveLLMModel) via Ollama, ready"))
+            rows.append(HealthRow(id: "polish", level: .ok, title: "AI polish", detail: "\(settings.effectiveLLMModel), ready"))
         }
 
         return rows
     }
 
-    /// The managed engine's (7.7) live state, when it's doing something
-    /// worth showing. nil = fall back to the normal Ollama checks.
+    /// The engine's live state, when it's doing something worth showing.
+    /// nil = fall back to the endpoint probes.
     private var managedRow: HealthRow? {
         let model = settings.effectiveLLMModel
         switch managedEngine.phase {
-        case .off, .deferringToUserOllama:
+        case .off:
             return nil
         case .downloadingEngine:
             return HealthRow(id: "polish", level: .warn, title: "AI polish", detail: "Downloading the polish engine (~120 MB, one-time)…")
@@ -430,7 +432,7 @@ struct AboutView: View {
             Section("Engine") {
                 Text(status.engineDescription)
                 if settings.llmEnabled {
-                    Text("Polish model: \(settings.effectiveLLMModel) via Ollama (localhost)")
+                    Text("Polish model: \(settings.effectiveLLMModel) via the app's built-in engine (localhost)")
                 }
                 Text("Tip: set System Settings → Keyboard → “Press 🌐 key” to “Do Nothing” so holding Fn doesn’t open the emoji picker.")
                     .font(.footnote)

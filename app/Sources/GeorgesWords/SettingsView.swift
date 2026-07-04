@@ -100,15 +100,15 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
 
                 if ollamaRunning == nil {
-                    Text("Checking for Ollama…")
+                    Text("Checking the polish engine…")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } else if ollamaRunning == false {
-                    Text("Ollama isn’t running. Install it from ollama.com, then run:  ollama pull \(settings.effectiveLLMModel)\nDictation still works without it — you just get rule-based cleanup instead of the full rewrite.")
+                    Text("The polish engine isn’t running yet — it starts and sets itself up automatically (progress under Troubleshooting). Dictation still works meanwhile, with rule-based cleanup instead of the full rewrite.")
                         .font(.footnote)
                         .foregroundStyle(.orange)
                 } else if let models = installedModels, models.isEmpty {
-                    Text("Ollama is running but has no models downloaded yet. In Terminal:  ollama pull \(AppSettings.defaultLLMModel)  — then click Refresh.")
+                    Text("The engine is running and downloading its first model — check Troubleshooting for progress, then click Refresh.")
                         .font(.footnote)
                         .foregroundStyle(.orange)
                 } else if let models = installedModels {
@@ -124,11 +124,11 @@ struct SettingsView: View {
                     }
                     .disabled(!settings.llmEnabled)
                     if !settings.llmModel.isEmpty && !models.contains(settings.llmModel) {
-                        Text("This model isn’t downloaded anymore — pick another, or run:  ollama pull \(settings.llmModel)")
+                        Text("This model isn’t downloaded yet — the engine fetches it automatically; watch Troubleshooting, then Refresh.")
                             .font(.footnote)
                             .foregroundStyle(.orange)
                     }
-                    Label("Ollama detected — \(models.count) model\(models.count == 1 ? "" : "s") available", systemImage: "checkmark.circle.fill")
+                    Label("Polish engine running — \(models.count) model\(models.count == 1 ? "" : "s") available", systemImage: "checkmark.circle.fill")
                         .font(.footnote)
                         .foregroundStyle(.green)
                 }
@@ -137,11 +137,8 @@ struct SettingsView: View {
                     Task { await refreshOllama() }
                 }
 
-                Text("The polish engine manages itself: a normal Ollama install is used when it's running; otherwise the app runs its own private copy (downloaded once, ~120 MB + the model) and keeps it out of sight. Setup progress appears under Troubleshooting.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
 
-                Text("Fixes self-corrections (“Tuesday — no wait, Friday”), sentence structure, and tone, matched to the app you’re dictating into. Runs entirely on this Mac via Ollama (localhost); nothing is sent anywhere. Download more models with “ollama pull <name>”, then Refresh.")
+                Text("Fixes self-corrections (“Tuesday — no wait, Friday”), sentence structure, and tone, matched to the app you’re dictating into. The app runs its own private engine, entirely on this Mac — nothing is installed system-wide and nothing is sent anywhere. Its files live in Application Support → GeorgesWords → PolishEngine.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

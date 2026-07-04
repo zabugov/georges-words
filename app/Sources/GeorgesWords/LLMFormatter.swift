@@ -20,12 +20,9 @@ import Foundation
 /// caller falls back to the rule-cleaned transcript.
 final class LLMFormatter {
 
-    /// The standard user-installed Ollama.
-    static let defaultBaseURL = URL(string: "http://127.0.0.1:11434")!
-
-    /// Where the app talks to Ollama. The managed engine (7.7) repoints
-    /// this to its private port when — and only when — it is active.
-    static var baseURL = defaultBaseURL
+    /// The app's own polish engine (ManagedOllama, private port) — the
+    /// only endpoint the app ever talks to.
+    static let baseURL = URL(string: "http://127.0.0.1:11499")!
 
     private static let keepAlive = "30m"
 

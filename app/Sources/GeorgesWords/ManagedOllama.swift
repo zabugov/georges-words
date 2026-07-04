@@ -3,15 +3,13 @@ import Foundation
 /// Backlog 7.7: a polish engine the app installs and runs itself, so a
 /// fresh Mac never needs Terminal or a separate Ollama install.
 ///
-/// This is the default polish path (promoted from experimental
-/// 2026-07-04 after passing Zach's live test):
-/// - A user-installed Ollama at the standard port always wins — the
-///   managed engine only activates when 127.0.0.1:11434 is unreachable.
+/// This is THE polish engine (Zach's call, 2026-07-04): the app always
+/// runs its own, regardless of any separately installed Ollama — one
+/// identical code path on every machine.
 /// - Fully isolated: binary + models live in Application Support/
 ///   GeorgesWords/PolishEngine, the server runs on a private port
-///   (11499), and the child process dies with the app. Turning the
-///   toggle off stops the engine and restores the default endpoint
-///   immediately; deleting the folder is a complete uninstall.
+///   (11499), and the child process dies with the app. Deleting the
+///   folder is a complete uninstall.
 @MainActor
 final class ManagedOllama: ObservableObject {
 
@@ -25,7 +23,6 @@ final class ManagedOllama: ObservableObject {
 
     enum Phase: Equatable {
         case off
-        case deferringToUserOllama
         case downloadingEngine
         case startingEngine
         case downloadingModel(percent: Int?)
@@ -64,7 +61,7 @@ final class ManagedOllama: ObservableObject {
         }
     }
 
-    /// Stop the engine and restore the default endpoint. Instant revert.
+    /// Stop the engine. Instant off-switch.
     func shutdown() {
         setupTask?.cancel()
         setupTask = nil
@@ -73,18 +70,10 @@ final class ManagedOllama: ObservableObject {
         let process = serverProcess
         serverProcess = nil
         process?.terminate()
-        LLMFormatter.baseURL = LLMFormatter.defaultBaseURL
         phase = .off
     }
 
     private func run(model: String) async {
-        // A normal Ollama install always takes precedence.
-        if await Self.responds(LLMFormatter.defaultBaseURL) {
-            LLMFormatter.baseURL = LLMFormatter.defaultBaseURL
-            phase = .deferringToUserOllama
-            return
-        }
-
         do {
             if !FileManager.default.isExecutableFile(atPath: binaryURL.path) {
                 phase = .downloadingEngine
@@ -95,7 +84,6 @@ final class ManagedOllama: ObservableObject {
                 try startServer()
                 try await waitForServer()
             }
-            LLMFormatter.baseURL = Self.baseURL
             if !(await hasModel(model)) {
                 phase = .downloadingModel(percent: nil)
                 try await pull(model: model)
@@ -105,7 +93,6 @@ final class ManagedOllama: ObservableObject {
             phase = .ready
         } catch {
             guard !Task.isCancelled else { return }
-            LLMFormatter.baseURL = LLMFormatter.defaultBaseURL
             phase = .failed(error.localizedDescription)
         }
     }
