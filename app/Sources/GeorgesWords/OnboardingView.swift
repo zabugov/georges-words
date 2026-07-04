@@ -60,7 +60,6 @@ struct OnboardingView: View {
                     .frame(width: 110, height: 110)
                 Text("Welcome to George's Words.")
                     .font(.title.bold())
-                FnKeycap()
                 Text("Once this quick setup is done, you'll talk instead of type: hold down the **fn key** — the bottom-left corner of your keyboard — say what you want to write, and let go. Your words will appear right where you were typing, spelled and punctuated properly.")
                     .fixedSize(horizontal: false, vertical: true)
                 Text("Everything happens privately on this computer. Your voice never leaves it — nobody can hear what you say except you.")
@@ -205,10 +204,11 @@ struct OnboardingView: View {
 
         case .practice:
             page(
-                icon: "waveform",
+                icon: nil,
                 title: "Try it",
-                subtitle: "Click into the box below, hold \(settings.hotkey.displayName), say a sentence, and release."
+                subtitle: "Click into the box, hold down this key, say a sentence, and let go:"
             ) {
+                FnKeycap()
                 TextEditor(text: $practiceText)
                     .font(.body)
                     .frame(height: 100)
