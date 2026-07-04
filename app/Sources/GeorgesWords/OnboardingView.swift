@@ -121,7 +121,7 @@ struct OnboardingView: View {
             page(
                 icon: "keyboard",
                 title: "Accessibility",
-                subtitle: "This lets the app notice when you hold the fn key and place your words where you're typing. macOS calls this \"Accessibility\" access."
+                subtitle: "This lets the app notice when you hold the fn key and place your words where you're typing. Your Mac calls this \"Accessibility\" access."
             ) {
                 if axGranted {
                     Label("Accessibility access granted", systemImage: "checkmark.circle.fill")
@@ -164,7 +164,7 @@ struct OnboardingView: View {
             page(
                 icon: "globe",
                 title: "Free up the fn key",
-                subtitle: "George's Words listens while you hold the fn key. By default macOS also uses that key for the emoji picker — one setting fixes the overlap."
+                subtitle: "George's Words listens while you hold the fn key. Your Mac normally uses that key for the emoji picker — one quick setting change gives the key to George's Words instead."
             ) {
                 if fnKeyFreed {
                     Label("The 🌐 key is set to “Do Nothing” — it's all yours", systemImage: "checkmark.circle.fill")
