@@ -18,6 +18,9 @@ struct OnboardingView: View {
     }
 
     let onFinish: () -> Void
+    /// Fired when the Try-it page appears — the moment dictation should
+    /// come alive. Before that, holding fn must do nothing.
+    let onReachedPractice: () -> Void
 
     @ObservedObject private var status = AppStatus.shared
     @ObservedObject private var settings = AppSettings.shared
@@ -282,7 +285,11 @@ struct OnboardingView: View {
                 if step == .practice {
                     onFinish()
                 } else {
-                    step = Step(rawValue: step.rawValue + 1) ?? .practice
+                    let next = Step(rawValue: step.rawValue + 1) ?? .practice
+                    step = next
+                    if next == .practice {
+                        onReachedPractice()
+                    }
                 }
             }
             if pageActionPending {
@@ -313,7 +320,8 @@ struct OnboardingView: View {
 
 /// A drawn replica of the System Settings row the user must switch on —
 /// shows exactly what to look for, in the current light/dark appearance.
-/// Used by both the Microphone and Accessibility pages.
+/// Tilted with an EXAMPLE tag so it reads as an illustration, not a
+/// clickable control. Used by both the Microphone and Accessibility pages.
 struct PermissionRowMock: View {
     var body: some View {
         HStack(spacing: 10) {
@@ -337,6 +345,19 @@ struct PermissionRowMock: View {
         .frame(width: 320)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary, lineWidth: 1))
+        .overlay(alignment: .topTrailing) {
+            Text("EXAMPLE")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Capsule().fill(.orange))
+                .rotationEffect(.degrees(8))
+                .offset(x: 12, y: -8)
+        }
+        .rotationEffect(.degrees(-2))
+        .allowsHitTesting(false)
+        .padding(.vertical, 4)
     }
 }
 

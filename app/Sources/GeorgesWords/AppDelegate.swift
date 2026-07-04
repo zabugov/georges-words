@@ -94,8 +94,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.cancelRecording(message: "Audio device changed — dictation cancelled")
         }
 
-        installEscMonitor()
-
         // All update UI lives in the sidebar footer (UpdateFooter): the
         // pill is for dictation feedback only. The menu-bar item still
         // mirrors the phase so it can't be re-triggered mid-run.
@@ -122,7 +120,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showUpdateNotice("Updated to the latest version ✓")
         }
 
-        installHotkeys()
+        // During onboarding, holding fn must do nothing until the Try-it
+        // page — the wizard turns dictation on at that moment.
+        if !needsOnboarding {
+            installHotkeys()
+            installEscMonitor()
+        }
         observeSettings()
 
         // The polish engine manages itself (7.7): a user-installed Ollama
@@ -147,7 +150,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showOnboarding() {
         if onboardingWindow == nil {
-            let view = OnboardingView(onFinish: { [weak self] in self?.completeOnboarding() })
+            let view = OnboardingView(
+                onFinish: { [weak self] in self?.completeOnboarding() },
+                onReachedPractice: { [weak self] in
+                    self?.installHotkeys()
+                    self?.installEscMonitor()
+                }
+            )
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
             window.title = "Welcome to George's Words"
             window.styleMask = [.titled, .closable]
