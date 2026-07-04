@@ -443,6 +443,7 @@ struct AboutView: View {
 
             Section("App") {
                 LabeledContent("Version", value: Self.version)
+                Button("Replay Welcome Tour") { status.replayOnboarding?() }
                 Link("GitHub repository", destination: URL(string: "https://github.com/zabugov/georges-words")!)
             }
         }

@@ -63,15 +63,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appStatus.checkForUpdates = { [weak self] in self?.checkForUpdates() }
         updateStatusUI()
 
-        // First-run onboarding (5.2): on a fresh install, the wizard
-        // explains each permission before its system prompt appears.
-        // Installs that predate onboarding are grandfathered in.
-        let defaults = UserDefaults.standard
-        if !defaults.bool(forKey: "OnboardingCompleted"),
-           StatsStore.shared.totalDictations > 0 || !HistoryStore.shared.entries.isEmpty {
-            defaults.set(true, forKey: "OnboardingCompleted")
-        }
-        let needsOnboarding = !defaults.bool(forKey: "OnboardingCompleted")
+        // First-run onboarding (5.2): the wizard explains each permission
+        // before its system prompt appears. Shown until completed once;
+        // wiping the defaults domain (fresh-install testing) brings it back.
+        let needsOnboarding = !UserDefaults.standard.bool(forKey: "OnboardingCompleted")
+        appStatus.replayOnboarding = { [weak self] in self?.showOnboarding() }
 
         if !needsOnboarding {
             requestPermissions()

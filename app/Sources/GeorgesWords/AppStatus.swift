@@ -70,6 +70,7 @@ final class AppStatus: ObservableObject {
     @Published var updateNotice: String?
 
     var checkForUpdates: (() -> Void)?
+    var replayOnboarding: (() -> Void)?
 
     private init() {}
 }
