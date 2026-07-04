@@ -30,7 +30,9 @@ on:
 jobs:
   dmg:
     runs-on: macos-15
-    timeout-minutes: 60
+    # Generous: a new Apple account's first notarizations can sit in
+    # extended review for over an hour. Steady-state runs take minutes.
+    timeout-minutes: 180
     env:
       HAS_SIGNING: ${{ secrets.MACOS_CERT_P12 != '' }}
       HAS_NOTARY: ${{ secrets.APPLE_APP_PASSWORD != '' }}
