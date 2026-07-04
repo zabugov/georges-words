@@ -105,19 +105,30 @@ struct OnboardingView: View {
             page(
                 icon: "keyboard",
                 title: "Accessibility",
-                subtitle: "Lets the app watch for your dictation key and place finished text at your cursor in other apps. macOS calls this \"Accessibility\" access."
+                subtitle: "This lets the app notice when you hold the fn key and place your words where you're typing. macOS calls this \"Accessibility\" access."
             ) {
                 if axGranted {
                     Label("Accessibility access granted", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 } else {
-                    Button("Grant Accessibility Access") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        stepRow(1, "Click **Open Accessibility Settings** below. The right page opens by itself.")
+                        stepRow(2, "Find **GeorgesWords** in the list of apps.")
+                        stepRow(3, "Click its switch so it turns blue and slides right — like this:")
+                    }
+                    .multilineTextAlignment(.leading)
+                    AccessibilityRowMock()
+                    VStack(alignment: .leading, spacing: 10) {
+                        stepRow(4, "If your Mac asks for your login password, that's normal — enter it.")
+                    }
+                    .multilineTextAlignment(.leading)
+                    Button("Open Accessibility Settings") {
                         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
                         AXIsProcessTrustedWithOptions(options)
                         Self.openPrivacyPane("Privacy_Accessibility")
                     }
                     .controlSize(.large)
-                    Text("System Settings will open — turn on GeorgesWords in the list, then come back here. This page updates by itself.")
+                    Text("Then come back to this window — it notices on its own and shows a green checkmark here.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -255,10 +266,48 @@ struct OnboardingView: View {
         }
     }
 
+    private func stepRow(_ number: Int, _ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("\(number).")
+                .fontWeight(.semibold)
+                .monospacedDigit()
+            Text(.init(text))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private static func openPrivacyPane(_ anchor: String) {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") {
             NSWorkspace.shared.open(url)
         }
+    }
+}
+
+/// A drawn replica of the System Settings row the user must switch on —
+/// shows exactly what to look for, in the current light/dark appearance.
+struct AccessibilityRowMock: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 26, height: 26)
+            Text("GeorgesWords")
+            Spacer()
+            Capsule()
+                .fill(.blue)
+                .frame(width: 40, height: 24)
+                .overlay(alignment: .trailing) {
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 20, height: 20)
+                        .padding(2)
+                }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(width: 320)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary, lineWidth: 1))
     }
 }
 
