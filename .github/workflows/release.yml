@@ -4,11 +4,23 @@ name: Release DMG
 # or on a version tag push. Self-contained on purpose: it does NOT touch
 # build.sh or the local dev flow.
 #
-# Until a Developer ID exists (backlog 7.1), the DMG is ad-hoc signed —
-# fine for our own Macs, but other Macs will show Gatekeeper's
-# "unidentified developer" flow. Once the Apple Developer account exists,
-# add the two commented steps below (real signing + notarization) and
-# the same pipeline produces a drag-and-drop-installable DMG.
+# Signing is automatic based on which repo secrets exist:
+#   - No secrets → ad-hoc signed DMG (fine for our own Macs).
+#   - MACOS_CERT_P12 + MACOS_CERT_PASSWORD → Developer ID signing with
+#     hardened runtime.
+#   - APPLE_ID + APPLE_TEAM_ID + APPLE_APP_PASSWORD as well → notarized
+#     and stapled: installs on any Mac with zero Gatekeeper friction.
+#
+# Secrets to add after backlog 7.1 (Settings → Secrets and variables →
+# Actions):
+#   MACOS_CERT_P12       base64 of the exported Developer ID Application
+#                        certificate (.p12):  base64 -i cert.p12 | pbcopy
+#   MACOS_CERT_PASSWORD  the .p12 export password
+#   APPLE_ID             Apple ID email of the developer account
+#   APPLE_TEAM_ID        10-character team ID (developer.apple.com →
+#                        Membership details)
+#   APPLE_APP_PASSWORD   app-specific password (account.apple.com →
+#                        Sign-In and Security → App-Specific Passwords)
 
 on:
   workflow_dispatch:
@@ -19,6 +31,9 @@ jobs:
   dmg:
     runs-on: macos-15
     timeout-minutes: 60
+    env:
+      HAS_SIGNING: ${{ secrets.MACOS_CERT_P12 != '' }}
+      HAS_NOTARY: ${{ secrets.APPLE_APP_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -32,6 +47,7 @@ jobs:
           restore-keys: |
             spm-${{ runner.os }}-
 
+      # The same build that build.sh ships.
       - name: Build (release)
         working-directory: app
         run: swift build -c release
@@ -44,19 +60,37 @@ jobs:
           cp app/Info.plist "$APP/Contents/Info.plist"
           cp app/icon/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
-      # ---- Developer ID signing (enable after backlog 7.1) ----
-      # Needs repo secrets: MACOS_CERT_P12 (base64), MACOS_CERT_PASSWORD.
-      # - name: Import signing certificate
-      #   run: |
-      #     echo "$MACOS_CERT_P12" | base64 --decode > cert.p12
-      #     security create-keychain -p ci build.keychain
-      #     security default-keychain -s build.keychain
-      #     security unlock-keychain -p ci build.keychain
-      #     security import cert.p12 -k build.keychain -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
-      #     security set-key-partition-list -S apple-tool:,apple: -s -k ci build.keychain
+      - name: Import signing certificate
+        if: env.HAS_SIGNING == 'true'
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          echo "$MACOS_CERT_P12" | base64 --decode > cert.p12
+          security create-keychain -p ci build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p ci build.keychain
+          security import cert.p12 -k build.keychain -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ci build.keychain
+          rm cert.p12
+          IDENTITY=$(security find-identity -v -p codesigning build.keychain | awk -F'"' '/Developer ID Application/ {print $2; exit}')
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::Certificate imported but no 'Developer ID Application' identity found — wrong certificate type?"
+            exit 1
+          fi
+          echo "SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
 
-      - name: Sign (ad-hoc until 7.1)
-        run: codesign --force --deep --sign - dist/GeorgesWords.app
+      - name: Sign
+        run: |
+          if [ -n "${SIGN_IDENTITY:-}" ]; then
+            echo "Signing with: $SIGN_IDENTITY (hardened runtime)"
+            codesign --force --options runtime --timestamp \
+              --entitlements app/GeorgesWords.entitlements \
+              --sign "$SIGN_IDENTITY" dist/GeorgesWords.app
+          else
+            echo "No Developer ID secrets — ad-hoc signing (see 7.1)"
+            codesign --force --deep --sign - dist/GeorgesWords.app
+          fi
 
       - name: Package DMG
         run: |
@@ -66,15 +100,21 @@ jobs:
           cp -R dist/GeorgesWords.app dist/dmg/
           ln -s /Applications dist/dmg/Applications
           hdiutil create -volname "George's Words" -srcfolder dist/dmg -ov -format UDZO "dist/GeorgesWords-$VERSION.dmg"
+          if [ -n "${SIGN_IDENTITY:-}" ]; then
+            codesign --force --timestamp --sign "$SIGN_IDENTITY" "dist/GeorgesWords-$VERSION.dmg"
+          fi
 
-      # ---- Notarization (enable after backlog 7.1) ----
-      # Needs secrets: APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD.
-      # - name: Notarize and staple
-      #   run: |
-      #     xcrun notarytool submit "dist/GeorgesWords-$VERSION.dmg" \
-      #       --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
-      #       --password "$APPLE_APP_PASSWORD" --wait
-      #     xcrun stapler staple "dist/GeorgesWords-$VERSION.dmg"
+      - name: Notarize and staple
+        if: env.HAS_NOTARY == 'true' && env.HAS_SIGNING == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun notarytool submit "dist/GeorgesWords-$VERSION.dmg" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" --wait
+          xcrun stapler staple "dist/GeorgesWords-$VERSION.dmg"
 
       - name: Verify bundle structure
         run: |
@@ -82,6 +122,10 @@ jobs:
           test -f dist/GeorgesWords.app/Contents/Resources/AppIcon.icns
           codesign -dv dist/GeorgesWords.app
           hdiutil verify "dist/GeorgesWords-$VERSION.dmg"
+          if [ -n "${SIGN_IDENTITY:-}" ] && [ "$HAS_NOTARY" = "true" ]; then
+            xcrun stapler validate "dist/GeorgesWords-$VERSION.dmg"
+            spctl --assess --type open --context context:primary-signature "dist/GeorgesWords-$VERSION.dmg"
+          fi
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
