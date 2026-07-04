@@ -39,6 +39,7 @@ final class ManagedOllama: ObservableObject {
 
     private var serverProcess: Process?
     private var setupTask: Task<Void, Never>?
+    private var crashRestarts = 0
 
     private let engineDir: URL
     private var binaryURL: URL { engineDir.appendingPathComponent("ollama") }
@@ -69,8 +70,11 @@ final class ManagedOllama: ObservableObject {
     func shutdown() {
         setupTask?.cancel()
         setupTask = nil
-        serverProcess?.terminate()
+        // Clear the reference before terminating so the supervision
+        // handler recognizes this as intentional and doesn't restart.
+        let process = serverProcess
         serverProcess = nil
+        process?.terminate()
         LLMFormatter.baseURL = LLMFormatter.defaultBaseURL
         phase = .off
     }
@@ -99,6 +103,7 @@ final class ManagedOllama: ObservableObject {
                 try await pull(model: model)
             }
             guard !Task.isCancelled else { return }
+            crashRestarts = 0
             phase = .ready
         } catch {
             guard !Task.isCancelled else { return }
@@ -136,6 +141,26 @@ final class ManagedOllama: ObservableObject {
         process.environment = environment
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
+        // Supervision: the engine is invisible (no menu-bar icon, no Dock
+        // entry), so nobody can quit it by accident — and if it dies
+        // anyway, bring it back rather than silently losing polish.
+        process.terminationHandler = { [weak self] terminated in
+            Task { @MainActor [weak self] in
+                guard let self, self.serverProcess === terminated else { return }
+                self.serverProcess = nil
+                guard AppSettings.shared.managedPolishEnabled else {
+                    self.phase = .off
+                    return
+                }
+                guard self.crashRestarts < 3 else {
+                    self.phase = .failed("The engine keeps stopping — try Recheck, or delete Application Support/GeorgesWords/PolishEngine and toggle the setting again.")
+                    return
+                }
+                self.crashRestarts += 1
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                self.ensureReady(model: AppSettings.shared.effectiveLLMModel)
+            }
+        }
         try process.run()
         serverProcess = process
     }
