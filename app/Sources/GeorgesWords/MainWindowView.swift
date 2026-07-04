@@ -49,6 +49,7 @@ struct HomeView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject private var stats = StatsStore.shared
     @ObservedObject private var history = HistoryStore.shared
+    @State private var copiedEntryID: UUID?
 
     var body: some View {
         ScrollView {
@@ -131,6 +132,16 @@ struct HomeView: View {
         }
     }
 
+    private func flashCopied(_ id: UUID) {
+        copiedEntryID = id
+        Task {
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            if copiedEntryID == id {
+                copiedEntryID = nil
+            }
+        }
+    }
+
     private var recentDictations: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -164,11 +175,13 @@ struct HomeView: View {
                                 let pasteboard = NSPasteboard.general
                                 pasteboard.clearContents()
                                 pasteboard.setString(entry.text, forType: .string)
+                                flashCopied(entry.id)
                             } label: {
-                                Image(systemName: "doc.on.doc")
+                                Image(systemName: copiedEntryID == entry.id ? "checkmark" : "doc.on.doc")
+                                    .foregroundStyle(copiedEntryID == entry.id ? Color.green : Color.secondary)
                             }
                             .buttonStyle(.borderless)
-                            .help("Copy")
+                            .help(copiedEntryID == entry.id ? "Copied" : "Copy")
                         }
                         .padding(.vertical, 10)
                     }

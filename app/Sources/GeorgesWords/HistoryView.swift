@@ -4,6 +4,7 @@ import SwiftUI
 struct HistoryView: View {
     @ObservedObject var store: HistoryStore
     @State private var query = ""
+    @State private var copiedEntryID: UUID?
 
     private var filtered: [HistoryStore.Entry] {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
@@ -35,13 +36,21 @@ struct HistoryView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Button("Copy") {
+                            Button(copiedEntryID == entry.id ? "Copied ✓" : "Copy") {
                                 let pasteboard = NSPasteboard.general
                                 pasteboard.clearContents()
                                 pasteboard.setString(entry.text, forType: .string)
+                                copiedEntryID = entry.id
+                                Task {
+                                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                                    if copiedEntryID == entry.id {
+                                        copiedEntryID = nil
+                                    }
+                                }
                             }
                             .buttonStyle(.borderless)
                             .font(.caption)
+                            .foregroundStyle(copiedEntryID == entry.id ? Color.green : Color.accentColor)
                             Button("Delete", role: .destructive) {
                                 store.remove(id: entry.id)
                             }
