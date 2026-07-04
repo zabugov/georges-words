@@ -231,6 +231,12 @@ struct TroubleshootingView: View {
             ollamaRunning = nil
             ollamaModels = nil
             guard settings.llmEnabled else { return }
+            // Re-evaluate the managed engine too: the user's Ollama may
+            // have appeared or disappeared since the last look (e.g.
+            // "quit Ollama, hit Recheck" from the testing recipe).
+            if settings.managedPolishEnabled {
+                ManagedOllama.shared.ensureReady(model: settings.effectiveLLMModel)
+            }
             let running = await LLMFormatter.ollamaIsRunning()
             ollamaRunning = running
             guard running else { return }
