@@ -111,6 +111,7 @@ struct OnboardingView: View {
                     Text("Then come back to this window — it notices on its own and shows a green checkmark here. (If it doesn't update, quit the app and open it again.)")
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -128,10 +129,13 @@ struct OnboardingView: View {
                         stepRow(1, "Click **Ask for Access** below.")
                         stepRow(2, "Your Mac will show a message — click **Open System Settings** on it.")
                         stepRow(3, "Find **GeorgesWords** in the list and click its switch so it turns blue — like this:")
-                        stepRow(4, "If your Mac asks for your login password, that's normal — enter it.")
                     }
                     .multilineTextAlignment(.leading)
                     PermissionRowMock()
+                    VStack(alignment: .leading, spacing: 10) {
+                        stepRow(4, "If your Mac asks for your login password, that's normal — enter it.")
+                    }
+                    .multilineTextAlignment(.leading)
                     // One path only: the system dialog's own button opens the
                     // right Settings page. Deep-linking ourselves at the same
                     // time buried that dialog behind System Settings, where
@@ -145,6 +149,7 @@ struct OnboardingView: View {
                     Text("Then come back to this window — it notices on its own and shows a green checkmark here.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Button("No message appeared? Open the settings page directly") {
                         Self.openPrivacyPane("Privacy_Accessibility")
                     }
@@ -160,6 +165,7 @@ struct OnboardingView: View {
                 subtitle: "George's Words listens while you hold the fn key. By default macOS also uses that key for the emoji picker — one setting fixes the overlap."
             ) {
                 Text("In Keyboard settings, find **“Press 🌐 key to”** and choose **“Do Nothing”** — so it looks like this:")
+                    .fixedSize(horizontal: false, vertical: true)
                 GlobeKeyRowMock()
                 Button("Open Keyboard Settings") {
                     if let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") {
@@ -171,6 +177,7 @@ struct OnboardingView: View {
                 Text("Prefer a different key? You can pick any key later in Settings → Hotkeys.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
         case .engine:
@@ -230,9 +237,11 @@ struct OnboardingView: View {
                     Text("Your words will appear on the screen as you speak. When you let go, they'll be right where you would have typed them.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 } else {
                     Label("That's it — you're set. This works in any app: mail, notes, chat, anywhere you can type.", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
