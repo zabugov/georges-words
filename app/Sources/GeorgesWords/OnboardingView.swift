@@ -93,11 +93,20 @@ struct OnboardingView: View {
                     }
                     .controlSize(.large)
                 default:
-                    Label("Access was denied — enable GeorgesWords under Microphone in System Settings, then come back.", systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.orange)
-                    Button("Open System Settings") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        stepRow(1, "Click **Open Microphone Settings** below. The right page opens by itself.")
+                        stepRow(2, "Find **GeorgesWords** in the list of apps.")
+                        stepRow(3, "Click its switch so it turns blue and slides right — like this:")
+                    }
+                    .multilineTextAlignment(.leading)
+                    PermissionRowMock()
+                    Button("Open Microphone Settings") {
                         Self.openPrivacyPane("Privacy_Microphone")
                     }
+                    .controlSize(.large)
+                    Text("Then come back to this window — it notices on its own and shows a green checkmark here. (If it doesn't update, quit the app and open it again.)")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -117,7 +126,7 @@ struct OnboardingView: View {
                         stepRow(3, "Click its switch so it turns blue and slides right — like this:")
                     }
                     .multilineTextAlignment(.leading)
-                    AccessibilityRowMock()
+                    PermissionRowMock()
                     VStack(alignment: .leading, spacing: 10) {
                         stepRow(4, "If your Mac asks for your login password, that's normal — enter it.")
                     }
@@ -285,7 +294,8 @@ struct OnboardingView: View {
 
 /// A drawn replica of the System Settings row the user must switch on —
 /// shows exactly what to look for, in the current light/dark appearance.
-struct AccessibilityRowMock: View {
+/// Used by both the Microphone and Accessibility pages.
+struct PermissionRowMock: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(nsImage: NSApp.applicationIconImage)
