@@ -103,7 +103,13 @@ final class ManagedOllama: ObservableObject {
             }
             // Only trust a responding server if WE spawned it — an
             // impostor on our port must never receive transcripts.
-            if serverProcess == nil || !(await Self.responds(Self.baseURL)) {
+            let ourServerAlive: Bool
+            if serverProcess == nil {
+                ourServerAlive = false
+            } else {
+                ourServerAlive = await Self.responds(Self.baseURL)
+            }
+            if !ourServerAlive {
                 phase = .startingEngine
                 try startServer()
                 try await waitForServer()
