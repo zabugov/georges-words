@@ -476,7 +476,18 @@ struct AboutView: View {
     }
 
     static var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let marketing = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let commit = Bundle.main.object(forInfoDictionaryKey: "GWBuildCommit") as? String
+        let date = Bundle.main.object(forInfoDictionaryKey: "GWBuildDate") as? String
+        switch (commit, date) {
+        case let (commit?, date?):
+            return "\(marketing) — build \(commit), \(date)"
+        case let (commit?, nil):
+            return "\(marketing) — build \(commit)"
+        default:
+            // Bundles assembled before stamping existed (or stray copies).
+            return "\(marketing) — unstamped build"
+        }
     }
 }
 

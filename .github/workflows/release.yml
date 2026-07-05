@@ -61,6 +61,8 @@ jobs:
           cp app/.build/release/GeorgesWords "$APP/Contents/MacOS/GeorgesWords"
           cp app/Info.plist "$APP/Contents/Info.plist"
           cp app/icon/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+          /usr/libexec/PlistBuddy -c "Add :GWBuildCommit string ${GITHUB_SHA::7}" "$APP/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :GWBuildDate string $(date -u '+%Y-%m-%d %H:%MZ')" "$APP/Contents/Info.plist"
 
       - name: Import signing certificate
         if: env.HAS_SIGNING == 'true'

@@ -42,6 +42,14 @@ mkdir -p "$STAGE_APP/Contents/MacOS" "$STAGE_APP/Contents/Resources"
 cp ".build/release/GeorgesWords" "$STAGE_APP/Contents/MacOS/GeorgesWords"
 cp "Info.plist" "$STAGE_APP/Contents/Info.plist"
 cp "icon/AppIcon.icns" "$STAGE_APP/Contents/Resources/AppIcon.icns"
+
+# Stamp the build so the app can display exactly what it is (shown in the
+# sidebar footer and About). An app without these keys is an old/stray build.
+BUILD_COMMIT="$(git -C .. rev-parse --short HEAD 2>/dev/null || echo unknown)"
+BUILD_DATE="$(date "+%Y-%m-%d %H:%M")"
+/usr/libexec/PlistBuddy -c "Add :GWBuildCommit string $BUILD_COMMIT" "$STAGE_APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :GWBuildDate string $BUILD_DATE" "$STAGE_APP/Contents/Info.plist"
+echo "==> Build stamp: $BUILD_COMMIT ($BUILD_DATE)"
 xattr -cr "$STAGE_APP" 2>/dev/null || true
 find "$STAGE_APP" -name "._*" -delete 2>/dev/null || true
 
