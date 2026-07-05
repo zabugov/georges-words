@@ -1,5 +1,18 @@
 import Foundation
 
+/// Where the managed engine is listening right now. Thread-safe because
+/// LLMFormatter reads it from background tasks while ManagedOllama
+/// (main-actor) sets it at server start.
+enum EngineEndpoint {
+    private static let lock = NSLock()
+    private static var current = URL(string: "http://127.0.0.1:11499")!
+
+    static var baseURL: URL {
+        get { lock.lock(); defer { lock.unlock() }; return current }
+        set { lock.lock(); defer { lock.unlock() }; current = newValue }
+    }
+}
+
 /// Backlog 7.7: a polish engine the app installs and runs itself, so a
 /// fresh Mac never needs Terminal or a separate Ollama install.
 ///
@@ -15,8 +28,11 @@ final class ManagedOllama: ObservableObject {
 
     static let shared = ManagedOllama()
 
-    /// Private port so a user-installed Ollama (11434) never conflicts.
-    static let baseURL = URL(string: "http://127.0.0.1:11499")!
+    /// The engine's address. The port is chosen fresh at every server
+    /// start (see startServer): a fixed well-known port would let any
+    /// local process squat it before we launch and impersonate the
+    /// engine — receiving every transcript (ADR 0006).
+    static var baseURL: URL { EngineEndpoint.baseURL }
 
     /// Standalone CLI tarball — a stable asset name on every release.
     static let engineDownloadURL = URL(string: "https://github.com/ollama/ollama/releases/latest/download/ollama-darwin.tgz")!
@@ -79,7 +95,9 @@ final class ManagedOllama: ObservableObject {
                 phase = .downloadingEngine
                 try await downloadEngine()
             }
-            if !(await Self.responds(Self.baseURL)) {
+            // Only trust a responding server if WE spawned it — an
+            // impostor on our port must never receive transcripts.
+            if serverProcess == nil || !(await Self.responds(Self.baseURL)) {
                 phase = .startingEngine
                 try startServer()
                 try await waitForServer()
@@ -116,12 +134,23 @@ final class ManagedOllama: ObservableObject {
     // MARK: - Server lifecycle
 
     private func startServer() throws {
+        // Replace, never orphan: a hung previous child would otherwise
+        // linger while we start a fresh one.
+        if let old = serverProcess {
+            old.terminationHandler = nil
+            serverProcess = nil
+            old.terminate()
+        }
+
+        let port = Self.pickFreePort() ?? 11499
+        EngineEndpoint.baseURL = URL(string: "http://127.0.0.1:\(port)")!
+
         try FileManager.default.createDirectory(at: modelsDir, withIntermediateDirectories: true)
         let process = Process()
         process.executableURL = binaryURL
         process.arguments = ["serve"]
         var environment = ProcessInfo.processInfo.environment
-        environment["OLLAMA_HOST"] = "127.0.0.1:11499"
+        environment["OLLAMA_HOST"] = "127.0.0.1:\(port)"
         environment["OLLAMA_MODELS"] = modelsDir.path
         process.environment = environment
         process.standardOutput = FileHandle.nullDevice
@@ -215,6 +244,35 @@ final class ManagedOllama: ObservableObject {
     }
 
     // MARK: - Helpers
+
+    /// Ask the kernel for a free localhost port: bind port 0, read back
+    /// the assignment, release it for the child to claim moments later.
+    nonisolated private static func pickFreePort() -> UInt16? {
+        let sock = socket(AF_INET, SOCK_STREAM, 0)
+        guard sock >= 0 else { return nil }
+        defer { close(sock) }
+
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = 0
+        addr.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
+        let bound = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(sock, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        guard bound == 0 else { return nil }
+
+        var assigned = sockaddr_in()
+        var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let named = withUnsafeMutablePointer(to: &assigned) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { pointer in
+                getsockname(sock, pointer, &length)
+            }
+        }
+        guard named == 0 else { return nil }
+        return UInt16(bigEndian: assigned.sin_port)
+    }
 
     nonisolated private static func responds(_ base: URL) async -> Bool {
         var request = URLRequest(url: base.appendingPathComponent("api/version"))

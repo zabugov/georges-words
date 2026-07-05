@@ -22,7 +22,9 @@ final class LLMFormatter {
 
     /// The app's own polish engine (ManagedOllama, private port) — the
     /// only endpoint the app ever talks to.
-    static let baseURL = URL(string: "http://127.0.0.1:11499")!
+    /// The managed engine's current address (random port per launch —
+    /// see ManagedOllama / ADR 0006).
+    static var baseURL: URL { EngineEndpoint.baseURL }
 
     private static let keepAlive = "30m"
 
