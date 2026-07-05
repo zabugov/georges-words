@@ -8,9 +8,7 @@ final class PillController {
 
     enum Phase: Equatable {
         case listening
-        case commandListening
         case transcribing
-        case commandWorking
         case message(String)
     }
 
@@ -42,10 +40,10 @@ final class PillController {
 
     func show(_ phase: Phase) {
         model.phase = phase
-        if phase != .listening && phase != .commandListening {
+        if phase != .listening {
             model.level = 0
         }
-        if phase == .listening || phase == .commandListening {
+        if phase == .listening {
             model.previewText = ""
         }
         position()
@@ -125,10 +123,10 @@ private struct PillView: View {
     var body: some View {
         HStack(spacing: 10) {
             switch model.phase {
-            case .listening, .commandListening:
-                LevelBars(level: model.level, color: model.phase == .listening ? .red : .purple)
+            case .listening:
+                LevelBars(level: model.level, color: .red)
                 if model.previewText.isEmpty {
-                    Text(model.phase == .listening ? "Listening…" : "Command…")
+                    Text("Listening…")
                 } else {
                     Text(model.previewText)
                         .lineLimit(1)
@@ -138,9 +136,6 @@ private struct PillView: View {
             case .transcribing:
                 ProgressView().controlSize(.small)
                 Text("Polishing…")
-            case .commandWorking:
-                ProgressView().controlSize(.small)
-                Text("Editing…")
             case .message(let text):
                 Image(systemName: "info.circle")
                 Text(text)

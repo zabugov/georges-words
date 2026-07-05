@@ -647,10 +647,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             text = "Ready — hold \(settings.hotkey.displayName) and speak"
         case .recording:
             symbol = "mic.fill"
-            text = mode == .dictation ? "Recording…" : "Recording command…"
+            text = "Recording…"
         case .processing:
             symbol = "ellipsis.circle"
-            text = mode == .dictation ? "Transcribing…" : "Applying edit…"
+            text = "Transcribing…"
         case .error(let message):
             symbol = "exclamationmark.triangle"
             text = message
@@ -674,9 +674,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         switch state {
         case .recording:
-            pill.show(mode == .dictation ? .listening : .commandListening)
+            pill.show(.listening)
         case .processing:
-            pill.show(mode == .dictation ? .transcribing : .commandWorking)
+            pill.show(.transcribing)
         default:
             pill.hide()
         }
