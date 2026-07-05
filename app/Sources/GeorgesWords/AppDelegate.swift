@@ -45,6 +45,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var commandSelection: String?
     private var lastTranscript: String?
 
+    /// The last text this app inserted — dictated or command-edited — so a
+    /// follow-up command ("now make it friendlier") can target it without
+    /// the user reselecting (4.3).
+    private struct LastInsertion {
+        let text: String
+        let bundleID: String?
+        let at: Date
+    }
+    private var lastInsertion: LastInsertion?
+
     // Quick-tap toggle (hands-free) state.
     private var pressStartedAt: Date?
     private var toggleLatched = false
@@ -385,11 +395,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if mode == .command {
-            guard let selection = SelectionReader.read(), !selection.isEmpty else {
+            if let selection = SelectionReader.read(), !selection.isEmpty {
+                commandSelection = selection
+            } else if let followUp = reclaimLastInsertion() {
+                // Nothing selected, but we just wrote text right here —
+                // re-selected it, so this command applies to the same text.
+                commandSelection = followUp
+            } else {
                 pill.flash("Select some text first, then hold \(settings.commandHotkey.displayName)")
                 return
             }
-            commandSelection = selection
         }
 
         self.mode = mode
@@ -456,6 +471,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         StatsStore.shared.record(words: text.split(separator: " ").count)
                         outcome = self.inserter.insert(text)
                         if outcome == .inserted {
+                            self.rememberInsertion(text, bundleID: context.bundleID)
                             self.scheduleCorrectionCheck(inserted: text, context: context)
                         }
                     }
@@ -480,7 +496,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         self.lastTranscript = result
                         self.appStatus.lastTranscript = result
                         HistoryStore.shared.add(result)
-                        if self.inserter.insert(result) == .copiedToClipboard {
+                        switch self.inserter.insert(result) {
+                        case .inserted:
+                            self.rememberInsertion(result, bundleID: context.bundleID)
+                        case .copiedToClipboard:
                             self.flashAccessibilityWarning()
                         }
                     } else {
@@ -491,6 +510,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+    }
+
+    // MARK: - Command-mode follow-ups (4.3)
+
+    /// Command pressed with nothing selected: if we inserted text into this
+    /// same app within the last few minutes and the caret is still sitting
+    /// right after it, re-select it and return it. Returns nil when the
+    /// trail has gone cold — the caller falls back to "select some text".
+    private func reclaimLastInsertion() -> String? {
+        guard let last = lastInsertion,
+              Date().timeIntervalSince(last.at) < 180,
+              AppContext.current().bundleID == last.bundleID,
+              SelectionReader.reselect(last.text)
+        else { return nil }
+        return last.text
+    }
+
+    private func rememberInsertion(_ text: String, bundleID: String?) {
+        lastInsertion = LastInsertion(text: text, bundleID: bundleID, at: Date())
     }
 
     // MARK: - Auto-learning dictionary (ADR 0005)

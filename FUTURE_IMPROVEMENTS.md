@@ -26,11 +26,12 @@ When we start something from this list, move it out of here and into the work it
 
 - [ ] **4.1 (M)** **Multilingual dictation** — switch to a multilingual STT model with language auto-detect; commercial supports 100+ languages with mid-sentence switching.
 - [ ] **4.2 (M)** **Snippets with placeholders** — "my intro ⟨name⟩" → expansion with a tab-through blank.
-- [ ] **4.3 (M)** **Command-mode follow-ups** — after an edit, speak another instruction that applies to the same text ("now make it friendlier") without reselecting.
+
+*(4.3, command-mode follow-ups, shipped 2026-07-05: with nothing selected, the command key re-targets the last text the app inserted — same app, within 3 minutes, caret still in place — so "now make it friendlier" works without reselecting.)*
 
 ## 5. UX & fit-and-finish
 
-*(Nothing open — the 5.x items all shipped with the Dock-app redesign and onboarding. 5.3, tabbed Settings, was retired 2026-07-05: the sidebar redesign already gave Dictionary/Snippets/Troubleshooting their own sections.)*
+*(Nothing open — the 5.x items all shipped with the Dock-app redesign and onboarding. 5.3, tabbed Settings, was briefly retired then shipped 2026-07-05 after all: Settings is now General / Speech / Hotkeys / AI Polish / Per-App tabs.)*
 
 ## 6. Reliability & compatibility
 

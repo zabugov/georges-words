@@ -38,6 +38,77 @@ enum SelectionReader {
         return selectedRef as? String
     }
 
+    /// Re-selects the text this app most recently inserted — the follow-up
+    /// path for command mode (4.3). Right after an insertion the caret sits
+    /// at its end, so the inserted text occupies the `text.utf16.count`
+    /// units before the caret. Selects that range, then verifies the
+    /// selection really is the expected text; on any mismatch (the user
+    /// moved the caret, sent the message, edited around it) the caret is
+    /// restored and this reports failure.
+    static func reselect(_ text: String) -> Bool {
+        let systemWide = AXUIElementCreateSystemWide()
+
+        var focusedRef: AnyObject?
+        guard AXUIElementCopyAttributeValue(
+            systemWide,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedRef
+        ) == .success,
+            let focusedRef,
+            CFGetTypeID(focusedRef) == AXUIElementGetTypeID()
+        else { return false }
+        let element = focusedRef as! AXUIElement
+
+        var rangeRef: AnyObject?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            kAXSelectedTextRangeAttribute as CFString,
+            &rangeRef
+        ) == .success,
+            let rangeRef,
+            CFGetTypeID(rangeRef) == AXValueGetTypeID()
+        else { return false }
+
+        var caret = CFRange()
+        guard AXValueGetValue(rangeRef as! AXValue, .cfRange, &caret),
+              caret.length == 0
+        else { return false }
+
+        let length = text.utf16.count
+        guard length > 0, caret.location >= length else { return false }
+
+        var target = CFRange(location: caret.location - length, length: length)
+        guard let targetValue = AXValueCreate(.cfRange, &target),
+              AXUIElementSetAttributeValue(
+                  element,
+                  kAXSelectedTextRangeAttribute as CFString,
+                  targetValue
+              ) == .success
+        else { return false }
+
+        var selectedRef: AnyObject?
+        if AXUIElementCopyAttributeValue(
+            element,
+            kAXSelectedTextAttribute as CFString,
+            &selectedRef
+        ) == .success,
+            let selected = selectedRef as? String,
+            selected == text {
+            return true
+        }
+
+        // Wrong text under the range — put the caret back where it was.
+        var original = caret
+        if let originalValue = AXValueCreate(.cfRange, &original) {
+            AXUIElementSetAttributeValue(
+                element,
+                kAXSelectedTextRangeAttribute as CFString,
+                originalValue
+            )
+        }
+        return false
+    }
+
     private static func readViaCopy() -> String? {
         guard AXIsProcessTrusted() else { return nil }
 
