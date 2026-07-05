@@ -2,41 +2,22 @@
 
 The outstanding work to bring George's Words to commercial Flow's level of polish and functionality — everything not already shipped or actively in progress. Sourced from the [commercial Flow deep-dive](docs/research/competitive-research.md) feature inventory and observations from daily use. Effort: **S** (hours), **M** (days), **L** (a milestone).
 
-> **⏭️ Next session — testing pass (added late 2026-07-03):** two things shipped
-> at the end of the session with only a quick smoke test; exercise them properly
-> in daily use before building more:
-> 1. **"Keep my words" light polish (new default)** — verify ums/false starts are
->    removed, self-corrections applied, and wording otherwise untouched across
->    real dictations (Slack, email, longer rambles). Watch for the fidelity gate
->    rejecting too often (polish silently falling back to rule-cleaned text —
->    if suspicious, check Console for "Light polish rejected").
-> 2. **`qwen2.5:1.5b` as the polish model** — initial impression good; confirm
->    speed ("Last: … polish" in the menu) and quality hold up vs `qwen2.5:3b`,
->    then record the verdict here.
-> 3. **Managed polish engine (7.7 — now the default, validated 2026-07-04:**
->    cold polish 2.8 s, warm 1.3 s with Ollama.app quit**)** — it prefers a
->    running user Ollama, otherwise runs its own. Watch for regressions in
->    daily use; full engine uninstall = delete Application Support →
->    GeorgesWords → PolishEngine.
-
 When we start something from this list, move it out of here and into the work itself (commit/ADR); when new gaps show up in daily use, add them. Items carry stable numbers (e.g. **5.1**) so we can refer to them — when an item leaves the list, retire its number rather than renumbering the rest.
 
-## 1. Speed & responsiveness
+## 1. Speed & responsiveness — lower priority as of 2026-07-05
 
-**Baseline as of 2026-07-03 (Parakeet + qwen2.5:3b on Zach's machine): 0.2 s transcribe + 1.4 s polish.** Transcription is solved; the LLM polish is ~90% of the remaining wait. Analysis from the 07-03 session:
+**Verdict recorded 2026-07-05: Zach is happy with both speed and quality.** Settled configuration: Parakeet v3 for transcription (~0.1–0.2 s) + `qwen2.5:1.5b` light polish via the app's built-in engine (~1.3 s warm; 1.1's smaller-model experiment is thereby closed). Everything below is next-level speed work for whenever the appetite returns:
 
-- [ ] **1.1 (S)** **Smaller polish model — in progress.** `qwen2.5:1.5b` is pulled and selected (2026-07-03, "seems to be working well"); confirm over a few days of use (see testing note above), then consider trying `llama3.2:1b` / `gemma3:1b` for another speed step. Revert = pick `qwen2.5:3b` in the Settings dropdown.
-- [ ] **1.2 (M)** **Speculative polish — the recommended next build.** While recording, whenever the speaker goes quiet ~1 s, speculatively polish the transcript-so-far in the background; on key release, if nothing more was said, the polished result is already ready → text appears near-instantly. Keep talking → discard the speculation (local compute, costs nothing). Architecturally just a cache in front of the existing pipeline: a miss falls back to today's behavior, never worse. Gets ~90% of the "streaming" benefit for ~10% of the work.
+- [ ] **1.2 (M)** **Speculative polish.** While recording, whenever the speaker goes quiet ~1 s, speculatively polish the transcript-so-far in the background; on key release, if nothing more was said, the polished result is already ready → text appears near-instantly. Keep talking → discard the speculation (local compute, costs nothing). Architecturally just a cache in front of the existing pipeline: a miss falls back to today's behavior, never worse. Gets ~90% of the "streaming" benefit for ~10% of the work.
 - [ ] **1.3 (L)** **True streaming polish** — polish sentence-by-sentence *while* speaking. Parked until real usage demands it (long-form dictation): hard problems include self-corrections spanning sentence boundaries ("…Tuesday. Wait, no, Friday"), tone consistency across separately-polished fragments, and sentence segmentation on unstable ASR output. Weeks of tuning, real quality risk.
 - [ ] **1.5 (M)** **Apple Foundation Models** (macOS 26+) as the polish engine — Apple's built-in on-device ~3B model; would remove the Ollama install entirely for users on new macOS. Needs a macOS 26 SDK build path.
 
 ## 2. Accuracy
 
-- [ ] **2.1 (S)** **Evaluate `distil-large-v3` as the default STT model** (currently `small.en`) — measure accuracy gain vs latency cost on real dictations.
-- [ ] **2.2 (M)** **Dictionary biasing in the speech model itself** — feed personal-dictionary terms to Whisper as a decoding prompt (WhisperKit `promptTokens`) so names come out right at transcription time, not just fixed afterwards. This is how commercial nails jargon on the first pass.
+- [ ] **2.2 (M, lower priority)** **Dictionary biasing in the speech model itself** — feed personal-dictionary terms to the recognizer so names come out right at transcription time, not just fixed afterwards (commercial's trick for jargon). Note: the known mechanism (WhisperKit `promptTokens`) only applies to the Whisper fallback engine; whether FluidAudio/Parakeet supports biasing needs research first. Deprioritized 2026-07-05 — transcription accuracy is already "doing really well", and learned `heard -> Correct` mappings cover the misses. (2.1, the Whisper model-size evaluation, retired for the same reason: Whisper is only the fallback engine now.)
 - [ ] **2.5 (M)** **Auto-learning dictionary isn't catching corrections well** (Zach, 2026-07-03, same day it shipped — details TBD from real use). Debugging leads, roughly in order of suspicion: (a) the fixed ~6 s re-read window — corrections made later are invisible; (b) the AX field re-read returning nothing in the apps he dictates into (Electron apps often fail `AXValue` reads — log the failure reason); (c) filters too strict — similarity ≥ 0.35, stopword-only rejection, or the ≥60% LCS gate discarding legit fixes; (d) suggestions being learned but not noticed in the Dictionary tab (surface a subtle badge/notification when one arrives?). First step: add a debug log line per stage (read ok? aligned? filtered why?) so a failing dictation can be diagnosed from Console instead of guesswork. See ADR 0005 for the design.
 
-## 3. Formatting intelligence
+## 3. Formatting intelligence — next-level polish, lower priority as of 2026-07-05
 
 - [ ] **3.3 (L)** **Personal style matching** — learn the user's tone from local samples of their writing (e.g. pasted examples) instead of generic casual/professional presets. commercial's "sounds like you" feature, done locally.
 - [ ] **3.5 (S)** **Grow the few-shot bank** from real-world failures — keep a small corpus of messy-transcript → ideal-output pairs and iterate on it as bad cleanups are noticed.
@@ -49,7 +30,7 @@ When we start something from this list, move it out of here and into the work it
 
 ## 5. UX & fit-and-finish
 
-- [ ] **5.3 (M)** **Settings redesign into tabs** (General / Formatting / Dictionary / Snippets / Advanced) as the option count grows.
+*(Nothing open — the 5.x items all shipped with the Dock-app redesign and onboarding. 5.3, tabbed Settings, was retired 2026-07-05: the sidebar redesign already gave Dictionary/Snippets/Troubleshooting their own sections.)*
 
 ## 6. Reliability & compatibility
 
@@ -59,8 +40,7 @@ When we start something from this list, move it out of here and into the work it
 ## 7. Distribution & maintenance
 
 - [ ] **7.1 (M→S)** **Developer ID signing + notarization — nearly done (2026-07-04).** Secrets are in, CI signs with hardened runtime + entitlements, DMGs build and submit cleanly; the only outstanding piece is Apple's notary queue clearing the first submission (sat "In Progress" for hours — a documented first-submission pattern; credentials verified good, no Invalid verdict). A retry loop re-runs `release.yml` every ~2 h until 2026-07-07 and push-notifies Zach on any terminal outcome. Close this item when the first Accepted verdict lands.
-- [ ] **7.3 (M)** **Auto-updates** via Sparkle — for a binary-distributed app later. (The source checkout already self-updates: menu bar → Check for Updates… pulls, rebuilds, and relaunches.)
-- [ ] **7.6 (S)** **Latency benchmark script** — a repeatable measurement of transcribe/polish times across models, so speed work is data-driven.
+- [ ] **7.3 (M)** **Auto-updates** via Sparkle — becomes real the moment the DMG lands on the first non-developer Mac (Zach's wife's): DMG installs can't self-update via git like the source checkout does. (7.6, the latency benchmark script, retired 2026-07-05 — speed is settled and the Home timing caption covers day-to-day monitoring.)
 
 ## Explicit non-goals
 
