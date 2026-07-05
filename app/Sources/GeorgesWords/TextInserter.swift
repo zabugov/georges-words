@@ -56,11 +56,37 @@ final class TextInserter {
         ) == .success, settable.boolValue
         else { return false }
 
-        return AXUIElementSetAttributeValue(
+        // Chromium/Electron fields report success for the set below without
+        // inserting anything — and once their AX tree has been woken (which
+        // outlives our own restarts), they pass the focus and settable
+        // checks too. Never trust the claim: require the field's value to
+        // be readable, and confirm it actually changed. Anything short of
+        // proof falls through to the ⌘V path, which works everywhere.
+        guard let before = fieldValue(of: element) else {
+            DebugLog.log("Insert: field value unreadable — using paste")
+            return false
+        }
+        guard AXUIElementSetAttributeValue(
             element,
             kAXSelectedTextAttribute as CFString,
             text as CFString
-        ) == .success
+        ) == .success else { return false }
+
+        guard fieldValue(of: element) != before else {
+            DebugLog.log("Insert: app claimed success but the field never changed — using paste")
+            return false
+        }
+        return true
+    }
+
+    private func fieldValue(of element: AXUIElement) -> String? {
+        var ref: AnyObject?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            kAXValueAttribute as CFString,
+            &ref
+        ) == .success else { return nil }
+        return ref as? String
     }
 
     // MARK: - Strategy 2: clipboard + simulated ⌘V
