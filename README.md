@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/zabugov/georges-words/actions/workflows/ci.yml/badge.svg)
 
-A system-wide dictation app for macOS, in the spirit of [commercial Flow](https://example.com) — hold a key, speak anywhere, get clean formatted text — with one hard rule:
+A system-wide dictation app for macOS, in the spirit of the best commercial dictation apps — hold a key, speak anywhere, get clean formatted text — with one hard rule:
 
 > **Audio never leaves the laptop.** Transcription and formatting run 100% on-device.
 
@@ -17,7 +17,7 @@ A system-wide dictation app for macOS, in the spirit of [commercial Flow](https:
 - **Auto-learning dictionary** — fix a misheard word right after dictating and the app notices (it re-reads the field via the Accessibility API and diffs), then suggests a one-click "heard -> Correct" dictionary entry. Nothing is added without your OK; see [ADR 0005](docs/decisions/0005-auto-learning-dictionary.md).
 - **A real app window** — open from the Dock: Home (status, usage stats, recent dictations, updates), History, Dictionary, Snippets, and Settings in one sidebar window. The menu-bar icon stays as the always-on recording indicator.
 
-Formatting is two-stage: instant rule-based cleanup always, plus an optional rewrite by a local LLM via [Ollama](https://ollama.com) — see below. See [`docs/research/`](docs/research/) for the commercial Flow deep-dive, [`docs/decisions/`](docs/decisions/) for the ADRs, and [`FUTURE_IMPROVEMENTS.md`](FUTURE_IMPROVEMENTS.md) for the backlog to full commercial Flow parity.
+Formatting is two-stage: instant rule-based cleanup always, plus an optional rewrite by a local LLM via [Ollama](https://ollama.com) — see below. See [`docs/decisions/`](docs/decisions/) for the ADRs and [`FUTURE_IMPROVEMENTS.md`](FUTURE_IMPROVEMENTS.md) for the backlog to full commercial-grade parity.
 
 ## Quick start (on your Mac)
 
@@ -85,7 +85,7 @@ georges-words/
 │       ├── RecordingPill.swift   # floating pill + live preview
 │       └── SettingsView.swift    # settings tab
 └── docs/
-    ├── research/        # commercial Flow + local STT deep-dive
+    ├── research/        # research notes (kept outside the repo)
     └── decisions/       # Architecture decision records (ADRs)
 ```
 

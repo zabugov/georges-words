@@ -7,7 +7,7 @@
 Backlog item 2.3: misheard words ("coober netties") should come out right
 ("Kubernetes") the next time. The hard part is that the app inserts text
 into *other* apps and then loses sight of it — there is no callback when
-the user fixes a word. commercial Flow solves this class of problem with cloud
+the user fixes a word. Commercial apps solve this class of problem with cloud
 context; we can't and won't (ADR 0001).
 
 A second gap surfaced during design: the personal dictionary only

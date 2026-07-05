@@ -7,22 +7,22 @@
 
 ## Owner's machine (for copy-pastable commands)
 
-- The repo lives on the owner's Mac at: `~/Desktop/[private]/georges-words`
-- **The path contains spaces** — always quote it in terminal commands:
-  `cd "$HOME/Desktop/[private]/georges-words"`
+- The repo lives in an iCloud-synced folder under the owner's Desktop. The
+  exact path is withheld from the public repo — ask the owner when you need
+  it. **The path contains spaces** — always quote it in terminal commands.
 - Note: the Desktop appears to be iCloud-synced (files show download icons in
   Finder). If git/build behaves bizarrely (stuck pulls, missing files),
   suspect iCloud evicting repo files before anything else.
-- A stable signing identity **"GeorgesWords Dev"** exists in Zach's login
+- A stable signing identity **"GeorgesWords Dev"** exists in the owner's login
   keychain (created 2026-07-03 via `app/setup-signing.sh`); `build.sh` signs
   with it, staging the bundle in a temp dir because iCloud re-stamps xattrs
   in-place (codesign "detritus" failures otherwise). Permissions (mic/AX)
   persist across rebuilds because of this — don't break it.
-- Parakeet (FluidAudio) compiles and runs on this machine and is the default
+- Parakeet (FluidAudio) compiles and runs on the owner's machine and is the default
   engine; `GW_PARAKEET=0` builds Whisper-only if it ever regresses.
 
 ## Project rules
 
-- This is a commercial Flow–style dictation app for macOS (Apple Silicon).
+- This is a hold-to-dictate app for macOS (Apple Silicon), rivaling the commercial dictation tools.
 - **Hard requirement: audio and transcripts never leave the device.** No cloud STT/LLM calls in the dictation path, no telemetry, no accounts.
 - Design decisions are recorded as ADRs in `docs/decisions/`. Research lives in `docs/research/`.

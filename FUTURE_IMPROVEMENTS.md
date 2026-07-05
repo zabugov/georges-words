@@ -1,6 +1,6 @@
 # Future Improvements
 
-The outstanding work to bring George's Words to commercial Flow's level of polish and functionality — everything not already shipped or actively in progress. Sourced from the competitive research notes (kept outside the repo) and observations from daily use. Effort: **S** (hours), **M** (days), **L** (a milestone).
+The outstanding work to bring George's Words to the level of polish and functionality of the best commercial dictation apps — everything not already shipped or actively in progress. Sourced from the competitive research notes (kept outside the repo) and observations from daily use. Effort: **S** (hours), **M** (days), **L** (a milestone).
 
 When we start something from this list, move it out of here and into the work itself (commit/ADR); when new gaps show up in daily use, add them. Items carry stable numbers (e.g. **5.1**) so we can refer to them — when an item leaves the list, retire its number rather than renumbering the rest.
 
@@ -14,17 +14,17 @@ When we start something from this list, move it out of here and into the work it
 
 ## 2. Accuracy
 
-- [ ] **2.2 (M, lower priority)** **Dictionary biasing in the speech model itself** — feed personal-dictionary terms to the recognizer so names come out right at transcription time, not just fixed afterwards (commercial's trick for jargon). Note: the known mechanism (WhisperKit `promptTokens`) only applies to the Whisper fallback engine; whether FluidAudio/Parakeet supports biasing needs research first. Deprioritized 2026-07-05 — transcription accuracy is already "doing really well", and learned `heard -> Correct` mappings cover the misses. (2.1, the Whisper model-size evaluation, retired for the same reason: Whisper is only the fallback engine now.)
+- [ ] **2.2 (M, lower priority)** **Dictionary biasing in the speech model itself** — feed personal-dictionary terms to the recognizer so names come out right at transcription time, not just fixed afterwards (the commercial apps' trick for jargon). Note: the known mechanism (WhisperKit `promptTokens`) only applies to the Whisper fallback engine; whether FluidAudio/Parakeet supports biasing needs research first. Deprioritized 2026-07-05 — transcription accuracy is already "doing really well", and learned `heard -> Correct` mappings cover the misses. (2.1, the Whisper model-size evaluation, retired for the same reason: Whisper is only the fallback engine now.)
 - [ ] **2.5 (M)** **Auto-learning dictionary isn't catching corrections well** (Zach, 2026-07-03, same day it shipped — details TBD from real use). Debugging leads, roughly in order of suspicion: (a) the fixed ~6 s re-read window — corrections made later are invisible; (b) the AX field re-read returning nothing in the apps he dictates into (Electron apps often fail `AXValue` reads — log the failure reason); (c) filters too strict — similarity ≥ 0.35, stopword-only rejection, or the ≥60% LCS gate discarding legit fixes; (d) suggestions being learned but not noticed in the Dictionary tab (surface a subtle badge/notification when one arrives?). First step: add a debug log line per stage (read ok? aligned? filtered why?) so a failing dictation can be diagnosed from Console instead of guesswork. See ADR 0005 for the design.
 
 ## 3. Formatting intelligence — next-level polish, lower priority as of 2026-07-05
 
-- [ ] **3.3 (L)** **Personal style matching** — learn the user's tone from local samples of their writing (e.g. pasted examples) instead of generic casual/professional presets. commercial's "sounds like you" feature, done locally.
+- [ ] **3.3 (L)** **Personal style matching** — learn the user's tone from local samples of their writing (e.g. pasted examples) instead of generic casual/professional presets. the commercial "sounds like you" feature, done locally.
 - [ ] **3.5 (S)** **Grow the few-shot bank** from real-world failures — keep a small corpus of messy-transcript → ideal-output pairs and iterate on it as bad cleanups are noticed.
 
-## 4. Feature parity with commercial Flow
+## 4. Feature parity with commercial dictation apps
 
-- [ ] **4.1 (M)** **Multilingual dictation** — switch to a multilingual STT model with language auto-detect; commercial supports 100+ languages with mid-sentence switching.
+- [ ] **4.1 (M)** **Multilingual dictation** — switch to a multilingual STT model with language auto-detect; the commercial apps support 100+ languages with mid-sentence switching.
 - [ ] **4.2 (M)** **Snippets with placeholders** — "my intro ⟨name⟩" → expansion with a tab-through blank.
 
 *(4.3, command-mode follow-ups, shipped 2026-07-05: with nothing selected, the command key re-targets the last text the app inserted — same app, within 3 minutes, caret still in place — so "now make it friendlier" works without reselecting.)*
@@ -45,7 +45,7 @@ When we start something from this list, move it out of here and into the work it
 
 ## Explicit non-goals
 
-commercial Flow features we deliberately will not copy — they conflict with the project's reason to exist (ADR 0001):
+Commercial-app features we deliberately will not copy — they conflict with the project's reason to exist (ADR 0001):
 
 - **NG-1** Cloud transcription or cloud LLMs in the dictation path
 - **NG-2** Accounts, sync, telemetry, usage analytics that leave the device

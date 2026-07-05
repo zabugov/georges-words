@@ -4,8 +4,7 @@
 
 ## Context
 
-Real-world use showed end-to-end latency is the biggest gap versus commercial
-Flow. The research report flagged NVIDIA's parakeet-tdt-0.6b as the
+Real-world use showed end-to-end latency is the biggest gap versus the commercial dictation apps. The research report flagged NVIDIA's parakeet-tdt-0.6b as the
 speed/accuracy leader (top of the Open ASR Leaderboard, RTFx in the
 hundreds on Apple Neural Engine via CoreML) and it is the engine behind
 the "instant" feel of VoiceInk and Handy.

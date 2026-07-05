@@ -396,10 +396,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if mode == .command {
             if let selection = SelectionReader.read(), !selection.isEmpty {
+                DebugLog.log("Command press: using live selection (\(selection.count) chars)")
                 commandSelection = selection
             } else if let followUp = reclaimLastInsertion() {
                 // Nothing selected, but we just wrote text right here —
                 // re-selected it, so this command applies to the same text.
+                DebugLog.log("Command press: follow-up re-selected the last insertion (\(followUp.count) chars)")
                 commandSelection = followUp
             } else {
                 pill.flash("Select some text first, then hold \(settings.commandHotkey.displayName)")
@@ -520,16 +522,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// trail has gone cold — the caller falls back to "select some text".
     private func reclaimLastInsertion() -> String? {
         guard let last = lastInsertion else {
-            NSLog("Follow-up: nothing inserted yet this session")
+            DebugLog.log("Follow-up: nothing inserted yet this session")
             return nil
         }
         guard Date().timeIntervalSince(last.at) < 180 else {
-            NSLog("Follow-up: last insertion is older than 3 minutes")
+            DebugLog.log("Follow-up: last insertion is older than 3 minutes")
             return nil
         }
         let front = AppContext.current().bundleID
         guard front == last.bundleID else {
-            NSLog("Follow-up: frontmost app %@ != insertion app %@", front, last.bundleID)
+            DebugLog.log("Follow-up: frontmost app \(front) != insertion app \(last.bundleID)")
             return nil
         }
         guard SelectionReader.reselect(last.text) else { return nil }

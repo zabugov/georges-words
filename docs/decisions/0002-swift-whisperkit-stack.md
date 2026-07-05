@@ -24,7 +24,7 @@ comparable apps: Handy (Tauri/Rust), OpenWhispr (Electron), VoiceInk
    whole Whisper family (`distil-large-v3`, `large-v3`, multilingual).
 3. **Insertion chain (M1):** clipboard + simulated ⌘V with clipboard
    save/restore. Direct AX insertion is planned for M2 with paste as the
-   fallback — the same chain commercial Flow uses.
+   fallback — the same chain the polished commercial apps use.
 4. **Hotkey:** hold-Fn via `NSEvent` global flags-changed monitor (keyCode 63).
 
 ## Consequences

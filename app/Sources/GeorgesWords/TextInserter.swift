@@ -2,7 +2,7 @@ import AppKit
 import ApplicationServices
 
 /// Inserts text at the cursor of whatever app has focus, using the same
-/// chain commercial Flow uses:
+/// chain the polished commercial dictation apps use:
 ///
 ///   1. Direct Accessibility-API insertion into the focused element
 ///      (replaces the current selection; inserts at the caret when the

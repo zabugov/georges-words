@@ -4,7 +4,7 @@
 
 ## Context
 
-commercial Flow's real moat is not speech recognition but the formatting layer
+The commercial dictation apps' real moat is not speech recognition but the formatting layer
 (self-corrections, tone, structure) — which it runs on cloud LLMs. We need
 the same capability without any text leaving the device (ADR 0001).
 
@@ -40,7 +40,7 @@ Options considered for running a local LLM from the app:
 5. **App context = frontmost app bundle ID only** (NSWorkspace), mapped to
    a tone profile (casual/professional/technical/neutral) in the prompt.
    Explicitly no screenshots, window titles, or URLs — the
-   privacy-respecting version of commercial's context awareness.
+   privacy-respecting version of commercial context awareness.
 
 ## Consequences
 

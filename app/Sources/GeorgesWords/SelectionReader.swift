@@ -65,7 +65,7 @@ enum SelectionReader {
             let focusedRef,
             CFGetTypeID(focusedRef) == AXUIElementGetTypeID()
         else {
-            NSLog("Follow-up reselect: no focused element")
+            DebugLog.log("Follow-up reselect: no focused element")
             return false
         }
         let element = focusedRef as! AXUIElement
@@ -82,18 +82,18 @@ enum SelectionReader {
                     return true
                 }
             } else {
-                NSLog("Follow-up reselect: inserted text no longer in the field")
+                DebugLog.log("Follow-up reselect: inserted text no longer in the field")
                 return false
             }
         }
 
         // Strategy 2: the units just before the caret.
         guard let caret = original, caret.length == 0 else {
-            NSLog("Follow-up reselect: field value unreadable and no collapsed caret")
+            DebugLog.log("Follow-up reselect: field value unreadable and no collapsed caret")
             return false
         }
         guard caret.location >= length else {
-            NSLog("Follow-up reselect: caret too close to the start")
+            DebugLog.log("Follow-up reselect: caret too close to the start")
             return false
         }
         return select(CFRange(location: caret.location - length, length: length),
@@ -141,7 +141,7 @@ enum SelectionReader {
                   targetValue
               ) == .success
         else {
-            NSLog("Follow-up reselect: app rejected setting the selection range")
+            DebugLog.log("Follow-up reselect: app rejected setting the selection range")
             return false
         }
 
@@ -156,7 +156,7 @@ enum SelectionReader {
             return true
         }
 
-        NSLog("Follow-up reselect: selection read back as different text")
+        DebugLog.log("Follow-up reselect: selection read back as different text")
         if var restore = original,
            let restoreValue = AXValueCreate(.cfRange, &restore) {
             AXUIElementSetAttributeValue(

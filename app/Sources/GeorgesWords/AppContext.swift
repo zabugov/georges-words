@@ -1,6 +1,6 @@
 import AppKit
 
-/// The privacy-respecting version of commercial Flow's "context awareness":
+/// The privacy-respecting version of commercial "context awareness":
 /// we look at ONE thing — the bundle identifier of the frontmost app —
 /// to pick a tone profile. No screenshots, no window titles, no URLs.
 enum ToneProfile {

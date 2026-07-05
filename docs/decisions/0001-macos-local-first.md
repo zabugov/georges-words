@@ -4,7 +4,7 @@
 
 ## Context
 
-We are building a commercial Flow–style dictation app. The owner's machine is a MacBook, and the non-negotiable requirement is that **no audio leaves the device** — commercial Flow itself transcribes in the cloud, which is exactly what we want to avoid.
+We are building a hold-to-dictate app to rival the best commercial dictation tools. The owner's machine is a MacBook, and the non-negotiable requirement is that **no audio leaves the device** — the leading commercial tools transcribe in the cloud, which is exactly what we want to avoid.
 
 ## Decision
 
@@ -16,7 +16,7 @@ We are building a commercial Flow–style dictation app. The owner's machine is 
 
 - We can use macOS-native frameworks (AVAudioEngine, CGEvent taps, Accessibility API, pasteboard) directly.
 - Model choice is constrained to what runs well locally (Whisper-family via whisper.cpp/WhisperKit, NVIDIA Parakeet via CoreML ports, Apple Speech APIs, etc.) — evaluated in the research report.
-- Some commercial Flow features that depend on server-side LLMs (heavy tone rewriting, cross-device sync) will be reimplemented with small local models or rules, or dropped.
+- Some commercial features that depend on server-side LLMs (heavy tone rewriting, cross-device sync) will be reimplemented with small local models or rules, or dropped.
 
 ## Open (decided later, informed by research)
 
