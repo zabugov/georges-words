@@ -25,4 +25,7 @@
 
 - This is a hold-to-dictate app for macOS (Apple Silicon), rivaling the commercial dictation tools.
 - **Hard requirement: audio and transcripts never leave the device.** No cloud STT/LLM calls in the dictation path, no telemetry, no accounts.
+- **This repo is public.** Keep competitor product names, the owner's local
+  folder paths, and personal machine details out of every file, commit
+  message, and diff (owner's scrub directive, 2026-07-05).
 - Design decisions are recorded as ADRs in `docs/decisions/`. Research lives in `docs/research/`.
