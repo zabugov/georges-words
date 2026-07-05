@@ -50,7 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// the user reselecting (4.3).
     private struct LastInsertion {
         let text: String
-        let bundleID: String?
+        let bundleID: String
         let at: Date
     }
     private var lastInsertion: LastInsertion?
@@ -527,7 +527,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return last.text
     }
 
-    private func rememberInsertion(_ text: String, bundleID: String?) {
+    private func rememberInsertion(_ text: String, bundleID: String) {
         lastInsertion = LastInsertion(text: text, bundleID: bundleID, at: Date())
     }
 
