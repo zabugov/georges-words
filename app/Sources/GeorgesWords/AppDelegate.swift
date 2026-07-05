@@ -309,7 +309,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         do {
             try await transcriber.load()
-            await MainActor.run { self.state = .idle }
+            await MainActor.run {
+                // A press may have started a recording while we loaded —
+                // don't clobber it; it resolves to .idle on its own.
+                if case .loadingModel = self.state { self.state = .idle }
+            }
         } catch {
             await MainActor.run { self.state = .error("Model failed to load: \(error.localizedDescription)") }
         }
@@ -357,8 +361,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .idle:
             break
         case .loadingModel:
-            pill.flash("Speech model is still loading — try again in a moment…", seconds: 2)
-            return
+            // The recorder doesn't need the model. Start capturing now —
+            // the Transcriber actor serializes transcribe() behind load(),
+            // so the result just arrives a beat later. Without this, the
+            // first press after launch got rejected and felt broken.
+            break
         case .processing:
             pill.flash("Finishing the previous dictation…", seconds: 2)
             return
