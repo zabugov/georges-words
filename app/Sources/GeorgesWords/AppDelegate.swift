@@ -519,11 +519,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// right after it, re-select it and return it. Returns nil when the
     /// trail has gone cold — the caller falls back to "select some text".
     private func reclaimLastInsertion() -> String? {
-        guard let last = lastInsertion,
-              Date().timeIntervalSince(last.at) < 180,
-              AppContext.current().bundleID == last.bundleID,
-              SelectionReader.reselect(last.text)
-        else { return nil }
+        guard let last = lastInsertion else {
+            NSLog("Follow-up: nothing inserted yet this session")
+            return nil
+        }
+        guard Date().timeIntervalSince(last.at) < 180 else {
+            NSLog("Follow-up: last insertion is older than 3 minutes")
+            return nil
+        }
+        let front = AppContext.current().bundleID
+        guard front == last.bundleID else {
+            NSLog("Follow-up: frontmost app %@ != insertion app %@", front, last.bundleID)
+            return nil
+        }
+        guard SelectionReader.reselect(last.text) else { return nil }
         return last.text
     }
 
