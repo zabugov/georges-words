@@ -86,6 +86,16 @@ final class PillController {
         }
     }
 
+    /// A message/alert flash is on screen. Status updates must not hide
+    /// the pill while this is true — the flash's own timer will.
+    var isFlashing: Bool {
+        guard panel.isVisible else { return false }
+        switch model.phase {
+        case .message, .alert: return true
+        default: return false
+        }
+    }
+
     func updateLevel(_ level: Float) {
         model.level = level
     }

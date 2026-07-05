@@ -461,6 +461,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let text = await self.processDictation(samples: samples, context: context)
             await MainActor.run {
                 var outcome: TextInserter.Outcome?
+                var switchedApps = false
                 if !text.isEmpty {
                     self.lastTranscript = text
                     self.appStatus.lastTranscript = text
@@ -477,11 +478,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         let pasteboard = NSPasteboard.general
                         pasteboard.clearContents()
                         pasteboard.setString(text, forType: .string)
-                        self.pill.flashAlert("You switched apps — your dictation is on the clipboard. Press ⌘V to paste it.")
+                        switchedApps = true
                     }
                 }
                 // A model swap may have taken over the state meanwhile.
                 if case .processing = self.state { self.state = .idle }
+                // Flash AFTER the state change: setting .idle refreshes the
+                // status UI, and a flash shown before it would be hidden.
+                if switchedApps {
+                    self.pill.flashAlert("You switched apps — your dictation is on the clipboard. Press ⌘V to paste it.")
+                }
                 if outcome == .copiedToClipboard { self.flashAccessibilityWarning() }
             }
         }
@@ -733,7 +739,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .processing:
             pill.show(.transcribing)
         default:
-            pill.hide()
+            // Never clobber an active flash — its own timer hides it.
+            if !pill.isFlashing { pill.hide() }
         }
     }
 
