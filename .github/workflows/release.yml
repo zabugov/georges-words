@@ -54,6 +54,11 @@ jobs:
         working-directory: app
         run: swift build -c release
 
+      # Never package a DMG whose tests fail.
+      - name: Test
+        working-directory: app
+        run: swift test
+
       - name: Assemble app bundle
         run: |
           APP="dist/GeorgesWords.app"
