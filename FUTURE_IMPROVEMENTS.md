@@ -1,6 +1,6 @@
 # Future Improvements
 
-The outstanding work to bring George's Words to commercial Flow's level of polish and functionality — everything not already shipped or actively in progress. Sourced from the [commercial Flow deep-dive](docs/research/competitive-research.md) feature inventory and observations from daily use. Effort: **S** (hours), **M** (days), **L** (a milestone).
+The outstanding work to bring George's Words to commercial Flow's level of polish and functionality — everything not already shipped or actively in progress. Sourced from the competitive research notes (kept outside the repo) and observations from daily use. Effort: **S** (hours), **M** (days), **L** (a milestone).
 
 When we start something from this list, move it out of here and into the work itself (commit/ADR); when new gaps show up in daily use, add them. Items carry stable numbers (e.g. **5.1**) so we can refer to them — when an item leaves the list, retire its number rather than renumbering the rest.
 

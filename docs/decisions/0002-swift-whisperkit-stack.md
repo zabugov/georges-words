@@ -4,8 +4,8 @@
 
 ## Context
 
-ADR 0001 fixed the platform (macOS, Apple Silicon, fully local). The research
-report (`docs/research/competitive-research.md`) surveyed stacks used by
+ADR 0001 fixed the platform (macOS, Apple Silicon, fully local). A research
+pass (competitive notes kept outside the repo) surveyed stacks used by
 comparable apps: Handy (Tauri/Rust), OpenWhispr (Electron), VoiceInk
 (native Swift).
 
