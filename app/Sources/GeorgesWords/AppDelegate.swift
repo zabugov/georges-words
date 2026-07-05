@@ -477,7 +477,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         let pasteboard = NSPasteboard.general
                         pasteboard.clearContents()
                         pasteboard.setString(text, forType: .string)
-                        self.pill.flash("You switched apps — dictation copied, press ⌘V to paste it", seconds: 4)
+                        self.pill.flashAlert("You switched apps — your dictation is on the clipboard. Press ⌘V to paste it.")
                     }
                 }
                 // A model swap may have taken over the state meanwhile.
@@ -750,7 +750,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// the Accessibility grant while still showing it enabled. Tell the
     /// user instead of failing silently.
     private func flashAccessibilityWarning() {
-        pill.flash("No Accessibility permission — copied to clipboard. Re-toggle GeorgesWords in System Settings → Accessibility.", seconds: 6)
+        pill.flashAlert("No Accessibility permission — copied to clipboard. Re-toggle GeorgesWords in System Settings → Accessibility.", seconds: 8)
     }
 
     func openMainWindow(section: MainSection? = nil) {

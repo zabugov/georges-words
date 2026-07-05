@@ -10,6 +10,9 @@ final class PillController {
         case listening
         case transcribing
         case message(String)
+        /// High-visibility variant for "your text did NOT land where you
+        /// were typing" — the one message that must not be missed.
+        case alert(String)
     }
 
     final class Model: ObservableObject {
@@ -101,6 +104,20 @@ final class PillController {
         }
     }
 
+    /// Can't-miss warning: orange, larger, longer, with a sound. Used when
+    /// the dictation went to the clipboard instead of the app — the user
+    /// is mid-flow and easily misses the ordinary pill.
+    func flashAlert(_ text: String, seconds: TimeInterval = 7) {
+        if AppSettings.shared.soundsEnabled {
+            NSSound(named: "Glass")?.play()
+        }
+        show(.alert(text))
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
+            guard let self, case .alert = self.model.phase else { return }
+            self.hide()
+        }
+    }
+
     private func position() {
         // Follow the display the user is working on (where the mouse is),
         // not just the primary screen.
@@ -142,14 +159,26 @@ private struct PillView: View {
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(2)
                     .frame(maxWidth: 360)
+            case .alert(let text):
+                Image(systemName: "doc.on.clipboard.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                Text(text)
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(2)
+                    .frame(maxWidth: 380)
             }
         }
         .font(.system(size: 13, weight: .medium))
         .foregroundStyle(.white)
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(Capsule().fill(Color.black.opacity(0.82)))
+        .padding(.vertical, isAlert ? 14 : 10)
+        .background(Capsule().fill(isAlert ? Color.orange.opacity(0.95) : Color.black.opacity(0.82)))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var isAlert: Bool {
+        if case .alert = model.phase { return true }
+        return false
     }
 }
 
