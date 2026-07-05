@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// Where the managed engine is listening right now. Thread-safe because
@@ -34,8 +35,13 @@ final class ManagedOllama: ObservableObject {
     /// engine — receiving every transcript (ADR 0006).
     static var baseURL: URL { EngineEndpoint.baseURL }
 
-    /// Standalone CLI tarball — a stable asset name on every release.
-    static let engineDownloadURL = URL(string: "https://github.com/ollama/ollama/releases/latest/download/ollama-darwin.tgz")!
+    /// Pinned engine build (ADR 0006). Never `latest`: the app runs this
+    /// binary on machines whose owners can't debug it, so upgrades are
+    /// deliberate — bump the version and digest TOGETHER, verified against
+    /// the release's sha256sum.txt.
+    static let engineVersion = "v0.31.1"
+    static let engineSHA256 = "0c4f92389fcc1f651c17282e2eaffd68c8d3d06e1f7b307604102ad0e09a10c9"
+    static let engineDownloadURL = URL(string: "https://github.com/ollama/ollama/releases/download/\(engineVersion)/ollama-darwin.tgz")!
 
     enum Phase: Equatable {
         case off
@@ -119,16 +125,48 @@ final class ManagedOllama: ObservableObject {
 
     private func downloadEngine() async throws {
         let (tempFile, response) = try await URLSession.shared.download(from: Self.engineDownloadURL)
+        defer { try? FileManager.default.removeItem(at: tempFile) }
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
             throw EngineError(message: "Engine download failed — check the internet connection and try again.")
         }
+
+        // Verify BEFORE anything gets extracted or executed: a tampered or
+        // corrupted archive must never become code running on this Mac.
+        let digest = try Self.sha256(of: tempFile)
+        guard digest == Self.engineSHA256 else {
+            throw EngineError(message: "Engine download didn't match its expected fingerprint — not installing it. Try again later.")
+        }
+
+        // Extract into a staging directory, then move into place — a
+        // half-unpacked engineDir never looks installed.
         try FileManager.default.createDirectory(at: engineDir, withIntermediateDirectories: true)
-        let status = try await Self.runProcess("/usr/bin/tar", ["-xzf", tempFile.path, "-C", engineDir.path])
-        try? FileManager.default.removeItem(at: tempFile)
-        guard status == 0, FileManager.default.fileExists(atPath: binaryURL.path) else {
+        let stage = engineDir.appendingPathComponent("stage-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: stage, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: stage) }
+
+        let status = try await Self.runProcess("/usr/bin/tar", ["-xzf", tempFile.path, "-C", stage.path])
+        guard status == 0,
+              FileManager.default.fileExists(atPath: stage.appendingPathComponent("ollama").path)
+        else {
             throw EngineError(message: "Engine archive could not be unpacked.")
         }
+        for item in try FileManager.default.contentsOfDirectory(at: stage, includingPropertiesForKeys: nil) {
+            let destination = engineDir.appendingPathComponent(item.lastPathComponent)
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.moveItem(at: item, to: destination)
+        }
         try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binaryURL.path)
+    }
+
+    /// Streaming SHA-256 so the ~120 MB archive never loads whole.
+    nonisolated static func sha256(of file: URL) throws -> String {
+        let handle = try FileHandle(forReadingFrom: file)
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while let chunk = try handle.read(upToCount: 4 << 20), !chunk.isEmpty {
+            hasher.update(data: chunk)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     // MARK: - Server lifecycle

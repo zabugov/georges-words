@@ -36,4 +36,21 @@ final class ManagedOllamaTests: XCTestCase {
         XCTAssertNil(ManagedOllama.pullError(fromLine: #"{"status":"success"}"#))
         XCTAssertNil(ManagedOllama.pullError(fromLine: "garbage"))
     }
+
+    func testSHA256MatchesKnownDigest() throws {
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent("gw-sha-test-\(UUID().uuidString)")
+        try Data("hello\n".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        XCTAssertEqual(
+            try ManagedOllama.sha256(of: file),
+            "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03"
+        )
+    }
+
+    func testPinnedEngineDigestLooksLikeSHA256() {
+        XCTAssertEqual(ManagedOllama.engineSHA256.count, 64)
+        XCTAssertTrue(ManagedOllama.engineSHA256.allSatisfy(\.isHexDigit))
+        XCTAssertTrue(ManagedOllama.engineDownloadURL.absoluteString.contains(ManagedOllama.engineVersion))
+    }
 }
