@@ -43,7 +43,10 @@ final class TextInserter {
     // MARK: - Strategy 1: Accessibility API
 
     private func insertViaAccessibility(_ text: String) -> Bool {
-        guard let element = AXFocus.focusedElement(logContext: "AX insert") else { return false }
+        // Writes use only the conservative focus lookup — see
+        // AXFocus.systemWideFocusedElement for why the Electron wake is
+        // insertion-unsafe. Failure here means the ⌘V path runs instead.
+        guard let element = AXFocus.systemWideFocusedElement() else { return false }
 
         var settable = DarwinBoolean(false)
         guard AXUIElementIsAttributeSettable(

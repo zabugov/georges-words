@@ -9,6 +9,19 @@ import ApplicationServices
 /// there. This helper tries every known door and logs which one opened.
 enum AXFocus {
 
+    /// The conservative door only: the system-wide query, no Electron wake.
+    /// Use this for WRITES (text insertion). Chromium-based apps woken via
+    /// AXManualAccessibility will report a successful kAXSelectedText set
+    /// without actually inserting anything — the caller then skips its paste
+    /// fallback and the dictation vanishes (seen in Claude Desktop,
+    /// 2026-07-05). If the system-wide query fails, let insertion fall back
+    /// to ⌘V, which is proven everywhere.
+    static func systemWideFocusedElement() -> AXUIElement? {
+        copyFocused(from: AXUIElementCreateSystemWide())
+    }
+
+    /// Every door, including the Electron wake. Safe for READS (selection,
+    /// field re-reads) — a wrong answer can't lose user text.
     static func focusedElement(logContext: String) -> AXUIElement? {
         if let element = copyFocused(from: AXUIElementCreateSystemWide()) {
             return element
