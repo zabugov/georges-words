@@ -64,19 +64,9 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-                HotkeyRecorderField(title: "Hold for command mode", spec: $settings.commandHotkey)
                 Text("Click Change… and press any key — modifier and function keys work best. Letter keys still type into the focused app while held.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                if settings.commandHotkey == settings.hotkey {
-                    Text("⚠️ Same key as dictation — command mode is disabled until you pick a different key.")
-                        .font(.footnote)
-                        .foregroundStyle(.orange)
-                } else {
-                    Text("Select text anywhere, hold \(settings.commandHotkey.displayName), and speak an instruction — “make this shorter”, “make it a bulleted list”, “translate to French”. Right after a dictation or an edit you can skip selecting: with nothing selected, the command applies to the last text the app wrote.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
                 Toggle("Live preview while speaking", isOn: $settings.previewEnabled)
                 Text("Shows a rolling transcript in the pill as you talk. Costs some extra compute while recording.")
                     .font(.footnote)

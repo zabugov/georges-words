@@ -15,12 +15,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case error(String)
     }
 
-    /// What the current recording is for.
-    private enum Mode {
-        case dictation
-        case command
-    }
-
     private var statusItem: NSStatusItem!
     private let statusMenuItem = NSMenuItem(title: "Starting…", action: nil, keyEquivalent: "")
     private let updateMenuItem = NSMenuItem(title: "Check for Updates…", action: nil, keyEquivalent: "")
@@ -37,23 +31,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let pill = PillController()
     private let updater = Updater()
     private var dictationHotkey: HotkeyMonitor?
-    private var commandHotkey: HotkeyMonitor?
     private var cancellables = Set<AnyCancellable>()
     private var previewTask: Task<Void, Never>?
 
-    private var mode: Mode = .dictation
-    private var commandSelection: String?
     private var lastTranscript: String?
-
-    /// The last text this app inserted — dictated or command-edited — so a
-    /// follow-up command ("now make it friendlier") can target it without
-    /// the user reselecting (4.3).
-    private struct LastInsertion {
-        let text: String
-        let bundleID: String
-        let at: Date
-    }
-    private var lastInsertion: LastInsertion?
 
     // Quick-tap toggle (hands-free) state.
     private var pressStartedAt: Date?
@@ -235,27 +216,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func installHotkeys() {
         dictationHotkey = HotkeyMonitor(
             hotkey: settings.hotkey,
-            onPress: { [weak self] in self?.beginRecording(.dictation) },
-            onRelease: { [weak self] in self?.endRecording(.dictation) }
+            onPress: { [weak self] in self?.beginRecording() },
+            onRelease: { [weak self] in self?.endRecording() }
         )
-        // Command mode is disabled when both features share a key.
-        if settings.commandHotkey != settings.hotkey {
-            commandHotkey = HotkeyMonitor(
-                hotkey: settings.commandHotkey,
-                onPress: { [weak self] in self?.beginRecording(.command) },
-                onRelease: { [weak self] in self?.endRecording(.command) }
-            )
-        } else {
-            commandHotkey = nil
-        }
     }
 
     private func observeSettings() {
         settings.$hotkey
-            .combineLatest(settings.$commandHotkey)
             .dropFirst()
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _, _ in self?.installHotkeys() }
+            .sink { [weak self] _ in self?.installHotkeys() }
             .store(in: &cancellables)
 
         settings.$modelName
@@ -352,17 +322,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = recorder.stop()
         toggleLatched = false
         ignoreNextRelease = false
-        commandSelection = nil
         state = .idle
         pill.flash(message, seconds: 1.5)
     }
 
-    private func beginRecording(_ mode: Mode) {
+    private func beginRecording() {
         // Second press while latched = the stop signal for toggle mode.
-        if toggleLatched, case .recording = state, self.mode == mode {
+        if toggleLatched, case .recording = state {
             toggleLatched = false
             ignoreNextRelease = true
-            finishRecording(mode)
+            finishRecording()
             return
         }
 
@@ -394,28 +363,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        if mode == .command {
-            if let selection = SelectionReader.read(), !selection.isEmpty {
-                DebugLog.log("Command press: using live selection (\(selection.count) chars)")
-                commandSelection = selection
-            } else if let followUp = reclaimLastInsertion() {
-                // Nothing selected, but we just wrote text right here —
-                // re-selected it, so this command applies to the same text.
-                DebugLog.log("Command press: follow-up re-selected the last insertion (\(followUp.count) chars)")
-                commandSelection = followUp
-            } else {
-                pill.flash("Select some text first, then hold \(settings.commandHotkey.displayName)")
-                return
-            }
-        }
-
-        self.mode = mode
         pressStartedAt = Date()
         do {
             try recorder.start()
             SoundFeedback.recordingStarted()
             state = .recording
-            if mode == .dictation && settings.previewEnabled {
+            if settings.previewEnabled {
                 startPreviewLoop()
             }
             // Load the LLM / prime its prompt cache while the user speaks,
@@ -430,22 +383,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Hotkey release: either finish, or — for a quick tap — latch into
     /// hands-free toggle mode (tap again to stop).
-    private func endRecording(_ mode: Mode) {
+    private func endRecording() {
         if ignoreNextRelease {
             ignoreNextRelease = false
             return
         }
-        guard case .recording = state, self.mode == mode else { return }
+        guard case .recording = state else { return }
         if toggleLatched { return }
         if let pressStartedAt, Date().timeIntervalSince(pressStartedAt) < 0.35 {
             toggleLatched = true
             return
         }
-        finishRecording(mode)
+        finishRecording()
     }
 
-    private func finishRecording(_ mode: Mode) {
-        guard case .recording = state, self.mode == mode else { return }
+    private func finishRecording() {
+        guard case .recording = state else { return }
         previewTask?.cancel()
         let samples = AudioTrim.trimSilence(recorder.stop())
         SoundFeedback.recordingStopped()
@@ -460,86 +413,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let context = AppContext.current()
         state = .processing
 
-        switch mode {
-        case .dictation:
-            Task {
-                let text = await self.processDictation(samples: samples, context: context)
-                await MainActor.run {
-                    var outcome: TextInserter.Outcome?
-                    if !text.isEmpty {
-                        self.lastTranscript = text
-                        self.appStatus.lastTranscript = text
-                        HistoryStore.shared.add(text)
-                        StatsStore.shared.record(words: text.split(separator: " ").count)
-                        outcome = self.inserter.insert(text)
-                        if outcome == .inserted {
-                            self.rememberInsertion(text, bundleID: context.bundleID)
-                            self.scheduleCorrectionCheck(inserted: text, context: context)
-                        }
-                    }
-                    // A model swap may have taken over the state meanwhile.
-                    if case .processing = self.state { self.state = .idle }
-                    if outcome == .copiedToClipboard { self.flashAccessibilityWarning() }
-                }
-            }
-        case .command:
-            let selection = commandSelection ?? ""
-            commandSelection = nil
-            Task {
-                let instruction = await self.transcriber.transcribe(samples)
-                var edited: String?
-                if !instruction.isEmpty && !selection.isEmpty {
-                    edited = await self.llmFormatter.applyCommand(instruction, to: selection, model: self.settings.effectiveLLMModel)
-                }
-                let result = edited
-                await MainActor.run {
-                    if case .processing = self.state { self.state = .idle }
-                    if let result, !result.isEmpty {
-                        self.lastTranscript = result
-                        self.appStatus.lastTranscript = result
-                        HistoryStore.shared.add(result)
-                        switch self.inserter.insert(result) {
-                        case .inserted:
-                            self.rememberInsertion(result, bundleID: context.bundleID)
-                        case .copiedToClipboard:
-                            self.flashAccessibilityWarning()
-                        }
-                    } else {
-                        self.pill.flash(instruction.isEmpty
-                            ? "Didn't catch that — try again"
-                            : "Command mode needs Ollama running")
+        Task {
+            let text = await self.processDictation(samples: samples, context: context)
+            await MainActor.run {
+                var outcome: TextInserter.Outcome?
+                if !text.isEmpty {
+                    self.lastTranscript = text
+                    self.appStatus.lastTranscript = text
+                    HistoryStore.shared.add(text)
+                    StatsStore.shared.record(words: text.split(separator: " ").count)
+                    outcome = self.inserter.insert(text)
+                    if outcome == .inserted {
+                        self.scheduleCorrectionCheck(inserted: text, context: context)
                     }
                 }
+                // A model swap may have taken over the state meanwhile.
+                if case .processing = self.state { self.state = .idle }
+                if outcome == .copiedToClipboard { self.flashAccessibilityWarning() }
             }
         }
-    }
-
-    // MARK: - Command-mode follow-ups (4.3)
-
-    /// Command pressed with nothing selected: if we inserted text into this
-    /// same app within the last few minutes and the caret is still sitting
-    /// right after it, re-select it and return it. Returns nil when the
-    /// trail has gone cold — the caller falls back to "select some text".
-    private func reclaimLastInsertion() -> String? {
-        guard let last = lastInsertion else {
-            DebugLog.log("Follow-up: nothing inserted yet this session")
-            return nil
-        }
-        guard Date().timeIntervalSince(last.at) < 180 else {
-            DebugLog.log("Follow-up: last insertion is older than 3 minutes")
-            return nil
-        }
-        let front = AppContext.current().bundleID
-        guard front == last.bundleID else {
-            DebugLog.log("Follow-up: frontmost app \(front) != insertion app \(last.bundleID)")
-            return nil
-        }
-        guard SelectionReader.reselect(last.text) else { return nil }
-        return last.text
-    }
-
-    private func rememberInsertion(_ text: String, bundleID: String) {
-        lastInsertion = LastInsertion(text: text, bundleID: bundleID, at: Date())
     }
 
     // MARK: - Auto-learning dictionary (ADR 0005)

@@ -431,7 +431,6 @@ struct AboutView: View {
                 Text("Hold \(settings.hotkey.displayName) in any text field, speak, and release — the polished text is inserted at your cursor.")
                 Text("Quick-tap \(settings.hotkey.displayName) to go hands-free: tap once to start, tap again to stop.")
                 Text("Press Esc while recording to cancel.")
-                Text("Command mode: select text anywhere, hold \(settings.commandHotkey.displayName), and speak an instruction — “make this shorter”, “make it a bulleted list”, “translate to French”. Requires the local LLM (Ollama).")
             }
 
             Section("Privacy") {

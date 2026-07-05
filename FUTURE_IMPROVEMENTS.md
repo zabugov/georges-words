@@ -26,8 +26,7 @@ When we start something from this list, move it out of here and into the work it
 
 - [ ] **4.1 (M)** **Multilingual dictation** — switch to a multilingual STT model with language auto-detect; the commercial apps support 100+ languages with mid-sentence switching.
 - [ ] **4.2 (M)** **Snippets with placeholders** — "my intro ⟨name⟩" → expansion with a tab-through blank.
-
-*(4.3, command-mode follow-ups, shipped 2026-07-05: with nothing selected, the command key re-targets the last text the app inserted — same app, within 3 minutes, caret still in place — so "now make it friendlier" works without reselecting.)*
+- [ ] **4.4 (M)** **Re-add command mode, properly this time.** Removed entirely 2026-07-05 (along with 4.3, its follow-up extension): after a command-mode use, normal dictation broke completely, and the feature was barely used — not worth debugging in place. Salvage from git history (pre-removal): the edit prompt + few-shots (`LLMFormatter.applyCommand`), and `SelectionReader` (AX read with ⌘C fallback, plus reselect-by-value-search for no-selection follow-ups — the reselect *worked*, even in Electron apps once `AXFocus` woke their accessibility tree). Prime suspect for the breakage: the press/latch state machine (`mode`/`toggleLatched`/`ignoreNextRelease`) was shared between the two hotkeys and wasn't designed for it — a quick command tap likely latches toggle mode and eats the next dictation press. If rebuilt: give command mode its own state machine instead of sharing dictation's.
 
 ## 5. UX & fit-and-finish
 

@@ -149,15 +149,6 @@ final class AppSettings: ObservableObject {
         return nil
     }
 
-    /// Hold this key with text selected to speak an edit instruction.
-    @Published var commandHotkey: HotkeySpec {
-        didSet {
-            if let data = try? JSONEncoder().encode(commandHotkey) {
-                defaults.set(data, forKey: "CommandHotkeySpec")
-            }
-        }
-    }
-
     /// Show a live partial transcript in the pill while speaking.
     @Published var previewEnabled: Bool {
         didSet { defaults.set(previewEnabled, forKey: "PreviewEnabled") }
@@ -226,12 +217,6 @@ final class AppSettings: ObservableObject {
         polishStrength = PolishStrength(rawValue: defaults.string(forKey: "PolishStrength") ?? "") ?? .light
         llmModel = defaults.string(forKey: "LLMModel") ?? Self.defaultLLMModel
         dictionaryText = defaults.string(forKey: "Dictionary") ?? ""
-        if let data = defaults.data(forKey: "CommandHotkeySpec"),
-           let saved = try? JSONDecoder().decode(HotkeySpec.self, from: data) {
-            commandHotkey = saved
-        } else {
-            commandHotkey = HotkeySpec.legacy(defaults.string(forKey: "CommandHotkey")) ?? .rightOption
-        }
         previewEnabled = defaults.object(forKey: "PreviewEnabled") as? Bool ?? true
         soundsEnabled = defaults.object(forKey: "SoundsEnabled") as? Bool ?? true
         if let data = defaults.data(forKey: "Snippets"),
