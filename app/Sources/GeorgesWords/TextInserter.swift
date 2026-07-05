@@ -43,19 +43,7 @@ final class TextInserter {
     // MARK: - Strategy 1: Accessibility API
 
     private func insertViaAccessibility(_ text: String) -> Bool {
-        let systemWide = AXUIElementCreateSystemWide()
-
-        var focusedRef: AnyObject?
-        guard AXUIElementCopyAttributeValue(
-            systemWide,
-            kAXFocusedUIElementAttribute as CFString,
-            &focusedRef
-        ) == .success,
-            let focusedRef,
-            CFGetTypeID(focusedRef) == AXUIElementGetTypeID()
-        else { return false }
-
-        let element = focusedRef as! AXUIElement
+        guard let element = AXFocus.focusedElement(logContext: "AX insert") else { return false }
 
         var settable = DarwinBoolean(false)
         guard AXUIElementIsAttributeSettable(

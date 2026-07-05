@@ -18,19 +18,7 @@ import ApplicationServices
 enum FocusedFieldReader {
 
     static func read() -> String? {
-        let systemWide = AXUIElementCreateSystemWide()
-
-        var focusedRef: AnyObject?
-        guard AXUIElementCopyAttributeValue(
-            systemWide,
-            kAXFocusedUIElementAttribute as CFString,
-            &focusedRef
-        ) == .success,
-            let focusedRef,
-            CFGetTypeID(focusedRef) == AXUIElementGetTypeID()
-        else { return nil }
-
-        let element = focusedRef as! AXUIElement
+        guard let element = AXFocus.focusedElement(logContext: "Correction re-read") else { return nil }
         var valueRef: AnyObject?
         guard AXUIElementCopyAttributeValue(
             element,

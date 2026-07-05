@@ -16,19 +16,7 @@ enum SelectionReader {
     }
 
     private static func readViaAccessibility() -> String? {
-        let systemWide = AXUIElementCreateSystemWide()
-
-        var focusedRef: AnyObject?
-        guard AXUIElementCopyAttributeValue(
-            systemWide,
-            kAXFocusedUIElementAttribute as CFString,
-            &focusedRef
-        ) == .success,
-            let focusedRef,
-            CFGetTypeID(focusedRef) == AXUIElementGetTypeID()
-        else { return nil }
-
-        let element = focusedRef as! AXUIElement
+        guard let element = AXFocus.focusedElement(logContext: "Selection read") else { return nil }
         var selectedRef: AnyObject?
         guard AXUIElementCopyAttributeValue(
             element,
@@ -55,20 +43,9 @@ enum SelectionReader {
         let length = text.utf16.count
         guard length > 0 else { return false }
 
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedRef: AnyObject?
-        guard AXUIElementCopyAttributeValue(
-            systemWide,
-            kAXFocusedUIElementAttribute as CFString,
-            &focusedRef
-        ) == .success,
-            let focusedRef,
-            CFGetTypeID(focusedRef) == AXUIElementGetTypeID()
-        else {
-            DebugLog.log("Follow-up reselect: no focused element")
+        guard let element = AXFocus.focusedElement(logContext: "Follow-up reselect") else {
             return false
         }
-        let element = focusedRef as! AXUIElement
 
         // Remember the current selection so a failed attempt is invisible.
         let original = selectedRange(of: element)
