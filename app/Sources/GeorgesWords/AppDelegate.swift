@@ -36,6 +36,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var lastTranscript: String?
 
+    /// The app dictation started in — the only app the result may be
+    /// inserted into (Zach's rule, 2026-07-05). Switch apps mid-recording
+    /// or mid-processing and the text lands on the clipboard instead.
+    private var recordingContext: AppContext?
+    /// Increments per recording so the max-duration watchdog can tell
+    /// whether "its" recording is still the live one.
+    private var recordingGeneration = 0
+
     // Quick-tap toggle (hands-free) state.
     private var pressStartedAt: Date?
     private var toggleLatched = false
@@ -85,6 +93,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.cancelRecording(message: "Audio device changed — dictation cancelled")
         }
 
+        // Sleep eats key-up events: without this, waking the Mac could
+        // leave the hotkey state stuck and the next press ignored.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            if case .recording = self.state {
+                self.cancelRecording(message: "Mac went to sleep — dictation cancelled")
+            }
+            self.dictationHotkey?.reset()
+            self.toggleLatched = false
+            self.ignoreNextRelease = false
+        }
+
         // All update UI lives in the sidebar footer (UpdateFooter): the
         // pill is for dictation feedback only. The menu-bar item still
         // mirrors the phase so it can't be re-triggered mid-run.
@@ -119,8 +141,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         observeSettings()
 
-        // The polish engine manages itself (7.7): a user-installed Ollama
-        // is used when present; otherwise the app runs its own.
+        // The polish engine manages itself (7.7, ADR 0006): the app always
+        // runs its own private engine — never a user-installed Ollama.
         if settings.llmEnabled {
             ManagedOllama.shared.ensureReady(model: settings.effectiveLLMModel)
         }
@@ -322,8 +344,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = recorder.stop()
         toggleLatched = false
         ignoreNextRelease = false
+        recordingContext = nil
         state = .idle
         pill.flash(message, seconds: 1.5)
+    }
+
+    /// Hands-free mode has no natural end — an accidental quick tap could
+    /// otherwise leave the microphone recording forever. Ten minutes is the
+    /// ceiling; whatever was said still transcribes and inserts normally.
+    private func scheduleRecordingCap(generation: Int) {
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 600 * 1_000_000_000)
+            guard let self,
+                  generation == self.recordingGeneration,
+                  case .recording = self.state
+            else { return }
+            self.toggleLatched = false
+            self.ignoreNextRelease = true
+            self.finishRecording()
+        }
     }
 
     private func beginRecording() {
@@ -364,10 +403,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         pressStartedAt = Date()
+        recordingContext = AppContext.current()
         do {
             try recorder.start()
             SoundFeedback.recordingStarted()
             state = .recording
+            recordingGeneration += 1
+            scheduleRecordingCap(generation: recordingGeneration)
             if settings.previewEnabled {
                 startPreviewLoop()
             }
@@ -409,8 +451,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Capture the target app now, while it is still frontmost.
-        let context = AppContext.current()
+        // The dictation belongs to the app it STARTED in; tone and
+        // insertion both follow that, not whatever is frontmost later.
+        let context = recordingContext ?? AppContext.current()
+        recordingContext = nil
         state = .processing
 
         Task {
@@ -422,9 +466,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.appStatus.lastTranscript = text
                     HistoryStore.shared.add(text)
                     StatsStore.shared.record(words: text.split(separator: " ").count)
-                    outcome = self.inserter.insert(text)
-                    if outcome == .inserted {
-                        self.scheduleCorrectionCheck(inserted: text, context: context)
+                    if AppContext.current().bundleID == context.bundleID {
+                        outcome = self.inserter.insert(text)
+                        if outcome == .inserted {
+                            self.scheduleCorrectionCheck(inserted: text, context: context)
+                        }
+                    } else {
+                        // Different app frontmost than where dictation
+                        // began — never type into the wrong window.
+                        let pasteboard = NSPasteboard.general
+                        pasteboard.clearContents()
+                        pasteboard.setString(text, forType: .string)
+                        self.pill.flash("You switched apps — dictation copied, press ⌘V to paste it", seconds: 4)
                     }
                 }
                 // A model swap may have taken over the state meanwhile.
@@ -441,21 +494,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// suggestions. Entirely local, and bails out unless we're clearly still
     /// looking at the same text in the same app.
     private func scheduleCorrectionCheck(inserted: String, context: AppContext) {
-        Task { [weak self] in
+        Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 6_000_000_000)
-            await MainActor.run {
-                guard let self else { return }
-                // Same app still frontmost, and not mid-dictation.
-                guard AppContext.current().bundleID == context.bundleID else { return }
-                guard case .idle = self.state else { return }
-                guard let fieldText = FocusedFieldReader.read(), !fieldText.isEmpty else { return }
-                for substitution in CorrectionDetector.substitutions(from: inserted, to: fieldText) {
-                    CorrectionStore.shared.add(
-                        heard: substitution.heard,
-                        corrected: substitution.corrected,
-                        settings: self.settings
-                    )
-                }
+            guard let self else { return }
+            // Same app still frontmost, and not mid-dictation.
+            guard AppContext.current().bundleID == context.bundleID else { return }
+            guard case .idle = self.state else { return }
+            guard let fieldText = FocusedFieldReader.read(), !fieldText.isEmpty else { return }
+            for substitution in CorrectionDetector.substitutions(from: inserted, to: fieldText) {
+                CorrectionStore.shared.add(
+                    heard: substitution.heard,
+                    corrected: substitution.corrected,
+                    settings: self.settings
+                )
             }
         }
     }
@@ -524,10 +575,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 guard stillRecording else { return }
 
+                // Check length BEFORE copying: a long hands-free recording
+                // would otherwise re-copy an ever-growing buffer forever.
+                let count = self.recorder.sampleCount
+                guard count > 16_000 else { continue }
+                // Past 30 s the preview is done for good — stop the loop,
+                // don't just skip ticks.
+                guard count < 16_000 * 30 else { return }
                 let snapshot = self.recorder.snapshot()
-                // Need at least 1 s of audio; stop previewing past 30 s to
-                // keep re-transcription cost bounded.
-                guard snapshot.count > 16_000, snapshot.count < 16_000 * 30 else { continue }
 
                 let text = await self.transcriber.transcribe(snapshot)
                 guard !Task.isCancelled, !text.isEmpty else { continue }

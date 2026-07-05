@@ -93,6 +93,13 @@ final class HotkeyMonitor {
         }
     }
 
+    /// Forget a half-seen press. Sleep, secure input, and app switches can
+    /// eat the release event, leaving `keyIsDown` stuck and the next real
+    /// press ignored.
+    func reset() {
+        keyIsDown = false
+    }
+
     private func add(_ monitor: Any?) {
         if let monitor { monitors.append(monitor) }
     }

@@ -108,12 +108,16 @@ final class TextInserter {
 
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+        let ourChangeCount = pasteboard.changeCount
 
         simulatePaste()
 
         // Give the focused app a moment to read the pasteboard, then restore
         // what the user had on it.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // If the user copied something new during that window, theirs
+            // wins — never overwrite a fresher clipboard.
+            guard pasteboard.changeCount == ourChangeCount else { return }
             pasteboard.clearContents()
             guard !saved.isEmpty else { return }
             let items = saved.map { entry -> NSPasteboardItem in

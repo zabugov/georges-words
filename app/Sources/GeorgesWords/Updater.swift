@@ -85,8 +85,24 @@ final class Updater {
             return .failed("git pull failed:\n\(tail(pull.output))")
         }
         let after = run("/usr/bin/git", ["rev-parse", "HEAD"], cwd: repo, timeout: 30)
-        if before.output == after.output {
-            log("Already up to date.")
+        let head = after.output.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // "Up to date" means the INSTALLED APP was built from HEAD — not
+        // merely that the pull found nothing. Comparing only before/after
+        // meant a failed build (or a manual reset) was never retried: HEAD
+        // hadn't moved, so the updater shrugged while running stale code.
+        let builtCommit = UserDefaults.standard.string(forKey: "BuiltCommit")
+        let upToDate: Bool
+        if let builtCommit {
+            upToDate = head == builtCommit
+        } else {
+            // Legacy state (no record yet): fall back to the old check
+            // once, and start keeping the record from here.
+            upToDate = before.output == after.output
+        }
+        if upToDate {
+            if builtCommit == nil { UserDefaults.standard.set(head, forKey: "BuiltCommit") }
+            log("Already up to date (built commit \(head.prefix(7))).")
             return .upToDate
         }
 
@@ -99,10 +115,13 @@ final class Updater {
         log("build.sh (status \(build.status)):\n\(build.output)")
         guard build.status == 0 else {
             // build.sh compiles before it replaces the bundle, so a failed
-            // build leaves the currently-running version intact on disk.
+            // build leaves the currently-running version intact on disk —
+            // and BuiltCommit keeps its old value, so the next check
+            // retries this build instead of claiming "up to date".
             return .failed("Build failed — still running the previous version.\n\n\(tail(build.output))")
         }
-        log("Update succeeded; relaunching.")
+        UserDefaults.standard.set(head, forKey: "BuiltCommit")
+        log("Update succeeded (built \(head.prefix(7))); relaunching.")
         return .updated
     }
 

@@ -75,7 +75,23 @@ final class AudioRecorder {
             self?.append(buffer)
         }
         engine.prepare()
-        try engine.start()
+        do {
+            try engine.start()
+        } catch {
+            // Roll the tap back — a leftover tap makes the next start()
+            // attempt install a second one on the same bus, which crashes.
+            input.removeTap(onBus: 0)
+            converter = nil
+            throw error
+        }
+    }
+
+    /// Samples captured so far, without copying the buffer — cheap enough
+    /// to poll every preview tick.
+    var sampleCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return samples.count
     }
 
     /// Copy of the samples captured so far — used by the live-preview loop
