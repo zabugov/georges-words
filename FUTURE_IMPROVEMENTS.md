@@ -15,32 +15,54 @@ When we start something from this list, move it out of here and into the work it
 ## 2. Accuracy
 
 - [ ] **2.2 (M, lower priority)** **Dictionary biasing in the speech model itself** — feed personal-dictionary terms to the recognizer so names come out right at transcription time, not just fixed afterwards (the commercial apps' trick for jargon). Note: the known mechanism (WhisperKit `promptTokens`) only applies to the Whisper fallback engine; whether FluidAudio/Parakeet supports biasing needs research first. Deprioritized 2026-07-05 — transcription accuracy is already "doing really well", and learned `heard -> Correct` mappings cover the misses. (2.1, the Whisper model-size evaluation, retired for the same reason: Whisper is only the fallback engine now.)
-- [ ] **2.5 (M)** **Auto-learning dictionary isn't catching corrections well** (Zach, 2026-07-03, same day it shipped — details TBD from real use). Debugging leads, roughly in order of suspicion: (a) the fixed ~6 s re-read window — corrections made later are invisible; (b) the AX field re-read returning nothing in the apps he dictates into (Electron apps often fail `AXValue` reads — log the failure reason); (c) filters too strict — similarity ≥ 0.35, stopword-only rejection, or the ≥60% LCS gate discarding legit fixes; (d) suggestions being learned but not noticed in the Dictionary tab (surface a subtle badge/notification when one arrives?). First step: add a debug log line per stage (read ok? aligned? filtered why?) so a failing dictation can be diagnosed from Console instead of guesswork. See ADR 0005 for the design.
+- [ ] **2.5 (M)** **Auto-learning dictionary isn't catching corrections well** (Zach, 2026-07-03, same day it shipped — details TBD from real use). Debugging leads, roughly in order of suspicion: (a) the fixed ~6 s re-read window — corrections made later are invisible; (b) the AX field re-read returning nothing in the apps he dictates into (Electron trees sleep until woken — partially addressed 2026-07-05 by AXFocus, which now wakes them and logs to debug.log); (c) filters too strict — similarity ≥ 0.35, stopword-only rejection, or the ≥60% LCS gate discarding legit fixes; (d) suggestions being learned but not noticed in the Dictionary tab (surface a subtle badge/notification when one arrives?); (e) from the 2026-07-05 code review: the re-read only validates the frontmost bundle ID — it may diff against a *different field* in the same app and learn junk; retain and revalidate the exact AX element. See ADR 0005 for the design.
 
 ## 3. Formatting intelligence — next-level polish, lower priority as of 2026-07-05
 
 - [ ] **3.3 (L)** **Personal style matching** — learn the user's tone from local samples of their writing (e.g. pasted examples) instead of generic casual/professional presets. the commercial "sounds like you" feature, done locally.
 - [ ] **3.5 (S)** **Grow the few-shot bank** from real-world failures — keep a small corpus of messy-transcript → ideal-output pairs and iterate on it as bad cleanups are noticed.
+- [ ] **3.7 (S)** **Keep the raw transcript, offer "use raw instead"** (from the 2026-07-05 code review) — retain the pre-polish transcript alongside the polished one; a click on Home/History swaps the last insertion to the raw version. Makes the "polish can't lose your words" promise true by construction instead of by validation heuristics.
 
 ## 4. Feature parity with commercial dictation apps
 
 - [ ] **4.1 (M)** **Multilingual dictation** — switch to a multilingual STT model with language auto-detect; the commercial apps support 100+ languages with mid-sentence switching.
 - [ ] **4.2 (M)** **Snippets with placeholders** — "my intro ⟨name⟩" → expansion with a tab-through blank.
 - [ ] **4.4 (M)** **Re-add command mode, properly this time.** Removed entirely 2026-07-05 (along with 4.3, its follow-up extension): after a command-mode use, normal dictation broke completely, and the feature was barely used — not worth debugging in place. Salvage from git history (pre-removal): the edit prompt + few-shots (`LLMFormatter.applyCommand`), and `SelectionReader` (AX read with ⌘C fallback, plus reselect-by-value-search for no-selection follow-ups — the reselect *worked*, even in Electron apps once `AXFocus` woke their accessibility tree). Prime suspect for the breakage: the press/latch state machine (`mode`/`toggleLatched`/`ignoreNextRelease`) was shared between the two hotkeys and wasn't designed for it — a quick command tap likely latches toggle mode and eats the next dictation press. If rebuilt: give command mode its own state machine instead of sharing dictation's.
+- [ ] **4.5 (M)** **Voice editing pack** (from the 2026-07-05 code review) — "delete last word/sentence", "undo that", spoken punctuation ("open parenthesis", "semicolon"), a spoken "no polish" escape, and a literal mode for code/URLs/identifiers. Builds on the existing spoken-commands layer in TranscriptCleaner.
 
 ## 5. UX & fit-and-finish
 
 *(Nothing open — the 5.x items all shipped with the Dock-app redesign and onboarding. 5.3, tabbed Settings, is retired for good: shipped 2026-07-05, reverted the same day — Zach prefers the single scrolling list.)*
 
+- [ ] **5.5 (S)** **Undo Last Insertion** (from the 2026-07-05 code review — its best product idea): a menu-bar item / Home button that removes the text the last dictation inserted, via the same AX select-and-replace machinery. Pairs with 3.7 (swap to raw).
+
+
 ## 6. Reliability & compatibility
 
 - [ ] **6.2 (M)** **Per-app insertion quirks** — audit the AX path in Electron apps, terminals (trailing-newline behavior), Java apps, and browsers; maintain a fallback list.
 - [ ] **6.4 (S)** **Escape the iCloud repo trap** — second incident 2026-07-04: iCloud's file provider wedged mid-session, blocking all local git reads; the self-updater's pull hung to its 120 s timeout and even `git status` froze until a reboot (first incident was the codesign xattr race that forced temp-dir staging). Two-part fix: (a) move the checkout out of iCloud-synced Desktop (e.g. `~/georges-words` — permissions survive via the stable signing identity; update CLAUDE.md paths after); (b) updater polish: when the pull times out, say "this usually means iCloud has wedged the repo — see Troubleshooting" instead of a generic failure, and consider a pre-flight `git status` probe with a 5 s timeout so the spinner never runs long on a dead filesystem.
+- [ ] **6.5 (S)** **Input-device picker + silent-mic warning** (code review) — choose which microphone the app records from, and warn when the input is muted, disconnected, or suspiciously quiet instead of producing empty transcripts.
+- [ ] **6.6 (S)** **Insertion compatibility tester** (code review) — a Troubleshooting button that checks the currently focused app: can we read the field, is direct insertion verified, or will paste be used? Turns "it doesn't type into app X" reports into one click of diagnosis. Pairs with 6.2.
+- [ ] **6.7 (S)** **Truly complete factory reset** (code review) — also delete the WhisperKit/FluidAudio model caches (they live outside Application Support/GeorgesWords), unregister launch-at-login, await engine shutdown before deleting, and surface deletion failures instead of `try?`-swallowing them.
 
 ## 7. Distribution & maintenance
 
 - [ ] **7.1 (M→S)** **Developer ID signing + notarization — nearly done (2026-07-04).** Secrets are in, CI signs with hardened runtime + entitlements, DMGs build and submit cleanly; the only outstanding piece is Apple's notary queue clearing the first submission (sat "In Progress" for hours — a documented first-submission pattern; credentials verified good, no Invalid verdict). A retry loop re-runs `release.yml` every ~2 h until 2026-07-07 and push-notifies Zach on any terminal outcome. Close this item when the first Accepted verdict lands.
 - [ ] **7.3 (M)** **Auto-updates** via Sparkle — becomes real the moment the DMG lands on the first non-developer Mac (Zach's wife's): DMG installs can't self-update via git like the source checkout does. (7.6, the latency benchmark script, retired 2026-07-05 — speed is settled and the Home timing caption covers day-to-day monitoring.)
+- [ ] **7.8 (S)** **Export/import** settings, dictionary, snippets, and per-app notes (code review) — one JSON file out, one file in. The practical path for seeding a family member's Mac with a tuned dictionary.
+- [ ] **7.9 (M)** **Internal hardening, incrementally** (code review, accepted in spirit): adopt @MainActor on the UI/state owners and enable strict concurrency in CI once clean; extract pieces of AppDelegate (recording session, insertion) opportunistically when touching them — no big-bang refactor.
+
+## 8. Privacy controls (new section, from the 2026-07-05 code review)
+
+The app already keeps everything on-device; these give the user control over what it keeps at all — they matter once family members are dictating.
+
+- [ ] **8.1 (M)** **Per-app exclusion list** — never store history or learn corrections from chosen apps (password managers, banking, private browsing).
+- [ ] **8.2 (S)** **History retention controls** — off entirely, session-only, or time-boxed, instead of always-keep-200.
+- [ ] **8.3 (S)** **Correction-learning off switch** — one toggle to stop the auto-learning dictionary from watching post-dictation edits.
+
+## Code-review triage (2026-07-05)
+
+CODE_REVIEW.md was triaged the same day it landed. Addressed immediately in code: wrong-app insertion guard, transactional updater, clipboard-restore race, audio-tap rollback, hands-free cap + preview bounds, wake-time hotkey reset, Swift 6 warning, pinned+verified engine download, random engine port, model-default/doc drift, WhisperKit pin, release-workflow tests, Whisper-only CI leg. Declined (deliberate choices, not oversights): updater process groups, opt-in signing setup, big-bang coordinator split, protocol seams everywhere, engine auth proxy, double-tap hands-free, menu-bar-only mode, encrypted backups, storage-usage screen.
 
 ## Explicit non-goals
 
