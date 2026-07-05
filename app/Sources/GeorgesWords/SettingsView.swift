@@ -29,41 +29,6 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        // Tabbed layout (5.3): one topic per tab instead of one long scroll.
-        TabView {
-            generalTab
-                .tabItem { Label("General", systemImage: "gearshape") }
-            speechTab
-                .tabItem { Label("Speech", systemImage: "waveform") }
-            hotkeysTab
-                .tabItem { Label("Hotkeys", systemImage: "keyboard") }
-            polishTab
-                .tabItem { Label("AI Polish", systemImage: "wand.and.stars") }
-            perAppTab
-                .tabItem { Label("Per-App", systemImage: "app.badge.checkmark") }
-        }
-        .padding(.top, 6)
-        .navigationTitle("Settings")
-        .task { await refreshOllama() }
-    }
-
-    private var generalTab: some View {
-        Form {
-            Section {
-                Toggle("Launch at login", isOn: $settings.launchAtLogin)
-            }
-            Section("While dictating") {
-                Toggle("Live preview while speaking", isOn: $settings.previewEnabled)
-                Text("Shows a rolling transcript in the on-screen bubble as you talk. Costs some extra compute while recording.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Toggle("Sound on record start/stop", isOn: $settings.soundsEnabled)
-            }
-        }
-        .formStyle(.grouped)
-    }
-
-    private var speechTab: some View {
         Form {
             Section("Speech recognition") {
                 if SpeechEngine.parakeetAvailable {
@@ -91,12 +56,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-        }
-        .formStyle(.grouped)
-    }
 
-    private var hotkeysTab: some View {
-        Form {
             Section("Hotkeys") {
                 HotkeyRecorderField(title: "Hold to dictate", spec: $settings.hotkey)
                 if settings.hotkey == .fn {
@@ -117,13 +77,13 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+                Toggle("Live preview while speaking", isOn: $settings.previewEnabled)
+                Text("Shows a rolling transcript in the pill as you talk. Costs some extra compute while recording.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Toggle("Sound on record start/stop", isOn: $settings.soundsEnabled)
             }
-        }
-        .formStyle(.grouped)
-    }
 
-    private var polishTab: some View {
-        Form {
             Section("AI polish (local)") {
                 Toggle("Polish transcripts with a local LLM", isOn: $settings.llmEnabled)
 
@@ -182,12 +142,7 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-        }
-        .formStyle(.grouped)
-    }
 
-    private var perAppTab: some View {
-        Form {
             Section("Per-app style notes") {
                 ForEach($settings.appInstructions) { $entry in
                     VStack(alignment: .leading, spacing: 4) {
@@ -222,8 +177,14 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                Toggle("Launch at login", isOn: $settings.launchAtLogin)
+            }
         }
         .formStyle(.grouped)
+        .navigationTitle("Settings")
+        .task { await refreshOllama() }
     }
 
     private struct HotkeyRecorderField: View {

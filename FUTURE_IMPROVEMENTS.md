@@ -31,7 +31,7 @@ When we start something from this list, move it out of here and into the work it
 
 ## 5. UX & fit-and-finish
 
-*(Nothing open — the 5.x items all shipped with the Dock-app redesign and onboarding. 5.3, tabbed Settings, was briefly retired then shipped 2026-07-05 after all: Settings is now General / Speech / Hotkeys / AI Polish / Per-App tabs.)*
+*(Nothing open — the 5.x items all shipped with the Dock-app redesign and onboarding. 5.3, tabbed Settings, is retired for good: shipped 2026-07-05, reverted the same day — Zach prefers the single scrolling list.)*
 
 ## 6. Reliability & compatibility
 
