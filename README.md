@@ -47,7 +47,7 @@ After the *first* signed build, re-grant Accessibility one last time (System Set
 
 ### AI polish — automatic
 
-Full AI polish (self-corrections, sentence restructuring, per-app tone) sets itself up automatically: the app downloads and privately runs its own copy of the [Ollama](https://ollama.com) engine plus a small local model (~1 GB, one-time) — no Terminal, no separate installs, and independent of anything else on the machine. It's an app-to-app call inside your Mac; no text goes to any network, and until the engine is ready, dictation falls back to rule-based cleanup. Never worse, sometimes much better.
+Full AI polish (self-corrections, sentence restructuring, per-app tone) sets itself up automatically: the app downloads and privately runs its own copy of the [Ollama](https://ollama.com) engine plus a small local model (~1 GB, one-time) — no Terminal, no separate installs, and independent of anything else on the machine. It's an app-to-app call inside your Mac; no text goes to any network, and until the engine is ready, dictation falls back to rule-based cleanup, which is already solid on its own.
 
 ## What it will do
 

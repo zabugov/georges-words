@@ -96,7 +96,9 @@ final class AppSettings: ObservableObject {
     }
 
 
-    static let defaultLLMModel = "qwen2.5:3b"
+    // The settled configuration (2026-07-05): light polish is fast and
+    // good at 1.5b, and it keeps the onboarding "about 1 GB" promise true.
+    static let defaultLLMModel = "qwen2.5:1.5b"
 
     /// Ollama model tag used for the polish pass. May be empty or
     /// mid-edit in the Settings field — use `effectiveLLMModel` when

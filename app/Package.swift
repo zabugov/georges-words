@@ -8,7 +8,9 @@ import Foundation
 let parakeetEnabled = ProcessInfo.processInfo.environment["GW_PARAKEET"] != "0"
 
 var dependencies: [Package.Dependency] = [
-    .package(url: "https://github.com/argmaxinc/WhisperKit.git", .upToNextMajor(from: "0.9.0"))
+    // Pinned exactly: pre-1.0, minor bumps can break the API. Update
+    // deliberately, with a local test of the Whisper fallback engine.
+    .package(url: "https://github.com/argmaxinc/WhisperKit.git", exact: "0.18.0")
 ]
 var targetDependencies: [Target.Dependency] = [
     .product(name: "WhisperKit", package: "WhisperKit")

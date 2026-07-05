@@ -1,6 +1,6 @@
 # ADR 0003: Two-stage formatting — rules always, local LLM via Ollama when available
 
-**Status:** Accepted · **Date:** 2026-07-03
+**Status:** Accepted · **Date:** 2026-07-03 · **Superseded in part by [ADR 0006](0006-managed-polish-engine.md):** the two-stage formatting design below still stands, but the engine is now app-managed on a private port, not user-installed on 11434.
 
 ## Context
 
