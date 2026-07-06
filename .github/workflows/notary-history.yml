@@ -1,0 +1,25 @@
+name: Notary History
+
+# Diagnostic: list every notarization submission and its current status.
+# Our release runs give up after ~3 h of "In Progress", but Apple keeps
+# processing server-side — a submission can flip to Accepted hours after
+# the runner died. The first Accepted verdict makes that run's DMG pass
+# Gatekeeper's online check immediately, no staple needed.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  history:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - name: List submissions
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun notarytool history \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD"
