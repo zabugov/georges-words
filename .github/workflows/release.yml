@@ -255,7 +255,10 @@ jobs:
           PYEOF
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add appcast.xml
+          # swift build may have refreshed Package.resolved — commit it too
+          # so local checkouts stay clean, and autostash any other noise
+          # (run #13 died here on an unstaged-changes refusal).
+          git add appcast.xml app/Package.resolved
           git commit -m "Appcast: ${VERSION} build ${GITHUB_RUN_NUMBER}"
-          git pull --rebase origin main
+          git pull --rebase --autostash origin main
           git push origin main
