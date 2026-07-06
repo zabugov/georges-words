@@ -23,6 +23,10 @@ final class PillController {
 
     private let panel: NSPanel
     private let model = Model()
+    /// Bumped on every show()/hide() so a fade-out finishing late can tell
+    /// whether it was interrupted by a newer show() — in which case it
+    /// must NOT order the panel out (that ate the app-switch alert).
+    private var appearanceGeneration = 0
 
     init() {
         panel = NSPanel(
@@ -42,6 +46,7 @@ final class PillController {
     }
 
     func show(_ phase: Phase) {
+        appearanceGeneration += 1
         model.phase = phase
         if phase != .listening {
             model.level = 0
@@ -52,7 +57,12 @@ final class PillController {
         position()
 
         if panel.isVisible {
-            panel.alphaValue = 1
+            // A zero-duration animation on the same property cancels any
+            // in-flight fade-out, so it can't drag the alpha back down.
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0
+                panel.animator().alphaValue = 1
+            }
             panel.orderFrontRegardless()
         } else if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             panel.alphaValue = 1
@@ -71,6 +81,8 @@ final class PillController {
         model.level = 0
         model.previewText = ""
         guard panel.isVisible else { return }
+        appearanceGeneration += 1
+        let generation = appearanceGeneration
 
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             panel.orderOut(nil)
@@ -80,7 +92,11 @@ final class PillController {
                 self.panel.animator().alphaValue = 0
             }, completionHandler: { [weak self] in
                 guard let self else { return }
-                self.panel.orderOut(nil)
+                // If a show() arrived mid-fade, this fade lost — leave
+                // the panel up instead of yanking the new content away.
+                if self.appearanceGeneration == generation {
+                    self.panel.orderOut(nil)
+                }
                 self.panel.alphaValue = 1
             })
         }
