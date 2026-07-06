@@ -380,9 +380,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             break
         case .loadingModel:
             // The recorder doesn't need the model. Start capturing now —
-            // the Transcriber actor serializes transcribe() behind load(),
-            // so the result just arrives a beat later. Without this, the
-            // first press after launch got rejected and felt broken.
+            // transcribe() explicitly awaits the in-flight load (see
+            // Transcriber), so the result just arrives once the model is
+            // ready. Without this, the first press after launch got
+            // rejected and felt broken.
+            DebugLog.log("Press while model still loading — recording anyway")
             break
         case .processing:
             pill.flash("Finishing the previous dictation…", seconds: 2)
@@ -419,6 +421,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 llmFormatter.warmUpIfStale(model: settings.effectiveLLMModel, strength: settings.polishStrength)
             }
         } catch {
+            DebugLog.log("Recorder start failed: \(error.localizedDescription)")
             state = .error("Microphone error: \(error.localizedDescription)")
         }
     }
@@ -445,9 +448,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let samples = AudioTrim.trimSilence(recorder.stop())
         SoundFeedback.recordingStopped()
 
-        // Ignore accidental taps shorter than ~0.3 s of audio (16 kHz mono).
+        // Taps shorter than ~0.3 s of audio can't transcribe — but say so
+        // instead of going silently idle, which read as "the app ignored
+        // me" to first-time users.
         guard samples.count > 4800 else {
+            DebugLog.log("Recording dropped: only \(samples.count) samples captured")
             state = .idle
+            pill.flash("Didn't catch that — hold the key down while you speak", seconds: 2.5)
             return
         }
 

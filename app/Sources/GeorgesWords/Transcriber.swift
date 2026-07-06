@@ -28,11 +28,19 @@ actor Transcriber {
     }
 
     private var backend: Backend?
+    private var loadTask: Task<Void, Error>?
 
     nonisolated var modelName: String { AppSettings.shared.modelName }
 
     func load() async throws {
         backend = nil
+        let task = Task { try await self.performLoad() }
+        loadTask = task
+        try await task.value
+    }
+
+    private func performLoad() async throws {
+        let start = Date()
         #if PARAKEET
         if AppSettings.shared.engine == .parakeet {
             let models = try await AsrModels.downloadAndLoad(version: .v3)
@@ -40,15 +48,29 @@ actor Transcriber {
             try await manager.loadModels(models)
             backend = .parakeet(manager)
             await warmUp()
+            DebugLog.log(String(format: "Model load: parakeet ready in %.1fs (incl. warm-up)", -start.timeIntervalSinceNow))
             return
         }
         #endif
         backend = .whisper(try await WhisperKit(WhisperKitConfig(model: modelName)))
         await warmUp()
+        DebugLog.log(String(format: "Model load: whisper ready in %.1fs (incl. warm-up)", -start.timeIntervalSinceNow))
     }
 
     func transcribe(_ samples: [Float]) async -> String {
-        guard let backend else { return "" }
+        // Actors are REENTRANT at await points: while load() is suspended
+        // (downloading/compiling the model), a call used to slip in here,
+        // see a nil backend, and silently return "" — the "first fn press
+        // after launch does nothing" bug. Wait for the load instead; the
+        // recording that queued during it then transcribes normally.
+        if backend == nil, let loadTask {
+            DebugLog.log("Transcribe requested mid-load — waiting for the model")
+            try? await loadTask.value
+        }
+        guard let backend else {
+            DebugLog.log("Transcribe: no backend after load — returning empty")
+            return ""
+        }
         do {
             switch backend {
             case .whisper(let whisperKit):
