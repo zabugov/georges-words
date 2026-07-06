@@ -3,6 +3,7 @@ import ApplicationServices
 import AVFoundation
 import Carbon.HIToolbox
 import Combine
+import Sparkle
 import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -30,6 +31,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let inserter = TextInserter()
     private let pill = PillController()
     private let updater = Updater()
+    /// Sparkle drives updates for DMG installs; nil on the source checkout,
+    /// where the git-pull updater owns the job instead (ADR 0007).
+    private var sparkle: SPUStandardUpdaterController?
     private var dictationHotkey: HotkeyMonitor?
     private var cancellables = Set<AnyCancellable>()
     private var previewTask: Task<Void, Never>?
@@ -60,6 +64,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         buildMenu()
         appStatus.checkForUpdates = { [weak self] in self?.checkForUpdates() }
+
+        // DMG installs can't self-update via git — Sparkle takes over
+        // there, with its own standard UI. Never both at once.
+        if !updater.runsFromSourceCheckout {
+            sparkle = SPUStandardUpdaterController(
+                startingUpdater: true,
+                updaterDelegate: nil,
+                userDriverDelegate: nil
+            )
+        }
         updateStatusUI()
 
         // First-run onboarding (5.2): the wizard explains each permission
@@ -814,6 +828,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func checkForUpdates() {
+        if let sparkle {
+            NSApp.activate(ignoringOtherApps: true)
+            sparkle.checkForUpdates(nil)
+            return
+        }
         guard !updater.isUpdating else { return }
         // Instant feedback on click — the first background progress message
         // may be a beat away while git starts up.

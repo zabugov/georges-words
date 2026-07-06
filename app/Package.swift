@@ -10,10 +10,13 @@ let parakeetEnabled = ProcessInfo.processInfo.environment["GW_PARAKEET"] != "0"
 var dependencies: [Package.Dependency] = [
     // Pinned exactly: pre-1.0, minor bumps can break the API. Update
     // deliberately, with a local test of the Whisper fallback engine.
-    .package(url: "https://github.com/argmaxinc/WhisperKit.git", exact: "0.18.0")
+    .package(url: "https://github.com/argmaxinc/WhisperKit.git", exact: "0.18.0"),
+    // Auto-updates for DMG installs (ADR 0007). Pinned per project policy.
+    .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.9.4")
 ]
 var targetDependencies: [Target.Dependency] = [
-    .product(name: "WhisperKit", package: "WhisperKit")
+    .product(name: "WhisperKit", package: "WhisperKit"),
+    .product(name: "Sparkle", package: "Sparkle")
 ]
 var swiftSettings: [SwiftSetting] = []
 

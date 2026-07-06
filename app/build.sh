@@ -38,10 +38,23 @@ trap 'rm -rf "$STAGE_DIR"' EXIT
 STAGE_APP="$STAGE_DIR/GeorgesWords.app"
 
 echo "==> Assembling ${APP_DIR}"
-mkdir -p "$STAGE_APP/Contents/MacOS" "$STAGE_APP/Contents/Resources"
+mkdir -p "$STAGE_APP/Contents/MacOS" "$STAGE_APP/Contents/Resources" "$STAGE_APP/Contents/Frameworks"
 cp ".build/release/GeorgesWords" "$STAGE_APP/Contents/MacOS/GeorgesWords"
 cp "Info.plist" "$STAGE_APP/Contents/Info.plist"
 cp "icon/AppIcon.icns" "$STAGE_APP/Contents/Resources/AppIcon.icns"
+
+# Sparkle ships as a framework the binary loads at runtime — embed it and
+# point the binary at Contents/Frameworks (ADR 0007).
+SPARKLE_FW="$(find .build -type d -name "Sparkle.framework" -path "*release*" | head -1)"
+if [ -z "$SPARKLE_FW" ]; then
+    SPARKLE_FW="$(find .build -type d -name "Sparkle.framework" | head -1)"
+fi
+if [ -z "$SPARKLE_FW" ]; then
+    echo "!! Sparkle.framework not found in .build — the app would crash on launch."
+    exit 1
+fi
+ditto "$SPARKLE_FW" "$STAGE_APP/Contents/Frameworks/Sparkle.framework"
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$STAGE_APP/Contents/MacOS/GeorgesWords" 2>/dev/null || true
 
 # Stamp the build so the app can display exactly what it is (shown in the
 # sidebar footer and About). An app without these keys is an old/stray build.

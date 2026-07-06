@@ -27,6 +27,9 @@ on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: write # publish releases + push the appcast
+
 jobs:
   dmg:
     runs-on: macos-15
@@ -63,12 +66,23 @@ jobs:
       - name: Assemble app bundle
         run: |
           APP="dist/GeorgesWords.app"
-          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
           cp app/.build/release/GeorgesWords "$APP/Contents/MacOS/GeorgesWords"
           cp app/Info.plist "$APP/Contents/Info.plist"
           cp app/icon/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
           /usr/libexec/PlistBuddy -c "Add :GWBuildCommit string ${GITHUB_SHA::7}" "$APP/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c "Add :GWBuildDate string $(date -u '+%Y-%m-%d %H:%MZ')" "$APP/Contents/Info.plist"
+          # Sparkle compares CFBundleVersion numerically — the run number
+          # gives every release a strictly increasing build number.
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${GITHUB_RUN_NUMBER}" "$APP/Contents/Info.plist"
+          # Embed the Sparkle framework and point the binary at it.
+          SPARKLE_FW="$(find app/.build -type d -name "Sparkle.framework" -path "*release*" | head -1)"
+          if [ -z "$SPARKLE_FW" ]; then
+            SPARKLE_FW="$(find app/.build -type d -name "Sparkle.framework" | head -1)"
+          fi
+          test -n "$SPARKLE_FW"
+          ditto "$SPARKLE_FW" "$APP/Contents/Frameworks/Sparkle.framework"
+          install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/GeorgesWords" 2>/dev/null || true
 
       - name: Import signing certificate
         if: env.HAS_SIGNING == 'true'
@@ -94,6 +108,17 @@ jobs:
         run: |
           if [ -n "${SIGN_IDENTITY:-}" ]; then
             echo "Signing with: $SIGN_IDENTITY (hardened runtime)"
+            # Nested Sparkle code first (no app entitlements on helpers),
+            # innermost out — notarization inspects every nested binary.
+            FW="dist/GeorgesWords.app/Contents/Frameworks/Sparkle.framework"
+            if [ -d "$FW" ]; then
+              for HELPER in "$FW"/Versions/B/XPCServices/*.xpc "$FW/Versions/B/Autoupdate" "$FW/Versions/B/Updater.app"; do
+                if [ -e "$HELPER" ]; then
+                  codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$HELPER"
+                fi
+              done
+              codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$FW"
+            fi
             codesign --force --options runtime --timestamp \
               --entitlements app/GeorgesWords.entitlements \
               --sign "$SIGN_IDENTITY" dist/GeorgesWords.app
@@ -191,3 +216,46 @@ jobs:
           name: GeorgesWords-${{ env.VERSION }}-dmg-stapled
           path: dist/GeorgesWords-*.dmg
           if-no-files-found: error
+
+      # The stapled DMG becomes a real GitHub Release, and the Sparkle
+      # appcast on main starts pointing at it — every installed copy
+      # picks it up within a day (or on Check for Updates). ADR 0007.
+      - name: Publish release and update feed
+        if: env.NOTARY_ACCEPTED == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${VERSION}-b${GITHUB_RUN_NUMBER}"
+          DMG="GeorgesWords-${VERSION}.dmg"
+          gh release create "$TAG" "dist/$DMG" \
+            --title "George's Words ${VERSION} (build ${GITHUB_RUN_NUMBER})" \
+            --notes "Notarized, stapled, auto-updating build."
+          LENGTH=$(stat -f%z "dist/$DMG")
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${DMG}"
+          python3 - "$VERSION" "$GITHUB_RUN_NUMBER" "$URL" "$LENGTH" <<'PYEOF'
+          import sys, email.utils, time
+          version, build, url, length = sys.argv[1:5]
+          appcast = f"""<?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+            <channel>
+              <title>George's Words</title>
+              <item>
+                <title>Version {version} (build {build})</title>
+                <pubDate>{email.utils.formatdate(time.time())}</pubDate>
+                <sparkle:version>{build}</sparkle:version>
+                <sparkle:shortVersionString>{version}</sparkle:shortVersionString>
+                <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+                <enclosure url="{url}" length="{length}" type="application/octet-stream"/>
+              </item>
+            </channel>
+          </rss>
+          """
+          lines = [line[10:] if line.startswith(" " * 10) else line for line in appcast.splitlines()]
+          open("appcast.xml", "w").write("\n".join(line for line in lines if line.strip() or line == "") + "\n")
+          PYEOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          git commit -m "Appcast: ${VERSION} build ${GITHUB_RUN_NUMBER}"
+          git pull --rebase origin main
+          git push origin main

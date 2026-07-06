@@ -16,6 +16,11 @@ final class Updater {
 
     private(set) var isUpdating = false
 
+    /// True when the app runs out of its git checkout (the developer's
+    /// machine). DMG installs return false and update via Sparkle instead
+    /// (ADR 0007).
+    var runsFromSourceCheckout: Bool { repoRoot != nil }
+
     /// Progress text for the menu bar (nil when finished).
     var onProgress: ((String?) -> Void)?
 
