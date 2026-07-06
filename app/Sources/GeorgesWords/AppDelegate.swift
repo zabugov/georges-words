@@ -493,7 +493,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // Flash AFTER the state change: setting .idle refreshes the
                 // status UI, and a flash shown before it would be hidden.
                 if switchedApps {
-                    self.pill.flashAlert("Switched apps — press ⌘V to paste your dictation")
+                    self.pill.flashAlert("You switched apps — press ⌘V to paste your dictation")
                 }
                 if outcome == .copiedToClipboard { self.flashAccessibilityWarning() }
             }
