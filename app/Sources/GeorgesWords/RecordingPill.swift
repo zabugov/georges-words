@@ -30,7 +30,9 @@ final class PillController {
 
     init() {
         panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 60),
+            // Wide enough that alert copy never ellipsizes; the capsule
+            // hugs its content, so the extra window area is invisible.
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 70),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -133,7 +135,7 @@ final class PillController {
     /// Can't-miss warning: orange, larger, longer, with a sound. Used when
     /// the dictation went to the clipboard instead of the app — the user
     /// is mid-flow and easily misses the ordinary pill.
-    func flashAlert(_ text: String, seconds: TimeInterval = 7) {
+    func flashAlert(_ text: String, seconds: TimeInterval = 3) {
         if AppSettings.shared.soundsEnabled {
             NSSound(named: "Glass")?.play()
         }
@@ -191,7 +193,8 @@ private struct PillView: View {
                 Text(text)
                     .font(.system(size: 14, weight: .semibold))
                     .lineLimit(2)
-                    .frame(maxWidth: 380)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 560)
             }
         }
         .font(.system(size: 13, weight: .medium))

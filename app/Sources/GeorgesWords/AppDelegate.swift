@@ -493,7 +493,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // Flash AFTER the state change: setting .idle refreshes the
                 // status UI, and a flash shown before it would be hidden.
                 if switchedApps {
-                    self.pill.flashAlert("You switched apps — your dictation is on the clipboard. Press ⌘V to paste it.")
+                    self.pill.flashAlert("Switched apps — press ⌘V to paste your dictation")
                 }
                 if outcome == .copiedToClipboard { self.flashAccessibilityWarning() }
             }
@@ -764,7 +764,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// the Accessibility grant while still showing it enabled. Tell the
     /// user instead of failing silently.
     private func flashAccessibilityWarning() {
-        pill.flashAlert("No Accessibility permission — copied to clipboard. Re-toggle GeorgesWords in System Settings → Accessibility.", seconds: 8)
+        // Longer than the app-switch alert: this one carries instructions.
+        pill.flashAlert("No Accessibility permission — copied to clipboard. Re-toggle GeorgesWords in System Settings → Accessibility.", seconds: 6)
     }
 
     func openMainWindow(section: MainSection? = nil) {
