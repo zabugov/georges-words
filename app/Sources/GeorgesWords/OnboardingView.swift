@@ -30,6 +30,7 @@ struct OnboardingView: View {
     @State private var axGranted = AXIsProcessTrusted()
     @State private var fnKeyFreed = OnboardingView.fnKeyIsFreed()
     @State private var practiceText = ""
+    @FocusState private var practiceBoxFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,6 +42,16 @@ struct OnboardingView: View {
                 .padding(16)
         }
         .frame(width: 520)
+        .onChange(of: step) { _, newStep in
+            // The cursor should already be waiting in the practice box —
+            // asking a first-time user to "click into the box" first was
+            // one instruction too many. Small delay so the page transition
+            // finishes before focus lands.
+            guard newStep == .practice else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                practiceBoxFocused = true
+            }
+        }
         .task {
             // Live permission status while the wizard is open — grants
             // happen in System Settings, outside our control.
@@ -237,13 +248,14 @@ struct OnboardingView: View {
             page(
                 icon: nil,
                 title: "Try it",
-                subtitle: "Click into the box, hold down this key, say a sentence, and let go:"
+                subtitle: "Hold down this key, say a sentence, and let go:"
             ) {
                 FnKeycap()
                 TextEditor(text: $practiceText)
                     .font(.body)
                     .frame(height: 100)
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+                    .focused($practiceBoxFocused)
                 if practiceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text("Your words will appear on the screen as you speak. When you let go, they'll be right where you would have typed them.")
                         .font(.callout)
