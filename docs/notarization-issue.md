@@ -1,7 +1,16 @@
 # Notarization: goal, mechanism, history, and current state
 
-*Last updated 2026-07-06 (early UTC). This is the running log for backlog
+*Last updated 2026-07-06 13:50 UTC. This is the running log for backlog
 item 7.1.*
+
+> **RESOLVED 2026-07-06 ~13:42 UTC.** Apple's hold lifted roughly 36–60
+> hours after the first submission: every submission (all nine) flipped
+> to **Accepted** at once, consistent with the account-review hypothesis.
+> The preserved run #12 DMG was stapled, validated (`stapler validate` +
+> `spctl --assess` both pass), and published by the Staple Release
+> workflow. The submit-once → preserve → staple-later pipeline worked
+> exactly as designed on its first live use. Backlog 7.1 is closed;
+> Sparkle auto-updates (7.3) are the next distribution step.
 
 ## What we are trying to achieve
 
