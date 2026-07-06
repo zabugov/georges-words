@@ -27,7 +27,17 @@ enum DiagnosticReport {
             atPath: repoCandidate.appendingPathComponent("app/build.sh").path
         )
         lines.append("Install: \(fromCheckout ? "source checkout (git updates)" : "app bundle (Sparkle updates)")")
-        lines.append("Location: \(Bundle.main.bundleURL.path)")
+        // Category only, never the actual path — reports get attached to
+        // public issues, and paths leak usernames and folder names.
+        let location: String
+        if fromCheckout {
+            location = "source checkout"
+        } else if Bundle.main.bundleURL.path.hasPrefix("/Applications/") {
+            location = "/Applications"
+        } else {
+            location = "other (path withheld)"
+        }
+        lines.append("Location: \(location)")
         lines.append("")
 
         lines.append("Microphone permission: \(describe(AVCaptureDevice.authorizationStatus(for: .audio)))")
