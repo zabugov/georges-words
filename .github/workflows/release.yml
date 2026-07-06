@@ -133,8 +133,30 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           mkdir -p dist/dmg
           cp -R dist/GeorgesWords.app dist/dmg/
-          ln -s /Applications dist/dmg/Applications
-          hdiutil create -volname "George's Words" -srcfolder dist/dmg -ov -format UDZO "dist/GeorgesWords-$VERSION.dmg"
+
+          # Pretty installer window: app icon, arrow, Applications drop
+          # target on a custom background. create-dmg drives Finder, which
+          # is occasionally flaky on runners — cosmetics must never block
+          # a release, so fall back to a plain DMG on any failure.
+          brew install --quiet create-dmg || true
+          BG="app/dmg/background.png"
+          sips -Z 1200 -s dpiHeight 144 -s dpiWidth 144 "app/dmg/background@2x.png" --out "$BG" >/dev/null
+          if command -v create-dmg >/dev/null && create-dmg \
+            --volname "George's Words" \
+            --volicon "app/icon/AppIcon.icns" \
+            --background "$BG" \
+            --window-size 600 360 \
+            --icon-size 110 \
+            --icon "GeorgesWords.app" 170 160 \
+            --hide-extension "GeorgesWords.app" \
+            --app-drop-link 430 160 \
+            "dist/GeorgesWords-$VERSION.dmg" "dist/dmg/"; then
+            echo "Styled DMG created."
+          else
+            echo "::warning::create-dmg unavailable or failed — shipping a plain DMG"
+            ln -s /Applications dist/dmg/Applications
+            hdiutil create -volname "George's Words" -srcfolder dist/dmg -ov -format UDZO "dist/GeorgesWords-$VERSION.dmg"
+          fi
           if [ -n "${SIGN_IDENTITY:-}" ]; then
             codesign --force --timestamp --sign "$SIGN_IDENTITY" "dist/GeorgesWords-$VERSION.dmg"
           fi
