@@ -233,6 +233,13 @@ struct TroubleshootingView: View {
             }
 
             Section {
+                Button("Save Diagnostic Report…") { DiagnosticReport.saveViaPanel() }
+                Text("Creates a small text file describing versions, permissions, and engine status — never your voice, transcripts, dictionary, or history. Attach it when reporting a problem.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Text("Dictation degrades gracefully: without Accessibility, transcripts go to the clipboard; without Ollama, you get rule-based cleanup instead of AI polish. Nothing here ever blocks the microphone-to-text path.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -460,6 +467,11 @@ struct AboutView: View {
                     .onTapGesture { versionTaps += 1 }
                 Button("Replay Welcome Tour") { status.replayOnboarding?() }
                 Link("GitHub repository", destination: URL(string: "https://github.com/zabugov/georges-words")!)
+                // CC-BY-4.0 attribution for Parakeet is a license
+                // requirement (9.1); crediting the rest is good manners.
+                Text("Built on open source: NVIDIA Parakeet speech model (CC-BY-4.0) via FluidAudio, WhisperKit, Ollama running Qwen 2.5 (Apache 2.0), and Sparkle.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 if versionTaps >= 5 {
                     Button("Erase Everything & Quit", role: .destructive) {
                         FactoryReset.perform()

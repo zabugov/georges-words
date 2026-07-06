@@ -246,17 +246,37 @@ jobs:
         if: env.NOTARY_ACCEPTED == '1'
         env:
           GH_TOKEN: ${{ github.token }}
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
         run: |
           TAG="v${VERSION}-b${GITHUB_RUN_NUMBER}"
           DMG="GeorgesWords-${VERSION}.dmg"
-          gh release create "$TAG" "dist/$DMG" \
+          # A stable-named copy so the download page can always link
+          # releases/latest/download/GeorgesWords.dmg (9.2).
+          cp "dist/$DMG" "dist/GeorgesWords.dmg"
+          gh release create "$TAG" "dist/$DMG" "dist/GeorgesWords.dmg" \
             --title "George's Words ${VERSION} (build ${GITHUB_RUN_NUMBER})" \
             --notes "Notarized, stapled, auto-updating build."
+          # EdDSA-sign the archive for Sparkle when the key exists (7.10);
+          # until the secret is added this quietly no-ops.
+          ED_SIG=""
+          if [ -n "${SPARKLE_ED_PRIVATE_KEY:-}" ]; then
+            SIGN_TOOL=$(find app/.build -name sign_update -type f -perm +111 2>/dev/null | head -1)
+            if [ -n "$SIGN_TOOL" ]; then
+              printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > ed_key.txt
+              ED_SIG=$("$SIGN_TOOL" -f ed_key.txt "dist/$DMG" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
+              rm -f ed_key.txt
+              test -n "$ED_SIG"
+            else
+              echo "::warning::SPARKLE_ED_PRIVATE_KEY set but sign_update tool not found"
+            fi
+          fi
           LENGTH=$(stat -f%z "dist/$DMG")
           URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${DMG}"
-          python3 - "$VERSION" "$GITHUB_RUN_NUMBER" "$URL" "$LENGTH" <<'PYEOF'
+          python3 - "$VERSION" "$GITHUB_RUN_NUMBER" "$URL" "$LENGTH" "$ED_SIG" <<'PYEOF'
           import sys, email.utils, time
           version, build, url, length = sys.argv[1:5]
+          ed_sig = sys.argv[5] if len(sys.argv) > 5 else ""
+          sig_attr = f' sparkle:edSignature="{ed_sig}"' if ed_sig else ""
           appcast = f"""<?xml version="1.0" encoding="utf-8"?>
           <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
             <channel>
@@ -267,7 +287,7 @@ jobs:
                 <sparkle:version>{build}</sparkle:version>
                 <sparkle:shortVersionString>{version}</sparkle:shortVersionString>
                 <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-                <enclosure url="{url}" length="{length}" type="application/octet-stream"/>
+                <enclosure url="{url}" length="{length}"{sig_attr} type="application/octet-stream"/>
               </item>
             </channel>
           </rss>

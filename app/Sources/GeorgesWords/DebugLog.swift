@@ -7,6 +7,9 @@ import Foundation
 /// stages, lengths, and bundle IDs only.
 enum DebugLog {
 
+    /// Where the log lives — the diagnostic report includes its tail.
+    static var fileURL: URL { url }
+
     private static let url: URL = {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("GeorgesWords", isDirectory: true)

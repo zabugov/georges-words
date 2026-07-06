@@ -66,16 +66,16 @@ The stack is already commercially clean: Ollama (MIT), Qwen 2.5 **1.5B** (Apache
 
 **Any scale (do first):**
 
-- [ ] **9.1 (S)** **Parakeet attribution line in About** — CC-BY-4.0 requires it; one sentence, required before charging anyone.
-- [ ] **9.2 (S)** **User-facing download page** (GitHub Pages, later a domain) with a one-paragraph privacy statement ("nothing leaves your Mac" — the easiest privacy policy ever written) so the share link isn't a raw GitHub releases page.
-- [ ] **9.3 (S)** **GitHub issue templates + Discussions** as the self-service support channel.
+- [x] **9.1** ~~Parakeet attribution line in About~~ — shipped 2026-07-06 (About → App section credits Parakeet/CC-BY-4.0, FluidAudio, WhisperKit, Ollama/Qwen, Sparkle).
+- [ ] **9.2 (S)** **User-facing download page** — BUILT 2026-07-06 (`site/index.html` + `pages.yml` deploy workflow; releases now also attach a stable-named `GeorgesWords.dmg` so the page's download button always works). **Waiting on one owner click:** repo Settings → Pages → Source: "GitHub Actions".
+- [ ] **9.3 (S)** **Issue templates + Discussions** — templates shipped 2026-07-06 (bug report asks for the 9.5 diagnostic file). **Waiting on one owner click:** repo Settings → General → Features → enable Discussions.
 
 **Hundreds of users:**
 
-- [ ] **9.4 (S)** **Graceful unsupported-Mac gating** — Intel and macOS < 14 currently get a cryptic system error; show a kind "this Mac isn't supported (Apple Silicon + macOS 14 required)" instead, and say so on the download page.
-- [ ] **9.5 (S)** **Diagnostic bundle export** — one button producing versions, permission states, model/engine status, and recent error categories (never audio or transcripts), so support is "send me the file" instead of twenty questions.
-- [ ] **9.6 (S)** **Homebrew cask** for the technical crowd.
-- [ ] 7.10 (EdDSA-signed update feed) graduates from optional to required at this tier.
+- [x] **9.4** ~~Unsupported-Mac gating~~ — resolved 2026-07-06: `LSMinimumSystemVersion` 14.0 makes macOS itself show a clear "requires macOS 14" message, and the download page states the Apple-Silicon requirement prominently. (A friendly Intel-specific message would need a universal-binary stub — deliberately skipped as over-engineering; Intel users see macOS's standard incompatibility notice.)
+- [x] **9.5** ~~Diagnostic bundle export~~ — shipped 2026-07-06: Troubleshooting → "Save Diagnostic Report…" (versions, permissions, engine state, settings flags, debug.log tail — never voice/transcripts/dictionary).
+- [ ] **9.6 (S)** **Homebrew cask** — needs a tap repo named `homebrew-georges-words` under the owner's account (official homebrew/cask requires notability we don't have yet). **Owner action:** create that empty public repo (or add it to a session via add_repo) and the cask file + release automation follow.
+- [ ] 7.10 (EdDSA feed signing) — pipeline side DONE 2026-07-06: releases sign the DMG and stamp `sparkle:edSignature` into the appcast automatically once the `SPARKLE_ED_PRIVATE_KEY` secret exists (silent no-op until then). **Owner actions:** run Sparkle's `generate_keys` locally (tools ship inside the SwiftPM checkout), add the exported private key as that repo secret, and send the PUBLIC key here so `SUPublicEDKey` can go into Info.plist.
 
 **Thousands+:**
 

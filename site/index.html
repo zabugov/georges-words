@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>George's Words — private dictation for your Mac</title>
+<meta name="description" content="Hold a key, speak, and polished text appears where you were typing. Everything happens on your Mac — your voice never leaves it.">
+<style>
+  :root { color-scheme: light dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    background: #fafafa; color: #1d1d1f;
+    display: flex; min-height: 100vh; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #1c1c1e; color: #f2f2f4; }
+    .card { background: #2a2a2d !important; }
+    .req, .privacy, footer { color: #9a9aa2 !important; }
+  }
+  main { max-width: 560px; text-align: center; }
+  .icon { width: 128px; height: 128px; border-radius: 28px; margin-bottom: 20px; }
+  h1 { font-size: 40px; letter-spacing: -0.5px; margin-bottom: 10px; }
+  .tagline { font-size: 20px; line-height: 1.45; margin-bottom: 8px; }
+  .privacy { font-size: 16px; color: #6e6e73; margin-bottom: 28px; line-height: 1.5; }
+  .privacy strong { color: inherit; }
+  .download {
+    display: inline-block; background: #0071e3; color: #fff; text-decoration: none;
+    font-size: 19px; font-weight: 600; padding: 14px 34px; border-radius: 999px;
+  }
+  .download:hover { background: #0077ed; }
+  .req { font-size: 13px; color: #86868b; margin-top: 14px; }
+  .card {
+    background: #fff; border-radius: 16px; padding: 22px 26px; margin-top: 36px;
+    text-align: left; font-size: 15px; line-height: 1.6;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .card h2 { font-size: 15px; margin-bottom: 8px; }
+  .card ol { padding-left: 20px; }
+  footer { margin-top: 36px; font-size: 13px; color: #86868b; }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <img class="icon" src="icon.png" alt="George's Words app icon">
+  <h1>George&rsquo;s Words</h1>
+  <p class="tagline">Hold a key. Say what you want to write. Let go — and polished, punctuated text appears right where you were typing.</p>
+  <p class="privacy"><strong>Your voice never leaves your Mac.</strong> Transcription and cleanup run entirely on your computer — no cloud, no account, no data collection of any kind. That's the whole privacy policy.</p>
+  <a class="download" href="https://github.com/zabugov/georges-words/releases/latest/download/GeorgesWords.dmg">Download for Mac</a>
+  <p class="req">Requires a Mac with Apple&nbsp;Silicon (M1 or newer) and macOS&nbsp;14 or later. Free.</p>
+  <div class="card">
+    <h2>Installing takes a minute</h2>
+    <ol>
+      <li>Open the downloaded file and drag George's Words into Applications.</li>
+      <li>Open it — a short welcome tour sets up everything, including the two one-time downloads it needs (about 1.6&nbsp;GB).</li>
+      <li>Hold the <strong>fn</strong> key anywhere you can type, and talk.</li>
+    </ol>
+  </div>
+  <footer>
+    <a href="https://github.com/zabugov/georges-words">Source on GitHub</a> ·
+    <a href="https://github.com/zabugov/georges-words/issues">Report a problem</a> ·
+    Updates install themselves.
+  </footer>
+</main>
+</body>
+</html>

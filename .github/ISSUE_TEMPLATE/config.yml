@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions & help
+    url: https://github.com/zabugov/georges-words/discussions
+    about: For how-do-I questions, use Discussions instead of an issue.
