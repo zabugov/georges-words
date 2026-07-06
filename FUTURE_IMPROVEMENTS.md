@@ -60,6 +60,35 @@ The app already keeps everything on-device; these give the user control over wha
 - [ ] **8.2 (S)** **History retention controls** — off entirely, session-only, or time-boxed, instead of always-keep-200.
 - [ ] **8.3 (S)** **Correction-learning off switch** — one toggle to stop the auto-learning dictionary from watching post-dictation edits.
 
+## 9. Going commercial (roadmap recorded 2026-07-06 — Zach wants to try it)
+
+The stack is already commercially clean: Ollama (MIT), Qwen 2.5 **1.5B** (Apache 2.0 — the 3B variant is research-only, so check the license of any model size before switching defaults), Parakeet (CC-BY-4.0, attribution required), WhisperKit/Sparkle (MIT), FluidAudio (Apache 2.0), no GPL anywhere. The app's own code has **no license file on purpose**: visible is not reusable — do NOT add an open-source license while a paid future is on the table (one-way door). Distribution infrastructure (GitHub Releases + Hugging Face + Ollama registry) costs nothing and scales to tens of thousands of users as-is; the work below is trust, edge cases, and support capacity, ordered by the scale that demands it.
+
+**Any scale (do first):**
+
+- [ ] **9.1 (S)** **Parakeet attribution line in About** — CC-BY-4.0 requires it; one sentence, required before charging anyone.
+- [ ] **9.2 (S)** **User-facing download page** (GitHub Pages, later a domain) with a one-paragraph privacy statement ("nothing leaves your Mac" — the easiest privacy policy ever written) so the share link isn't a raw GitHub releases page.
+- [ ] **9.3 (S)** **GitHub issue templates + Discussions** as the self-service support channel.
+
+**Hundreds of users:**
+
+- [ ] **9.4 (S)** **Graceful unsupported-Mac gating** — Intel and macOS < 14 currently get a cryptic system error; show a kind "this Mac isn't supported (Apple Silicon + macOS 14 required)" instead, and say so on the download page.
+- [ ] **9.5 (S)** **Diagnostic bundle export** — one button producing versions, permission states, model/engine status, and recent error categories (never audio or transcripts), so support is "send me the file" instead of twenty questions.
+- [ ] **9.6 (S)** **Homebrew cask** for the technical crowd.
+- [ ] 7.10 (EdDSA-signed update feed) graduates from optional to required at this tier.
+
+**Thousands+:**
+
+- [ ] **9.7 (M)** **Two-repo split when code privacy matters**: private code repo + public releases repo holding only DMGs, appcast, and the download page (published across via a token). Sequencing is critical so no installed copy is stranded: ship a release whose feed URL points at the new public location FIRST, let installs update, then flip the code private. Note: a private code repo re-introduces the Actions billing limit (macOS minutes at 10×) — trim CI or budget a few dollars/month.
+- [ ] **9.8 (M)** **Payments + license keys** — App Store is impossible (sandboxing vs the Accessibility API), so direct sales: Paddle / Lemon Squeezy checkout, license key issuance, and an in-app key check. ~a week of work; nothing in the current architecture blocks it.
+- [ ] **9.9 (S)** **Release notes discipline** — CHANGELOG + notes in the Sparkle update dialog (users deciding whether to click Update deserve to know what changed).
+- [ ] **9.10 (M)** **Opt-in crash reporting** — opt-in only; the no-telemetry stance is the product's best marketing, and it must survive commercialization. 6.2/6.6 (insertion quirks + compatibility tester) become the main support-load reducers at this tier.
+
+**Tens of thousands and beyond:**
+
+- [ ] **9.11 (L)** **Localization** — UI strings first (the dictation engines already handle 25 languages).
+- [ ] **9.12 (S)** **Own domain for downloads + feed** — independence from raw.githubusercontent as a serving host, plus branding. Requires the same careful feed-URL migration as 9.7.
+
 ## Code-review triage (2026-07-05)
 
 CODE_REVIEW.md was triaged the same day it landed. Addressed immediately in code: wrong-app insertion guard, transactional updater, clipboard-restore race, audio-tap rollback, hands-free cap + preview bounds, wake-time hotkey reset, Swift 6 warning, pinned+verified engine download, random engine port, model-default/doc drift, WhisperKit pin, release-workflow tests, Whisper-only CI leg. Declined (deliberate choices, not oversights): updater process groups, opt-in signing setup, big-bang coordinator split, protocol seams everywhere, engine auth proxy, double-tap hands-free, menu-bar-only mode, encrypted backups, storage-usage screen.

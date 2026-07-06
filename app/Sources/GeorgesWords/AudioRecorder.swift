@@ -102,6 +102,17 @@ final class AudioRecorder {
         return samples
     }
 
+    /// Copy of just the last `seconds` of audio. The live preview only
+    /// needs the recent window — keeping its per-tick cost constant no
+    /// matter how long the recording runs.
+    func snapshotTail(seconds: Double) -> [Float] {
+        lock.lock()
+        defer { lock.unlock() }
+        let keep = Int(seconds * 16_000)
+        guard samples.count > keep else { return samples }
+        return Array(samples.suffix(keep))
+    }
+
     func stop() -> [Float] {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()

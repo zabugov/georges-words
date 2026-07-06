@@ -602,14 +602,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 guard stillRecording else { return }
 
-                // Check length BEFORE copying: a long hands-free recording
-                // would otherwise re-copy an ever-growing buffer forever.
-                let count = self.recorder.sampleCount
-                guard count > 16_000 else { continue }
-                // Past 30 s the preview is done for good — stop the loop,
-                // don't just skip ticks.
-                guard count < 16_000 * 30 else { return }
-                let snapshot = self.recorder.snapshot()
+                // Need at least 1 s of audio (cheap count, no copy).
+                guard self.recorder.sampleCount > 16_000 else { continue }
+                // Preview re-transcribes only the last ~15 s — constant
+                // cost however long the dictation runs, so the pill keeps
+                // flowing to the very end instead of freezing at 30 s
+                // (Zach's report, 2026-07-06).
+                let snapshot = self.recorder.snapshotTail(seconds: 15)
 
                 let text = await self.transcriber.transcribe(snapshot)
                 guard !Task.isCancelled, !text.isEmpty else { continue }
