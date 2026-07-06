@@ -3,12 +3,12 @@
   <channel>
     <title>George's Words</title>
     <item>
-      <title>Version 0.3.0 (build 15)</title>
-      <pubDate>Mon, 06 Jul 2026 18:20:49 -0000</pubDate>
-      <sparkle:version>15</sparkle:version>
+      <title>Version 0.3.0 (build 16)</title>
+      <pubDate>Mon, 06 Jul 2026 23:22:25 -0000</pubDate>
+      <sparkle:version>16</sparkle:version>
       <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/zabugov/georges-words/releases/download/v0.3.0-b15/GeorgesWords-0.3.0.dmg" length="9423370" type="application/octet-stream"/>
+      <enclosure url="https://github.com/zabugov/georges-words/releases/download/v0.3.0-b16/GeorgesWords-0.3.0.dmg" length="9423202" type="application/octet-stream"/>
     </item>
   </channel>
 </rss>
