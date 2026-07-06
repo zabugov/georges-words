@@ -1,0 +1,70 @@
+name: Staple Release
+
+# Second half of the release pipeline: once Apple accepts a submission,
+# fetch the EXACT DMG that was submitted (preserved as an artifact by
+# release.yml), staple the ticket to it, validate, and publish the
+# stapled DMG. Run it with the release run's ID (Actions → the run →
+# copy the number from its URL).
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Release run ID whose preserved DMG to staple"
+        required: true
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  staple:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Download preserved DMG + submission ID
+        uses: actions/download-artifact@v4
+        with:
+          pattern: GeorgesWords-*-dmg
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: dist
+
+      - name: Check verdict and staple
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          SUBMISSION_ID=$(cat dist/submission-id.txt)
+          echo "Submission: $SUBMISSION_ID"
+          STATUS=$(xcrun notarytool info "$SUBMISSION_ID" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" --output-format json \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['status'])")
+          echo "Notary status: $STATUS"
+          if [ "$STATUS" = "Invalid" ]; then
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_APP_PASSWORD" || true
+            exit 1
+          fi
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "::warning::Still '$STATUS' — nothing to staple yet. Re-run later."
+            echo "ACCEPTED=0" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "ACCEPTED=1" >> "$GITHUB_ENV"
+          DMG=$(ls dist/GeorgesWords-*.dmg)
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+          spctl --assess --type open --context context:primary-signature "$DMG"
+
+      - name: Upload stapled DMG
+        if: env.ACCEPTED == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: GeorgesWords-stapled
+          path: dist/GeorgesWords-*.dmg
+          if-no-files-found: error

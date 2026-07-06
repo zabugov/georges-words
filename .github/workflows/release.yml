@@ -30,9 +30,10 @@ on:
 jobs:
   dmg:
     runs-on: macos-15
-    # Generous: a new Apple account's first notarizations can sit in
-    # extended review for over an hour. Steady-state runs take minutes.
-    timeout-minutes: 180
+    # Long waits happen in the Staple Release workflow, not here: this
+    # job submits, preserves the DMG, waits at most ~40 min, and exits
+    # cleanly either way.
+    timeout-minutes: 90
     env:
       HAS_SIGNING: ${{ secrets.MACOS_CERT_P12 != '' }}
       HAS_NOTARY: ${{ secrets.APPLE_APP_PASSWORD != '' }}
@@ -113,10 +114,21 @@ jobs:
             codesign --force --timestamp --sign "$SIGN_IDENTITY" "dist/GeorgesWords-$VERSION.dmg"
           fi
 
-      # Submit once, then poll with retries: first-account notarizations
-      # sit in Apple's queue for a long while, and a single --wait dies on
-      # any transient runner network blip (seen in run #3).
-      - name: Notarize and staple
+      - name: Verify bundle structure
+        run: |
+          test -x dist/GeorgesWords.app/Contents/MacOS/GeorgesWords
+          test -f dist/GeorgesWords.app/Contents/Resources/AppIcon.icns
+          codesign -dv dist/GeorgesWords.app
+          hdiutil verify "dist/GeorgesWords-$VERSION.dmg"
+
+      # Submit ONCE and record the submission ID. A notarization ticket is
+      # tied to this exact file's hash, so the DMG is preserved as an
+      # artifact IMMEDIATELY — before any waiting — and a pending verdict
+      # is NOT a failure. The Staple Release workflow finishes the job
+      # whenever Apple's verdict lands. (The old design waited up to 3 h
+      # in-job and died before the upload step, losing the submitted DMG —
+      # eight submissions were stranded that way.)
+      - name: Submit for notarization
         if: env.HAS_NOTARY == 'true' && env.HAS_SIGNING == 'true'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -128,44 +140,54 @@ jobs:
             --password "$APPLE_APP_PASSWORD" --output-format json \
             | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
           echo "Notary submission: $SUBMISSION_ID"
-          done=""
-          for attempt in 1 2 3 4; do
-            if xcrun notarytool wait "$SUBMISSION_ID" \
-              --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
-              --password "$APPLE_APP_PASSWORD" --timeout 45m; then
-              done=1
-              break
-            fi
-            echo "wait attempt $attempt dropped (network blip?) — retrying in 30 s"
-            sleep 30
-          done
+          echo "$SUBMISSION_ID" > dist/submission-id.txt
+          echo "SUBMISSION_ID=$SUBMISSION_ID" >> "$GITHUB_ENV"
+
+      - name: Preserve DMG and submission ID
+        if: always() && env.VERSION != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: GeorgesWords-${{ env.VERSION }}-dmg
+          path: |
+            dist/GeorgesWords-*.dmg
+            dist/submission-id.txt
+          if-no-files-found: error
+
+      - name: Wait briefly for a verdict
+        if: env.HAS_NOTARY == 'true' && env.HAS_SIGNING == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun notarytool wait "$SUBMISSION_ID" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" --timeout 40m || true
           STATUS=$(xcrun notarytool info "$SUBMISSION_ID" \
             --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_PASSWORD" --output-format json \
             | python3 -c "import json,sys; print(json.load(sys.stdin)['status'])")
           echo "Notary status: $STATUS"
-          if [ "$STATUS" != "Accepted" ]; then
+          if [ "$STATUS" = "Invalid" ]; then
             xcrun notarytool log "$SUBMISSION_ID" \
               --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
               --password "$APPLE_APP_PASSWORD" || true
             exit 1
           fi
-          xcrun stapler staple "dist/GeorgesWords-$VERSION.dmg"
-
-      - name: Verify bundle structure
-        run: |
-          test -x dist/GeorgesWords.app/Contents/MacOS/GeorgesWords
-          test -f dist/GeorgesWords.app/Contents/Resources/AppIcon.icns
-          codesign -dv dist/GeorgesWords.app
-          hdiutil verify "dist/GeorgesWords-$VERSION.dmg"
-          if [ -n "${SIGN_IDENTITY:-}" ] && [ "$HAS_NOTARY" = "true" ]; then
-            xcrun stapler validate "dist/GeorgesWords-$VERSION.dmg"
-            spctl --assess --type open --context context:primary-signature "dist/GeorgesWords-$VERSION.dmg"
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "::warning::Verdict still '$STATUS'. DMG + submission ID are preserved as artifacts — run the Staple Release workflow (with this run's ID) once Apple accepts."
+            echo "NOTARY_ACCEPTED=0" >> "$GITHUB_ENV"
+            exit 0
           fi
+          echo "NOTARY_ACCEPTED=1" >> "$GITHUB_ENV"
+          xcrun stapler staple "dist/GeorgesWords-$VERSION.dmg"
+          xcrun stapler validate "dist/GeorgesWords-$VERSION.dmg"
+          spctl --assess --type open --context context:primary-signature "dist/GeorgesWords-$VERSION.dmg"
 
-      - name: Upload DMG artifact
+      - name: Upload stapled DMG
+        if: env.NOTARY_ACCEPTED == '1'
         uses: actions/upload-artifact@v4
         with:
-          name: GeorgesWords-${{ env.VERSION }}-dmg
+          name: GeorgesWords-${{ env.VERSION }}-dmg-stapled
           path: dist/GeorgesWords-*.dmg
           if-no-files-found: error

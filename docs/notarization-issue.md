@@ -65,17 +65,17 @@ Also ruled out along the way:
 - **The retry loop being too impatient** — see below: even 36 hours is
   not enough.
 
-## The decisive evidence (2026-07-06 00:24 UTC)
+## The key evidence (2026-07-06 00:24 UTC)
 
 A diagnostic workflow (`notary-history.yml`) queries
 `notarytool history` for the account. Result: **eight submissions, every
 single one still "In Progress" — including the very first, submitted
 2026-07-04 12:54 UTC, ~36 hours earlier.** None Accepted, none Invalid.
 
-This rules out the ordinary "first submission is slow, later ones are
-fast" queue behavior. An account whose *every* submission sits
-unprocessed for 1.5 days matches the known pattern of an **account-level
-hold pending review for first-time notarizers**.
+This is inconsistent with the ordinary "first submission is slow, later
+ones are fast" queue behavior. The **leading hypothesis** (not proof —
+Apple also documents extended analysis for some uploads) is an
+account-level hold pending review for first-time notarizers.
 
 Oldest submission ID (quoted in the support ticket):
 `6c5f4562-1ebd-4d18-92e4-0e4a245847db`.
@@ -85,14 +85,23 @@ Oldest submission ID (quoted in the support ticket):
 - **Apple Developer Support ticket filed 2026-07-06** (topic: Code
   Signing), asking whether the account is under extended review.
   Stated response window: two business days.
-- **The 2-hour retry loop stays armed** until 2026-07-07 16:00 UTC: the
-  moment the hold lifts, a run goes green and the owner is push-notified.
-  If the deadline passes first, the loop reports and stands down; the
-  watch can be re-armed to cover the support-ticket window.
-- **If the hold lifts server-side**, even the old stuck submissions
-  should flip to Accepted — at which point the DMG from any of those
-  runs immediately passes Gatekeeper's online check (stapling is a
-  nicety, not a requirement, once a verdict exists).
+- **Resubmission stopped (2026-07-06, after external review).** Retrying
+  identical builds creates more stranded submissions and no information.
+  Worse, the old pipeline waited up to 3 h in-job and died before the
+  artifact-upload step — so none of the eight submitted DMGs were
+  preserved, and a notarization ticket is tied to the exact file hash.
+- **Pipeline redesigned (2026-07-06):** `release.yml` now submits once,
+  preserves the exact DMG + submission ID as artifacts immediately,
+  waits at most ~40 min, and treats a pending verdict as success-with-
+  warning. A separate `staple.yml` workflow downloads the preserved DMG,
+  checks the verdict, staples, validates, and publishes once Apple
+  accepts. One fresh submission was made under this flow; the watch loop
+  now only monitors verdicts (via `notary-history.yml`) instead of
+  resubmitting.
+- **If the hold lifts server-side**, the preserved submission should
+  flip to Accepted and can be stapled and shipped as-is — a stale-but-
+  notarized DMG is fine as the first family install; updates follow once
+  the account processes submissions normally.
 
 ## Fallbacks if notarization stays stuck
 
