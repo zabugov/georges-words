@@ -43,7 +43,7 @@ These reduce support load and make failures explainable.
 
 Useful, but not blockers for a first commercial test.
 
-- [ ] **1.2 (M)** **Speculative polish.** While recording, polish transcript-so-far after a short pause; on key release, use the cached result if nothing changed. Discard speculation if the user keeps talking.
+- [ ] **1.2 (S)** **Verify speculative polish on-device.** Landed 2026-07-07 (ADR 0008): pause-triggered background polish with an exact-match cache; the timing line reads "polish done during a pause" on a hit. Remaining work: dictate with a natural pause before key release and confirm the hit; watch CPU/battery feel during long dictations; retire when it behaves.
 - [ ] **1.3 (L)** **True streaming polish.** Polish sentence-by-sentence while speaking. Hard cases: self-corrections across sentence boundaries, tone consistency, and segmentation on unstable ASR output.
 - [ ] **1.5 (M)** **Apple Foundation Models polish engine.** Explore macOS 26+ on-device models as a way to remove the managed Ollama dependency for newer Macs.
 - [ ] **2.2 (M)** **Dictionary biasing inside speech recognition.** Research done (docs/research/dictionary-biasing-in-asr.md): the pinned FluidAudio 0.15.4 already ships acoustic vocabulary boosting (CTC word spotter + rescorer) — remaining work is wiring it into the Parakeet path with learned corrections as aliases, behind a toggle, with lazy CTC-model download (~98 MB). WhisperKit prompt tokens for the fallback are unwired today and need a bug-check (WhisperKit #372) before shipping.

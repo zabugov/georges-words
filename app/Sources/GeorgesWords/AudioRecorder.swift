@@ -20,6 +20,16 @@ enum AudioTrim {
         let to = min(samples.count, end + 1 + padding)
         return Array(samples[from..<to])
     }
+
+    /// True when the clip is quiet enough to be a pause in speech — RMS
+    /// under the same near-silence threshold trimSilence trims at. Used
+    /// by speculative polish to spot pauses worth polishing during.
+    static func isNearSilence(_ samples: [Float], threshold: Float = 0.003) -> Bool {
+        guard !samples.isEmpty else { return true }
+        var sum: Float = 0
+        for sample in samples { sum += sample * sample }
+        return (sum / Float(samples.count)).squareRoot() < threshold
+    }
 }
 
 /// Captures microphone audio and accumulates it as 16 kHz mono Float32

@@ -16,6 +16,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case error(String)
     }
 
+    /// A polish computed during a pause in speech (ADR 0008). Usable only
+    /// if the final transcript cleans to the same text under the same
+    /// knobs — every field must match, or the guess is silently discarded.
+    private struct SpeculativeGuess {
+        let cleaned: String
+        let tone: ToneProfile
+        let dictionary: [String]
+        let model: String
+        let strength: PolishStrength
+        let instruction: String?
+        let polished: String
+    }
+
     private var statusItem: NSStatusItem!
     private let statusMenuItem = NSMenuItem(title: "Starting…", action: nil, keyEquivalent: "")
     private let updateMenuItem = NSMenuItem(title: "Check for Updates…", action: nil, keyEquivalent: "")
@@ -37,6 +50,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var dictationHotkey: HotkeyMonitor?
     private var cancellables = Set<AnyCancellable>()
     private var previewTask: Task<Void, Never>?
+
+    // Speculative polish (backlog 1.2, ADR 0008): while the user pauses
+    // mid-recording, polish the transcript-so-far; if they release the
+    // key without saying more, the final pass reuses the cached result.
+    private var speculationTask: Task<Void, Never>?
+    private var speculationWork: (sampleCount: Int, task: Task<Void, Never>)?
+    private var speculativeGuess: SpeculativeGuess?
+    private var lastSpeculatedCleaned: String?
 
     private var lastTranscript: String?
 
@@ -358,6 +379,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func cancelRecording(message: String) {
         guard case .recording = state else { return }
         previewTask?.cancel()
+        speculationTask?.cancel()
+        speculativeGuess = nil
         _ = recorder.stop()
         toggleLatched = false
         ignoreNextRelease = false
@@ -432,10 +455,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if settings.previewEnabled {
                 startPreviewLoop()
             }
+            speculativeGuess = nil
+            lastSpeculatedCleaned = nil
+            speculationWork = nil
             // Load the LLM / prime its prompt cache while the user speaks,
             // so the polish pass starts hot.
             if settings.llmEnabled {
                 llmFormatter.warmUpIfStale(model: settings.effectiveLLMModel, strength: settings.polishStrength)
+                startSpeculationLoop()
             }
         } catch {
             DebugLog.log("Recorder start failed: \(error.localizedDescription)")
@@ -462,6 +489,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func finishRecording() {
         guard case .recording = state else { return }
         previewTask?.cancel()
+        // Stop hunting for pauses; a speculation already in flight keeps
+        // running — the final pass may be about to collect its result.
+        speculationTask?.cancel()
         let samples = AudioTrim.trimSilence(recorder.stop())
         SoundFeedback.recordingStopped()
 
@@ -623,26 +653,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// transcribe → rule cleanup → snippets → (optional) local-LLM polish.
     private func processDictation(samples: [Float], context: AppContext) async -> String {
+        // A speculation still in flight from the last pause is about to be
+        // a perfect hit if the user said nothing after its snapshot — wait
+        // for it rather than duplicate its work. Meaningfully more final
+        // audio than the snapshot means they kept talking; skip the wait.
+        // (Both wrong guesses only cost latency — the equality check on
+        // the guess below is what decides correctness.)
+        if let pending = await MainActor.run(body: { self.speculationWork }),
+           samples.count <= pending.sampleCount + 8_000 {
+            await pending.task.value
+        }
+
         let transcribeStart = Date()
         let raw = await transcriber.transcribe(samples)
         let transcribeSeconds = Date().timeIntervalSince(transcribeStart)
         guard !raw.isEmpty else { return "" }
 
-        let dictionary = settings.dictionaryTerms
-        var cleaned = cleaner.clean(raw, dictionary: dictionary, replacements: settings.dictionaryReplacements)
-
-        let (expanded, snippetApplied) = SnippetExpander.apply(settings.snippets, to: cleaned)
-        cleaned = expanded
-
-        // Skip the LLM when a snippet fired (its expansion must be inserted
-        // verbatim), when spoken commands produced explicit line breaks
-        // (the polish pass writes single blocks and would flatten them),
-        // and for very short utterances (nothing to restructure, and
-        // skipping keeps them near-instant).
-        let wordCount = cleaned.split(separator: " ").count
-        guard settings.llmEnabled, !snippetApplied, !cleaned.contains("\n"), wordCount >= 5 else {
+        let (cleaned, polishEligible) = cleanForPolish(raw)
+        guard polishEligible else {
             await updateTiming(transcribe: transcribeSeconds, polish: nil)
             return cleaned
+        }
+
+        let dictionary = settings.dictionaryTerms
+        let model = settings.effectiveLLMModel
+        let strength = settings.polishStrength
+        let instruction = settings.appInstruction(for: context.bundleID)
+
+        // The prize: a pause-time speculation that still matches means the
+        // polish already happened while the user was silent.
+        if let guess = await MainActor.run(body: { self.speculativeGuess }),
+           guess.cleaned == cleaned, guess.tone == context.tone,
+           guess.dictionary == dictionary, guess.model == model,
+           guess.strength == strength, guess.instruction == instruction {
+            DebugLog.log("Speculative polish: hit (\(cleaned.count) chars)")
+            await updateTiming(transcribe: transcribeSeconds, polish: 0)
+            return guess.polished
         }
 
         let polishStart = Date()
@@ -650,18 +696,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             cleaned,
             tone: context.tone,
             dictionary: dictionary,
-            model: settings.effectiveLLMModel,
-            strength: settings.polishStrength,
-            customInstruction: settings.appInstruction(for: context.bundleID)
+            model: model,
+            strength: strength,
+            customInstruction: instruction
         )
         await updateTiming(transcribe: transcribeSeconds, polish: Date().timeIntervalSince(polishStart))
         return polished ?? cleaned
     }
 
+    /// Rule cleanup + snippets + the LLM eligibility gates — shared by the
+    /// final pass and the speculative pass, which must agree exactly for a
+    /// speculation to ever be usable. The gates: skip the LLM when a
+    /// snippet fired (its expansion must be inserted verbatim), when spoken
+    /// commands produced explicit line breaks (the polish pass writes
+    /// single blocks and would flatten them), and for very short
+    /// utterances (nothing to restructure; skipping keeps them instant).
+    private func cleanForPolish(_ raw: String) -> (text: String, polishEligible: Bool) {
+        let dictionary = settings.dictionaryTerms
+        var cleaned = cleaner.clean(raw, dictionary: dictionary, replacements: settings.dictionaryReplacements)
+        let (expanded, snippetApplied) = SnippetExpander.apply(settings.snippets, to: cleaned)
+        cleaned = expanded
+        let wordCount = cleaned.split(separator: " ").count
+        let eligible = settings.llmEnabled && !snippetApplied && !cleaned.contains("\n") && wordCount >= 5
+        return (cleaned, eligible)
+    }
+
     @MainActor
     private func updateTiming(transcribe: TimeInterval, polish: TimeInterval?) {
         if let polish {
-            appStatus.lastTiming = String(format: "Last dictation: %.1f s transcribe + %.1f s polish", transcribe, polish)
+            appStatus.lastTiming = polish < 0.05
+                // A speculative-polish hit: the work happened mid-pause.
+                ? String(format: "Last dictation: %.1f s transcribe + polish done during a pause", transcribe)
+                : String(format: "Last dictation: %.1f s transcribe + %.1f s polish", transcribe, polish)
         } else {
             appStatus.lastTiming = String(format: "Last dictation: %.1f s transcribe (no polish)", transcribe)
         }
@@ -702,6 +768,80 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+    }
+
+    // MARK: - Speculative polish (backlog 1.2, ADR 0008)
+
+    /// Watch for pauses in speech; on each one, transcribe the whole
+    /// buffer and polish it in the background. Release the key without
+    /// saying more and the final pass reuses the result — the polish
+    /// latency happened while the user was silent. Keep talking and the
+    /// guess dies on the equality check instead. The Transcriber actor
+    /// serializes these with the preview and final passes.
+    private func startSpeculationLoop() {
+        speculationTask?.cancel()
+        speculationTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                guard let self, !Task.isCancelled else { return }
+                guard case .recording = self.state else { return }
+
+                let sampleCount = self.recorder.sampleCount
+                // Not enough said yet to clear the 5-word polish gate.
+                guard sampleCount > 16_000 else { continue }
+                // Re-transcribing the full buffer is the cost of each
+                // guess — don't burn battery on marathon dictations.
+                guard sampleCount <= 16_000 * 90 else { continue }
+                // A pause = the last ~0.7 s is near-silent.
+                guard AudioTrim.isNearSilence(self.recorder.snapshotTail(seconds: 0.7)) else { continue }
+
+                let samples = self.recorder.snapshot()
+                let context = self.recordingContext ?? AppContext.current()
+                let generation = self.recordingGeneration
+                let work = Task { await self.speculate(samples: samples, context: context, generation: generation) }
+                self.speculationWork = (samples.count, work)
+                // One speculation at a time; the next pause check waits
+                // for this one to land.
+                await work.value
+            }
+        }
+    }
+
+    @MainActor
+    private func speculate(samples: [Float], context: AppContext, generation: Int) async {
+        let raw = await transcriber.transcribe(samples)
+        guard !raw.isEmpty else { return }
+        let (cleaned, eligible) = cleanForPolish(raw)
+        // Same pause, same words as last time — the guess is already made.
+        guard eligible, cleaned != lastSpeculatedCleaned else { return }
+        lastSpeculatedCleaned = cleaned
+
+        let dictionary = settings.dictionaryTerms
+        let model = settings.effectiveLLMModel
+        let strength = settings.polishStrength
+        let instruction = settings.appInstruction(for: context.bundleID)
+        guard let polished = await llmFormatter.format(
+            cleaned,
+            tone: context.tone,
+            dictionary: dictionary,
+            model: model,
+            strength: strength,
+            customInstruction: instruction
+        ) else { return }
+
+        // A newer recording may have started while we polished — never
+        // hand it a stale guess.
+        guard generation == recordingGeneration else { return }
+        speculativeGuess = SpeculativeGuess(
+            cleaned: cleaned,
+            tone: context.tone,
+            dictionary: dictionary,
+            model: model,
+            strength: strength,
+            instruction: instruction,
+            polished: polished
+        )
+        DebugLog.log("Speculative polish: guess ready (\(cleaned.count) chars)")
     }
 
     // MARK: - Main menu (Dock app)
