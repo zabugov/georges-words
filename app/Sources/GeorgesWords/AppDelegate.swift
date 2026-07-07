@@ -55,6 +55,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// What command mode edits: the last inserted text and, when the AX
     /// path proved one, the exact field element it went into.
     private var lastInsertion: (text: String, target: AXUIElement?)?
+    /// The pre-polish text when the LLM reworded the last insertion —
+    /// "Use Unpolished Version" (3.7) swaps it back in.
+    private var lastRawAlternative: String?
     private var cancellables = Set<AnyCancellable>()
     private var previewTask: Task<Void, Never>?
 
@@ -319,8 +322,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         commandMode.didEdit = { [weak self] edited in
             guard let self else { return }
             // The edit becomes the new "last dictation" so commands chain
-            // ("make it formal" … "now translate it to French").
+            // ("make it formal" … "now translate it to French"). The
+            // unpolished alternative no longer corresponds to it.
             self.lastInsertion = (edited, self.lastInsertion?.target)
+            self.lastRawAlternative = nil
             self.lastTranscript = edited
             self.appStatus.lastTranscript = edited
             HistoryStore.shared.add(edited)
@@ -577,7 +582,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         state = .processing
 
         Task {
-            let text = await self.processDictation(samples: samples, context: context)
+            let (text, rawAlternative) = await self.processDictation(samples: samples, context: context)
             await MainActor.run {
                 var outcome: TextInserter.Outcome?
                 var switchedApps = false
@@ -590,6 +595,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         outcome = self.inserter.insert(text)
                         if outcome == .inserted {
                             self.lastInsertion = (text, self.inserter.lastInsertionTarget)
+                            self.lastRawAlternative = rawAlternative
                             self.scheduleCorrectionCheck(
                                 inserted: text,
                                 context: context,
@@ -720,7 +726,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// transcribe → rule cleanup → snippets → (optional) local-LLM polish.
-    private func processDictation(samples: [Float], context: AppContext) async -> String {
+    /// `rawAlternative` is the pre-LLM text whenever polish actually
+    /// reworded it — "use raw instead" (3.7) swaps it back in.
+    private func processDictation(samples: [Float], context: AppContext) async -> (text: String, rawAlternative: String?) {
         // A speculation still in flight from the last pause is about to be
         // a perfect hit if the user said nothing after its snapshot — wait
         // for it rather than duplicate its work. Meaningfully more final
@@ -735,12 +743,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let transcribeStart = Date()
         let raw = await transcriber.transcribe(samples)
         let transcribeSeconds = Date().timeIntervalSince(transcribeStart)
-        guard !raw.isEmpty else { return "" }
+        guard !raw.isEmpty else { return ("", nil) }
 
         let (cleaned, polishEligible) = cleanForPolish(raw)
         guard polishEligible else {
             await updateTiming(transcribe: transcribeSeconds, polish: nil)
-            return cleaned
+            return (cleaned, nil)
         }
 
         let dictionary = settings.dictionaryTerms
@@ -758,7 +766,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
            guess.styleSample == styleSample {
             DebugLog.log("Speculative polish: hit (\(cleaned.count) chars)")
             await updateTiming(transcribe: transcribeSeconds, polish: 0)
-            return guess.polished
+            return (guess.polished, guess.polished == cleaned ? nil : cleaned)
         }
 
         let polishStart = Date()
@@ -772,7 +780,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             styleSample: styleSample
         )
         await updateTiming(transcribe: transcribeSeconds, polish: Date().timeIntervalSince(polishStart))
-        return polished ?? cleaned
+        guard let polished, polished != cleaned else { return (cleaned, nil) }
+        return (polished, cleaned)
     }
 
     /// Rule cleanup + snippets + the LLM eligibility gates — shared by the
@@ -996,6 +1005,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         correctLast.target = self
         menu.addItem(correctLast)
 
+        let useRaw = NSMenuItem(title: "Use Unpolished Version", action: #selector(useRawTranscript), keyEquivalent: "")
+        useRaw.target = self
+        menu.addItem(useRaw)
+
+        let undoInsert = NSMenuItem(title: "Undo Last Insertion", action: #selector(undoLastInsertion), keyEquivalent: "")
+        undoInsert.target = self
+        menu.addItem(undoInsert)
+
         menu.addItem(.separator())
 
         updateMenuItem.action = #selector(checkForUpdates)
@@ -1067,6 +1084,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let lastTranscript else { return }
         if inserter.insert(lastTranscript) == .copiedToClipboard {
             flashAccessibilityWarning()
+        }
+    }
+
+    /// 3.7: polish reworded something it shouldn't have — swap the
+    /// pre-polish text back into the field, in place.
+    @objc private func useRawTranscript() {
+        guard let last = lastInsertion, let raw = lastRawAlternative else {
+            pill.flash("The last dictation is already your exact words", seconds: 2.5)
+            return
+        }
+        if inserter.replaceLastInsertion(of: last.text, with: raw, target: last.target) {
+            lastInsertion = (raw, last.target)
+            lastRawAlternative = nil
+            lastTranscript = raw
+            appStatus.lastTranscript = raw
+            HistoryStore.shared.add(raw)
+            pill.flash("Swapped in your exact words", seconds: 2)
+        } else {
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(raw, forType: .string)
+            pill.flashAlert("Couldn't swap it in place — your exact words are copied, press ⌘V")
+        }
+    }
+
+    /// 5.5: remove the most recent insertion entirely.
+    @objc private func undoLastInsertion() {
+        guard let last = lastInsertion else {
+            pill.flash("Nothing to undo yet", seconds: 2)
+            return
+        }
+        if inserter.replaceLastInsertion(of: last.text, with: "", target: last.target) {
+            lastInsertion = nil
+            lastRawAlternative = nil
+            pill.flash("Last insertion removed", seconds: 2)
+        } else {
+            pill.flashAlert("Couldn't remove it automatically — delete it by hand")
         }
     }
 

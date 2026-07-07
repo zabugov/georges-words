@@ -57,12 +57,12 @@ Useful, but not blockers for a first commercial test.
 - [ ] **2.2 (M)** **Dictionary biasing inside speech recognition.** Research done (docs/research/dictionary-biasing-in-asr.md): the pinned FluidAudio 0.15.4 already ships acoustic vocabulary boosting (CTC word spotter + rescorer) — remaining work is wiring it into the Parakeet path with learned corrections as aliases, behind a toggle, with lazy CTC-model download (~98 MB). WhisperKit prompt tokens for the fallback are unwired today and need a bug-check (WhisperKit #372) before shipping.
 - [ ] **3.3 (S)** **Verify personal style matching on-device.** Landed 2026-07-07 (ADR 0011): paste a writing sample per app type under Settings → Your writing style; full polish imitates its voice. Remaining: paste real samples, dictate in a matching app with Full polish, judge the imitation; retire when it behaves.
 - [ ] **3.5 (S)** **Grow the few-shot bank.** Keep a small local corpus of messy transcript → ideal output examples from real failures.
-- [ ] **3.7 (S)** **Keep raw transcript + “use raw instead.”** Store the raw transcript alongside polished text and allow replacing the last insertion with the raw version.
+- [ ] **3.7 (S)** **Verify “Use Unpolished Version” on-device.** Landed 2026-07-07: when polish reworded the last dictation, the menu-bar action swaps the pre-polish text back in place (clipboard fallback otherwise).
 - [ ] **4.1 (M)** **Multilingual dictation.** Add language auto-detect and multilingual model support, including mid-sentence language changes if practical.
 - [ ] **4.2 (M)** **Snippets with placeholders.** Support expansions like “my intro [name]” with tab-through blanks.
 - [ ] **4.4 (S)** **Verify command mode on-device.** Rebuilt 2026-07-07 as free-form LLM edit instructions with its own state machine (ADR 0010). Remaining: assign a command key in Settings → Hotkeys, dictate, then hold it and say "make it more formal" / "remove the word X" / "translate to French"; confirm in-place replacement and the clipboard fallback; retire when it behaves.
 - [ ] **4.5 (M)** **Voice editing pack — remainder.** Free-form commands (4.4, ADR 0010) now cover deletions/rewording/restructuring. Still open: literal mode for code/URLs/identifiers and spoken punctuation *during* dictation, plus a no-polish escape word.
-- [ ] **5.5 (S)** **Undo Last Insertion.** Menu/home action that removes the most recent insertion — `TextInserter.replaceLastInsertion` (ADR 0010) is exactly this machinery; what's left is UI wiring. Pairs well with 3.7.
+- [ ] **5.5 (S)** **Verify “Undo Last Insertion” on-device.** Landed 2026-07-07 as a menu-bar action on the replaceLastInsertion machinery (ADR 0010).
 
 ## Distribution and scale-later work
 
