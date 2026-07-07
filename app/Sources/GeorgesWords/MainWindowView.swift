@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import AVFoundation
+import ServiceManagement
 import SwiftUI
 
 /// The main app window: sidebar navigation between Home, History,
@@ -549,14 +550,25 @@ struct AboutView: View {
 
 /// Testing-only: return the app to a factory-fresh state. Wipes defaults
 /// (settings, stats, onboarding flag), Application Support (history,
-/// corrections, the polish engine + models), revokes the TCC permissions
-/// via tccutil, and quits. Next launch = genuine first run.
+/// corrections, the polish engine + models), the speech-model caches,
+/// launch-at-login registration, and the TCC permissions, then quits.
+/// Next launch = genuine first run. Failures are shown, not swallowed
+/// (backlog 6.7).
 enum FactoryReset {
 
     @MainActor
     static func perform() {
-        // Stop the polish engine so its files aren't held open.
-        ManagedOllama.shared.shutdown()
+        var failures: [String] = []
+
+        // Stop the polish engine and WAIT for it to exit — deleting its
+        // files while the process still holds them leaves strays behind.
+        ManagedOllama.shared.shutdownAndWait()
+
+        // A reset app shouldn't keep launching itself at login.
+        if SMAppService.mainApp.status == .enabled {
+            do { try SMAppService.mainApp.unregister() }
+            catch { failures.append("Launch at login: \(error.localizedDescription)") }
+        }
 
         let bundleID = Bundle.main.bundleIdentifier ?? "com.georges.words"
         for service in ["Microphone", "Accessibility"] {
@@ -565,14 +577,40 @@ enum FactoryReset {
             process.arguments = ["reset", service, bundleID]
             try? process.run()
             process.waitUntilExit()
+            if process.terminationStatus != 0 {
+                failures.append("\(service) permission reset: tccutil exited \(process.terminationStatus)")
+            }
         }
 
         UserDefaults.standard.removePersistentDomain(forName: bundleID)
         UserDefaults.standard.synchronize()
 
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("GeorgesWords", isDirectory: true)
-        try? FileManager.default.removeItem(at: appSupport)
+        func remove(_ url: URL, _ label: String) {
+            guard FileManager.default.fileExists(atPath: url.path) else { return }
+            do { try FileManager.default.removeItem(at: url) }
+            catch { failures.append("\(label): \(error.localizedDescription)") }
+        }
+
+        let appSupportRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        remove(appSupportRoot.appendingPathComponent("GeorgesWords", isDirectory: true), "App data")
+        // The speech models cache outside the app's own folder: FluidAudio
+        // keeps Parakeet under its own Application Support directory,
+        // WhisperKit under ~/Documents/huggingface. Scoped to exactly
+        // those model folders — both re-download on demand.
+        remove(appSupportRoot.appendingPathComponent("FluidAudio", isDirectory: true), "Speech model cache (Parakeet)")
+        let whisperCache = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml", isDirectory: true)
+        remove(whisperCache, "Speech model cache (Whisper)")
+
+        if !failures.isEmpty {
+            let alert = NSAlert()
+            alert.messageText = "Some items couldn't be removed"
+            alert.informativeText = failures.joined(separator: "\n")
+                + "\n\nEverything else was reset. Remove the items above manually if a truly fresh start matters."
+            alert.alertStyle = .warning
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
 
         NSApp.terminate(nil)
     }

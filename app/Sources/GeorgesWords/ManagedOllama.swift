@@ -95,6 +95,23 @@ final class ManagedOllama: ObservableObject {
         phase = .off
     }
 
+    /// Shutdown that waits (bounded) for the child to actually exit —
+    /// the factory reset deletes the engine's files right afterwards,
+    /// and deleting them out from under a live process leaves strays
+    /// behind (backlog 6.7).
+    func shutdownAndWait(timeout: TimeInterval = 5) {
+        let process = serverProcess
+        shutdown()
+        guard let process else { return }
+        let deadline = Date().addingTimeInterval(timeout)
+        while process.isRunning && Date() < deadline {
+            usleep(100_000)
+        }
+        if process.isRunning {
+            DebugLog.log("Factory reset: engine still running after \(Int(timeout))s wait")
+        }
+    }
+
     private func run(model: String) async {
         do {
             if !FileManager.default.isExecutableFile(atPath: binaryURL.path) {
