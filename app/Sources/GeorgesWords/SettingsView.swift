@@ -9,6 +9,8 @@ struct SettingsView: View {
     @State private var styleTone: ToneProfile = .casual
     /// Available input devices for the microphone picker (6.5).
     @State private var inputDevices: [AudioInputDevices.Device] = []
+    /// Outcome line after an import attempt (7.8).
+    @State private var importFeedback = ""
 
     private struct RunningApp: Identifiable {
         let name: String
@@ -256,6 +258,21 @@ struct SettingsView: View {
 
             Section {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
+            }
+
+            Section("Backup") {
+                HStack {
+                    Button("Export Settings…") { SettingsBackup.exportViaPanel(settings) }
+                    Button("Import Settings…") { importFeedback = SettingsBackup.importViaPanel(settings) }
+                    if !importFeedback.isEmpty {
+                        Text(importFeedback)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Text("One file with your settings, dictionary, snippets, per-app notes, writing samples, and private-app list — for moving to a new Mac or keeping a backup. History and learned suggestions stay on this Mac. Nothing is uploaded anywhere.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

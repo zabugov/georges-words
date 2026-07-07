@@ -43,7 +43,7 @@ These reduce support load and make failures explainable.
 - [ ] **6.5 (S)** **Verify the microphone picker + silent-mic warning on-device.** Landed 2026-07-07: Settings → Microphone (remembered by device UID, hard fallback to system default), and a "only silence was heard" alert when a ≥1 s recording trims to nothing.
 - [ ] **6.6 (S)** **Verify the insertion compatibility tester on-device.** Landed 2026-07-07: Troubleshooting → "Test a Text Field…" (click into the target app within 3 s; read-only probe reports direct insertion vs paste fallback).
 - [ ] **6.7 (S)** **Complete factory reset.** Delete all model caches, unregister launch-at-login, await engine shutdown before deletion, and surface deletion failures instead of silently ignoring them.
-- [ ] **7.8 (S)** **Export/import.** Export and import settings, dictionary, snippets, and per-app notes as one JSON file.
+- [ ] **7.8 (S)** **Verify settings export/import on-device.** Landed 2026-07-07: Settings → Backup. Export, change something, import, confirm it restores (history and learned suggestions intentionally excluded).
 - [ ] **7.9 (M)** **Incremental internal hardening.** Adopt `@MainActor` on UI/state owners, enable stricter concurrency checks once clean, and extract pieces of `AppDelegate` opportunistically when touching them. No big-bang refactor.
 - [ ] **9.9 (S)** **Release notes as support.** Maintain a changelog, Sparkle update notes, website notes, and a short known-issues section for common compatibility problems.
 
