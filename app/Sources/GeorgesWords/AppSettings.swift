@@ -55,6 +55,15 @@ struct AppInstruction: Codable, Identifiable, Equatable {
     var instruction: String
 }
 
+/// An app the user marked private (backlog 8.1): dictations into it are
+/// never kept in history and its fields are never re-read for
+/// correction learning. Dictation itself still works normally.
+struct PrivateApp: Codable, Identifiable, Equatable {
+    var appName: String
+    var bundleID: String
+    var id: String { bundleID }
+}
+
 /// User preferences, persisted to UserDefaults, observable from SwiftUI.
 final class AppSettings: ObservableObject {
 
@@ -79,6 +88,21 @@ final class AppSettings: ObservableObject {
                 defaults.set(data, forKey: "HotkeySpec")
             }
         }
+    }
+
+    /// Apps where history and correction learning are disabled (8.1).
+    @Published var privateApps: [PrivateApp] {
+        didSet {
+            if let data = try? JSONEncoder().encode(privateApps) {
+                defaults.set(data, forKey: "PrivateApps")
+            }
+        }
+    }
+
+    func isPrivateApp(_ bundleID: String) -> Bool {
+        let id = bundleID.lowercased()
+        guard !id.isEmpty else { return false }
+        return privateApps.contains { $0.bundleID == id }
     }
 
     /// How long dictation history is kept (backlog 8.2).
@@ -275,6 +299,12 @@ final class AppSettings: ObservableObject {
         }
         historyRetention = HistoryRetention(rawValue: defaults.string(forKey: "HistoryRetention") ?? "") ?? .standard
         correctionLearningEnabled = defaults.object(forKey: "CorrectionLearningEnabled") as? Bool ?? true
+        if let data = defaults.data(forKey: "PrivateApps"),
+           let saved = try? JSONDecoder().decode([PrivateApp].self, from: data) {
+            privateApps = saved
+        } else {
+            privateApps = []
+        }
         launchAtLogin = SMAppService.mainApp.status == .enabled
         llmEnabled = defaults.object(forKey: "LLMEnabled") as? Bool ?? true
         polishStrength = PolishStrength(rawValue: defaults.string(forKey: "PolishStrength") ?? "") ?? .light

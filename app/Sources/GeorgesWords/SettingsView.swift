@@ -174,6 +174,29 @@ struct SettingsView: View {
                 Text("After inserting a dictation, the app briefly re-reads that text field to notice fixes you make (all on-device, suggestions only). Turn this off and it never looks back at the field; the manual “Fix the last transcript” box in Dictionary still works.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+
+                ForEach(settings.privateApps) { app in
+                    HStack {
+                        Text(app.appName.isEmpty ? app.bundleID : app.appName)
+                        Spacer()
+                        Button {
+                            settings.privateApps.removeAll { $0.bundleID == app.bundleID }
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+                Menu("Add Private App…") {
+                    ForEach(privateAppCandidates) { app in
+                        Button(app.name) {
+                            settings.privateApps.append(PrivateApp(appName: app.name, bundleID: app.bundleID))
+                        }
+                    }
+                }
+                Text("Dictation into a private app works normally, but nothing said there is kept in History and its text fields are never re-read for correction learning.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Per-app style notes") {
@@ -247,6 +270,23 @@ struct SettingsView: View {
             }
             .onDisappear { capture.cancel() }
         }
+    }
+
+    /// Running apps not yet marked private (8.1) — same source as the
+    /// per-app notes menu.
+    private var privateAppCandidates: [RunningApp] {
+        var seen = Set<String>()
+        return NSWorkspace.shared.runningApplications
+            .filter { $0.activationPolicy == .regular }
+            .compactMap { app -> RunningApp? in
+                guard let id = app.bundleIdentifier?.lowercased(), !id.isEmpty,
+                      let name = app.localizedName
+                else { return nil }
+                guard seen.insert(id).inserted else { return nil }
+                guard !settings.privateApps.contains(where: { $0.bundleID == id }) else { return nil }
+                return RunningApp(name: name, bundleID: id)
+            }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     /// Like HotkeyRecorderField, but for an optional hotkey: nil = the

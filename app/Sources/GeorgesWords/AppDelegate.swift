@@ -589,7 +589,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if !text.isEmpty {
                     self.lastTranscript = text
                     self.appStatus.lastTranscript = text
-                    HistoryStore.shared.add(text)
+                    // Private apps (8.1): nothing dictated into them is
+                    // kept in history (word-count stats carry no content).
+                    if !self.settings.isPrivateApp(context.bundleID) {
+                        HistoryStore.shared.add(text)
+                    }
                     StatsStore.shared.record(words: text.split(separator: " ").count)
                     if AppContext.current().bundleID == context.bundleID {
                         outcome = self.inserter.insert(text)
@@ -634,6 +638,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func scheduleCorrectionCheck(inserted: String, context: AppContext, target: AXUIElement?) {
         // The global off switch (backlog 8.3): no watching, no re-reads.
         guard settings.correctionLearningEnabled else { return }
+        // Private apps (8.1) are never re-read.
+        guard !settings.isPrivateApp(context.bundleID) else { return }
         correctionCheckGeneration += 1
         let generation = correctionCheckGeneration
 

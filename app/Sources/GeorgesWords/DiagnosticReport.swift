@@ -63,6 +63,7 @@ enum DiagnosticReport {
         lines.append("History entries: \(HistoryStore.shared.entries.count)")
         lines.append("History retention: \(settings.historyRetention.rawValue)")
         lines.append("Correction learning: \(settings.correctionLearningEnabled)")
+        lines.append("Private apps: \(settings.privateApps.count)")
         lines.append("")
 
         lines.append("--- recent diagnostics (debug.log tail; contains no dictated text) ---")
