@@ -61,7 +61,7 @@ Useful, but not blockers for a first commercial test.
 Do these when scale or code-privacy pressure justifies them.
 
 - [ ] **9.6 (S)** **Homebrew cask.** Add the cask to the existing tap repo and wire the release workflow to bump version + sha256 after each release. Keep using a self-tap until the app has enough notability for the main cask repo.
-- [ ] **9.7 (M)** **Two-repo split if code privacy matters.** Private code repo plus public releases repo for DMGs, appcast, and website. Sequence carefully: ship a release pointing installed apps at the new public feed first, wait for adoption, then make code private.
+- [ ] **9.7 (M)** **Two-repo split — execute the runbook.** Design + machinery landed 2026-07-07 (ADR 0009): the release workflow publishes to a public releases repo once `RELEASES_REPO`/`RELEASES_REPO_TOKEN` are configured, and updates both feeds during the transition. Remaining work is the ADR 0009 runbook: create the releases repo, seed it, flip `SUFeedURL`, cut the migration release (owner-gated, doubles as the 7.10 sign-off), wait for every install to migrate, then flip the code repo private.
 - [ ] **9.10 (M)** **Opt-in crash reporting.** Opt-in only, with the no-telemetry promise preserved. Prefer compatibility tooling and diagnostic reports first.
 - [ ] **9.11 (L)** **Localization.** Localize UI strings first; dictation language support is a separate model/runtime concern.
 - [ ] **9.12 (S)** **Own domain for downloads + feed.** Move download page and appcast to a controlled domain. Requires the same careful feed migration as 9.7.

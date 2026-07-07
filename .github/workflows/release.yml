@@ -284,13 +284,46 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          # Two-repo split (ADR 0009): configure the RELEASES_REPO repo
+          # variable + RELEASES_REPO_TOKEN secret and the release, DMG,
+          # and appcast land in the public releases repo instead. Until
+          # then this workflow behaves exactly as before.
+          RELEASES_REPO: ${{ vars.RELEASES_REPO }}
+          RELEASES_REPO_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
         run: |
           TAG="v${VERSION}-b${GITHUB_RUN_NUMBER}"
           DMG="GeorgesWords-${VERSION}.dmg"
+
+          # Never ship an app whose feed nothing in this run updates.
+          FEED_URL=$(/usr/libexec/PlistBuddy -c 'Print SUFeedURL' app/Info.plist)
+          if [ -n "${RELEASES_REPO:-}" ]; then
+            if [ -z "${RELEASES_REPO_TOKEN:-}" ]; then
+              echo "::error::RELEASES_REPO is set but RELEASES_REPO_TOKEN is missing (ADR 0009 step 2)."
+              exit 1
+            fi
+            TARGET_REPO="$RELEASES_REPO"
+            RELEASE_TOKEN="$RELEASES_REPO_TOKEN"
+            case "$FEED_URL" in
+              *"$RELEASES_REPO"*) echo "Feed points at the releases repo." ;;
+              *) echo "::warning::SUFeedURL still points at the code repo — correct only for the migration release itself (ADR 0009 step 4)." ;;
+            esac
+          else
+            TARGET_REPO="$GITHUB_REPOSITORY"
+            RELEASE_TOKEN="$GH_TOKEN"
+            case "$FEED_URL" in
+              *"$GITHUB_REPOSITORY"*) ;;
+              *)
+                echo "::error::SUFeedURL ($FEED_URL) points away from this repo but RELEASES_REPO is not configured — installed apps would follow a feed this run never updates."
+                exit 1
+                ;;
+            esac
+          fi
+
           # A stable-named copy so the download page can always link
           # releases/latest/download/GeorgesWords.dmg (9.2).
           cp "dist/$DMG" "dist/GeorgesWords.dmg"
-          gh release create "$TAG" "dist/$DMG" "dist/GeorgesWords.dmg" \
+          GH_TOKEN="$RELEASE_TOKEN" gh release create "$TAG" "dist/$DMG" "dist/GeorgesWords.dmg" \
+            --repo "$TARGET_REPO" \
             --title "George's Words ${VERSION} (build ${GITHUB_RUN_NUMBER})" \
             --notes "Notarized, stapled, auto-updating build."
           # EdDSA-sign the archive for Sparkle when the key exists (7.10);
@@ -308,7 +341,7 @@ jobs:
             fi
           fi
           LENGTH=$(stat -f%z "dist/$DMG")
-          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${DMG}"
+          URL="https://github.com/${TARGET_REPO}/releases/download/${TAG}/${DMG}"
           python3 - "$VERSION" "$GITHUB_RUN_NUMBER" "$URL" "$LENGTH" "$ED_SIG" <<'PYEOF'
           import sys, email.utils, time
           version, build, url, length = sys.argv[1:5]
@@ -341,3 +374,24 @@ jobs:
           git commit -m "Appcast: ${VERSION} build ${GITHUB_RUN_NUMBER}"
           git pull --rebase --autostash origin main
           git push origin main
+
+          # Two-repo split (ADR 0009): mirror the appcast into the public
+          # releases repo. The commit above keeps the OLD feed current too,
+          # so installs that haven't migrated yet still see this release —
+          # both feeds stay live until the code repo goes private.
+          if [ "$TARGET_REPO" != "$GITHUB_REPOSITORY" ]; then
+            git clone --depth 1 "https://x-access-token:${RELEASES_REPO_TOKEN}@github.com/${TARGET_REPO}.git" /tmp/releases-repo
+            cp appcast.xml /tmp/releases-repo/appcast.xml
+            # If the releases repo serves its site (and maybe the feed,
+            # on a custom domain) from site/, keep that copy fresh too.
+            if [ -d /tmp/releases-repo/site ]; then
+              cp appcast.xml /tmp/releases-repo/site/appcast.xml
+            fi
+            cd /tmp/releases-repo
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Appcast: ${VERSION} build ${GITHUB_RUN_NUMBER}"
+            git push
+            cd "$GITHUB_WORKSPACE"
+          fi
