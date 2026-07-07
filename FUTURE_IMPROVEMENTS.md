@@ -30,7 +30,7 @@ These are the highest-leverage items before sharing broadly or charging.
 
 These reduce support load and make failures explainable.
 
-- [ ] **2.5 (M)** **Improve auto-learning correction detection.** Main suspects: fixed re-read window, AX reads failing or waking late, strict similarity filters, learned suggestions not being visible enough, and validating only the frontmost app instead of the exact edited field. Keep ADR 0005 as the design reference.
+- [ ] **2.5 (S)** **Verify improved correction detection on-device.** The fixes landed 2026-07-07 (widened re-read schedule, exact-element tracking, phonetic second chance, strict mode for short dictations, sidebar badge + pill notice, debug logging — see ADR 0005 amendment). Remaining work: dictate, fix a word within a minute, and confirm the badge appears; retire this item when it behaves.
 - [ ] **6.2 (M)** **Per-app insertion quirks.** Audit direct insertion and paste fallback across Electron apps, browsers, terminals, Java apps, and secure/private fields; keep a compatibility list.
 - [ ] **6.5 (S)** **Input-device picker + silent-mic warning.** Let users choose the microphone and warn when input is muted, disconnected, or suspiciously quiet.
 - [ ] **6.6 (S)** **Insertion compatibility tester.** Add a Troubleshooting button that checks the focused app: can the field be read, can direct insertion be verified, or will paste fallback be used?
@@ -46,7 +46,7 @@ Useful, but not blockers for a first commercial test.
 - [ ] **1.2 (M)** **Speculative polish.** While recording, polish transcript-so-far after a short pause; on key release, use the cached result if nothing changed. Discard speculation if the user keeps talking.
 - [ ] **1.3 (L)** **True streaming polish.** Polish sentence-by-sentence while speaking. Hard cases: self-corrections across sentence boundaries, tone consistency, and segmentation on unstable ASR output.
 - [ ] **1.5 (M)** **Apple Foundation Models polish engine.** Explore macOS 26+ on-device models as a way to remove the managed Ollama dependency for newer Macs.
-- [ ] **2.2 (M)** **Dictionary biasing inside speech recognition.** Research whether the Parakeet/FluidAudio path supports biasing; WhisperKit prompt tokens only help the fallback engine.
+- [ ] **2.2 (M)** **Dictionary biasing inside speech recognition.** Research done (docs/research/dictionary-biasing-in-asr.md): the pinned FluidAudio 0.15.4 already ships acoustic vocabulary boosting (CTC word spotter + rescorer) — remaining work is wiring it into the Parakeet path with learned corrections as aliases, behind a toggle, with lazy CTC-model download (~98 MB). WhisperKit prompt tokens for the fallback are unwired today and need a bug-check (WhisperKit #372) before shipping.
 - [ ] **3.3 (L)** **Personal style matching.** Learn tone from local user-provided writing samples instead of generic style presets.
 - [ ] **3.5 (S)** **Grow the few-shot bank.** Keep a small local corpus of messy transcript → ideal output examples from real failures.
 - [ ] **3.7 (S)** **Keep raw transcript + “use raw instead.”** Store the raw transcript alongside polished text and allow replacing the last insertion with the raw version.
