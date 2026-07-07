@@ -90,6 +90,17 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Microphone chosen in Settings (6.5); nil follows the system default.
+    @Published var inputDeviceUID: String? {
+        didSet {
+            if let inputDeviceUID {
+                defaults.set(inputDeviceUID, forKey: "InputDeviceUID")
+            } else {
+                defaults.removeObject(forKey: "InputDeviceUID")
+            }
+        }
+    }
+
     /// Apps where history and correction learning are disabled (8.1).
     @Published var privateApps: [PrivateApp] {
         didSet {
@@ -305,6 +316,7 @@ final class AppSettings: ObservableObject {
         } else {
             privateApps = []
         }
+        inputDeviceUID = defaults.string(forKey: "InputDeviceUID")
         launchAtLogin = SMAppService.mainApp.status == .enabled
         llmEnabled = defaults.object(forKey: "LLMEnabled") as? Bool ?? true
         polishStrength = PolishStrength(rawValue: defaults.string(forKey: "PolishStrength") ?? "") ?? .light

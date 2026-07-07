@@ -48,6 +48,12 @@ final class AudioRecorder {
     private var samples: [Float] = []
     private let lock = NSLock()
 
+    /// Preferred input device UID (backlog 6.5); nil = system default.
+    /// Applied at each start(); any failure to resolve or apply falls
+    /// back to the default input — a stale picker choice must never
+    /// break dictation.
+    var preferredInputUID: String?
+
     /// Called on the main thread with a 0…1 loudness estimate while recording.
     var onLevel: ((Float) -> Void)?
 
@@ -72,6 +78,22 @@ final class AudioRecorder {
         lock.unlock()
 
         let input = engine.inputNode
+        // Select the chosen microphone before reading the format —
+        // the format follows the device.
+        if let uid = preferredInputUID {
+            if let deviceID = AudioInputDevices.deviceID(forUID: uid), let unit = input.audioUnit {
+                var device = deviceID
+                let status = AudioUnitSetProperty(
+                    unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+                    &device, UInt32(MemoryLayout<AudioDeviceID>.size)
+                )
+                if status != noErr {
+                    DebugLog.log("Input device select failed (\(status)) — using system default")
+                }
+            } else {
+                DebugLog.log("Chosen input device not present — using system default")
+            }
+        }
         let inputFormat = input.outputFormat(forBus: 0)
         guard inputFormat.sampleRate > 0 else {
             throw NSError(

@@ -7,6 +7,8 @@ struct SettingsView: View {
     @State private var installedModels: [String]?
     /// Which tone profile's writing sample is being edited (3.3).
     @State private var styleTone: ToneProfile = .casual
+    /// Available input devices for the microphone picker (6.5).
+    @State private var inputDevices: [AudioInputDevices.Device] = []
 
     private struct RunningApp: Identifiable {
         let name: String
@@ -58,6 +60,24 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            Section("Microphone") {
+                Picker("Input", selection: $settings.inputDeviceUID) {
+                    Text("System default").tag(String?.none)
+                    ForEach(inputDevices) { device in
+                        Text(device.name).tag(String?.some(device.uid))
+                    }
+                    // Keep a remembered-but-unplugged device selectable so
+                    // the picker never shows a blank selection.
+                    if let uid = settings.inputDeviceUID, !inputDevices.contains(where: { $0.uid == uid }) {
+                        Text("Remembered device (not connected)").tag(String?.some(uid))
+                    }
+                }
+                Text("System default follows whatever macOS is using. If dictations come out silent, check the right microphone is selected here.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .onAppear { inputDevices = AudioInputDevices.list() }
 
             Section("Hotkeys") {
                 HotkeyRecorderField(title: "Hold to dictate", spec: $settings.hotkey)

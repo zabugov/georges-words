@@ -40,7 +40,7 @@ These reduce support load and make failures explainable.
 
 - [ ] **2.5 (S)** **Verify improved correction detection on-device.** The fixes landed 2026-07-07 (widened re-read schedule, exact-element tracking, phonetic second chance, strict mode for short dictations, sidebar badge + pill notice, debug logging — see ADR 0005 amendment). Remaining work: dictate, fix a word within a minute, and confirm the badge appears; retire this item when it behaves.
 - [ ] **6.2 (M)** **Per-app insertion quirks.** Audit direct insertion and paste fallback across Electron apps, browsers, terminals, Java apps, and secure/private fields; keep a compatibility list.
-- [ ] **6.5 (S)** **Input-device picker + silent-mic warning.** Let users choose the microphone and warn when input is muted, disconnected, or suspiciously quiet.
+- [ ] **6.5 (S)** **Verify the microphone picker + silent-mic warning on-device.** Landed 2026-07-07: Settings → Microphone (remembered by device UID, hard fallback to system default), and a "only silence was heard" alert when a ≥1 s recording trims to nothing.
 - [ ] **6.6 (S)** **Verify the insertion compatibility tester on-device.** Landed 2026-07-07: Troubleshooting → "Test a Text Field…" (click into the target app within 3 s; read-only probe reports direct insertion vs paste fallback).
 - [ ] **6.7 (S)** **Complete factory reset.** Delete all model caches, unregister launch-at-login, await engine shutdown before deletion, and surface deletion failures instead of silently ignoring them.
 - [ ] **7.8 (S)** **Export/import.** Export and import settings, dictionary, snippets, and per-app notes as one JSON file.

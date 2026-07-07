@@ -184,6 +184,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         wireCommandMode()
+        recorder.preferredInputUID = settings.inputDeviceUID
         // During onboarding, holding fn must do nothing until the Try-it
         // page — the wizard turns dictation on at that moment.
         if !needsOnboarding {
@@ -344,6 +345,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.installHotkeys() }
+            .store(in: &cancellables)
+
+        settings.$inputDeviceUID
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] uid in self?.recorder.preferredInputUID = uid }
             .store(in: &cancellables)
 
         settings.$modelName
@@ -562,16 +570,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Stop hunting for pauses; a speculation already in flight keeps
         // running — the final pass may be about to collect its result.
         speculationTask?.cancel()
-        let samples = AudioTrim.trimSilence(recorder.stop())
+        let rawSamples = recorder.stop()
+        let samples = AudioTrim.trimSilence(rawSamples)
         SoundFeedback.recordingStopped()
 
         // Taps shorter than ~0.3 s of audio can't transcribe — but say so
         // instead of going silently idle, which read as "the app ignored
-        // me" to first-time users.
+        // me" to first-time users. A long recording that trimmed down to
+        // nothing is a different story: the mic heard only silence (6.5).
         guard samples.count > 4800 else {
-            DebugLog.log("Recording dropped: only \(samples.count) samples captured")
             state = .idle
-            pill.flash("Didn't catch that — hold the key down while you speak", seconds: 2.5)
+            if rawSamples.count > 16_000 && AudioTrim.isNearSilence(rawSamples) {
+                DebugLog.log("Recording dropped: \(rawSamples.count) raw samples, all near-silence — mic muted or wrong input?")
+                pill.flashAlert("Only silence was heard — is the microphone muted, or the wrong one selected in Settings?")
+            } else {
+                DebugLog.log("Recording dropped: only \(samples.count) samples captured")
+                pill.flash("Didn't catch that — hold the key down while you speak", seconds: 2.5)
+            }
             return
         }
 
