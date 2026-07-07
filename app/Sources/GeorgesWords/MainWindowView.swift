@@ -207,6 +207,8 @@ struct TroubleshootingView: View {
     @State private var ollamaRunning: Bool?
     @State private var ollamaModels: [String]?
     @State private var recheckTick = 0
+    @State private var insertionTestCountdown: Int?
+    @State private var insertionTestVerdict: InsertionTester.Verdict?
 
     var body: some View {
         Form {
@@ -234,6 +236,31 @@ struct TroubleshootingView: View {
                 Button("Recheck") { recheckTick += 1 }
             } header: {
                 Text("Health checks")
+            }
+
+            Section("Will insertion work where you type?") {
+                if let countdown = insertionTestCountdown {
+                    Label("Click into the other app's text field… checking in \(countdown)", systemImage: "cursorarrow.click")
+                } else {
+                    Button("Test a Text Field…") { startInsertionTest() }
+                }
+                if let verdict = insertionTestVerdict {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Circle()
+                            .fill(verdict.good ? .green : .orange)
+                            .frame(width: 8, height: 8)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verdict.title)
+                            Text(verdict.detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                Text("Click the button, then click into the app and text field you want to check. Three seconds later the app reports — without typing anything — whether dictation will insert directly or fall back to ⌘V paste there.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             Section {
@@ -364,6 +391,20 @@ struct TroubleshootingView: View {
                 fixTitle: "Retry",
                 fix: { ManagedOllama.shared.ensureReady(model: model) }
             )
+        }
+    }
+
+    /// 6.6: give the user three seconds to focus the field they want to
+    /// test, then probe whatever is focused — read-only.
+    private func startInsertionTest() {
+        insertionTestVerdict = nil
+        Task { @MainActor in
+            for remaining in stride(from: 3, through: 1, by: -1) {
+                insertionTestCountdown = remaining
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+            insertionTestCountdown = nil
+            insertionTestVerdict = InsertionTester.testFocusedField()
         }
     }
 
