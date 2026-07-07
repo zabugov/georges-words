@@ -81,6 +81,22 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// How long dictation history is kept (backlog 8.2).
+    @Published var historyRetention: HistoryRetention {
+        didSet {
+            defaults.set(historyRetention.rawValue, forKey: "HistoryRetention")
+            HistoryStore.shared.apply(historyRetention)
+        }
+    }
+
+    /// Backlog 8.3: the one switch that stops the app watching
+    /// post-dictation edits for learnable corrections (ADR 0005). The
+    /// manual "Fix the last transcript" flow stays available — that one
+    /// is explicit, not watching.
+    @Published var correctionLearningEnabled: Bool {
+        didSet { defaults.set(correctionLearningEnabled, forKey: "CorrectionLearningEnabled") }
+    }
+
     /// Personal style samples by tone profile (backlog 3.3): the user's
     /// own writing, pasted in Settings, that full polish should imitate.
     /// Keyed by ToneProfile rawValue; empty strings mean "no sample".
@@ -257,6 +273,8 @@ final class AppSettings: ObservableObject {
         } else {
             styleSamples = [:]
         }
+        historyRetention = HistoryRetention(rawValue: defaults.string(forKey: "HistoryRetention") ?? "") ?? .standard
+        correctionLearningEnabled = defaults.object(forKey: "CorrectionLearningEnabled") as? Bool ?? true
         launchAtLogin = SMAppService.mainApp.status == .enabled
         llmEnabled = defaults.object(forKey: "LLMEnabled") as? Bool ?? true
         polishStrength = PolishStrength(rawValue: defaults.string(forKey: "PolishStrength") ?? "") ?? .light

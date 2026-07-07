@@ -626,6 +626,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// still requires the same app to be frontmost. Entirely local, and a
     /// newer dictation's check silently retires this one.
     private func scheduleCorrectionCheck(inserted: String, context: AppContext, target: AXUIElement?) {
+        // The global off switch (backlog 8.3): no watching, no re-reads.
+        guard settings.correctionLearningEnabled else { return }
         correctionCheckGeneration += 1
         let generation = correctionCheckGeneration
 

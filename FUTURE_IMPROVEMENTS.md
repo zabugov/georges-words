@@ -30,8 +30,8 @@ These are the highest-leverage items before sharing broadly or charging.
 - [ ] **9.14 (S)** **Private support intake.** Add a support email or private form. GitHub Issues/Discussions are fine for public bugs, but diagnostic reports should not be pushed into public threads by default.
 - [ ] **9.15 (M)** **Closed-beta support rehearsal.** Test with about 10 nontechnical Macs: site download, install, permissions, first model downloads, dictation across common app types, Sparkle update, diagnostic export, factory reset/uninstall, and one unsupported Mac. Use the results to update launch copy, FAQ, and pricing assumptions.
 - [ ] **8.1 (M)** **Per-app privacy exclusions.** Let users choose apps where history and correction learning are disabled.
-- [ ] **8.2 (S)** **History retention controls.** Add options for off, session-only, time-boxed, or capped history instead of always keeping the last 200 entries.
-- [ ] **8.3 (S)** **Correction-learning off switch.** One global toggle to stop watching post-dictation edits for learned corrections.
+- [ ] **8.2 (S)** **Verify history retention controls on-device.** Landed 2026-07-07: Settings → Privacy → Keep dictation history (nothing / until quit / 7 days / last 200). Check that "Keep nothing" erases immediately and session-only leaves no history.json behind.
+- [ ] **8.3 (S)** **Verify the correction-learning off switch on-device.** Landed 2026-07-07: Settings → Privacy → Learn corrections from your edits. Off must mean zero field re-reads (debug.log shows no "Correction check" lines).
 - [ ] **9.8 (M)** **Payments + license keys.** Direct sales only. Use hosted checkout and license issuance from a merchant-of-record provider. Recommended v1: one-time purchase, stated update window, no accounts, no always-online DRM. Activation should store a local entitlement and only touch the network on explicit activate/deactivate/manual refresh; normal dictation must never depend on the network.
 
 ## Reliability and support reducers

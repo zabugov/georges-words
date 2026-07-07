@@ -161,6 +161,21 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Privacy") {
+                Picker("Keep dictation history", selection: $settings.historyRetention) {
+                    ForEach(HistoryRetention.allCases) { retention in
+                        Text(retention.displayName).tag(retention)
+                    }
+                }
+                Text("History only ever exists on this Mac — this controls how long even that local copy is kept. Switching to “Keep nothing” erases it immediately.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Toggle("Learn corrections from your edits", isOn: $settings.correctionLearningEnabled)
+                Text("After inserting a dictation, the app briefly re-reads that text field to notice fixes you make (all on-device, suggestions only). Turn this off and it never looks back at the field; the manual “Fix the last transcript” box in Dictionary still works.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Per-app style notes") {
                 ForEach($settings.appInstructions) { $entry in
                     VStack(alignment: .leading, spacing: 4) {
