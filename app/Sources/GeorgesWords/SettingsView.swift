@@ -67,6 +67,14 @@ struct SettingsView: View {
                 Text("Click Change… and press any key — modifier and function keys work best. Letter keys still type into the focused app while held.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                OptionalHotkeyRecorderField(
+                    title: "Hold for a voice command",
+                    spec: $settings.commandHotkey,
+                    conflictsWith: settings.hotkey
+                )
+                Text("Hold it and say how to change your last dictation — “make it more formal”, “remove the word actually”, “translate to French”. Runs on the same local AI as polish; nothing leaves your Mac.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 Toggle("Live preview while speaking", isOn: $settings.previewEnabled)
                 Text("Shows a rolling transcript in the pill as you talk. Costs some extra compute while recording.")
                     .font(.footnote)
@@ -203,6 +211,48 @@ struct SettingsView: View {
                 }
             }
             .onDisappear { capture.cancel() }
+        }
+    }
+
+    /// Like HotkeyRecorderField, but for an optional hotkey: nil = the
+    /// feature is off. Refuses the dictation key — one key, one job.
+    private struct OptionalHotkeyRecorderField: View {
+        let title: String
+        @Binding var spec: HotkeySpec?
+        let conflictsWith: HotkeySpec
+        @StateObject private var capture = HotkeyCapture()
+        @State private var conflictWarning = false
+
+        var body: some View {
+            LabeledContent(title) {
+                HStack(spacing: 8) {
+                    Text(capture.isRecording ? "Press any key… (Esc to cancel)" : (spec?.displayName ?? "Off"))
+                        .foregroundStyle(capture.isRecording || spec == nil ? .secondary : .primary)
+                    Button(capture.isRecording ? "Cancel" : (spec == nil ? "Set…" : "Change…")) {
+                        if capture.isRecording {
+                            capture.cancel()
+                        } else {
+                            conflictWarning = false
+                            capture.begin { new in
+                                if new == conflictsWith {
+                                    conflictWarning = true
+                                } else {
+                                    spec = new
+                                }
+                            }
+                        }
+                    }
+                    if spec != nil {
+                        Button("Turn Off") { spec = nil }
+                    }
+                }
+            }
+            .onDisappear { capture.cancel() }
+            if conflictWarning {
+                Text("That's already the dictation key — pick a different one.")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
         }
     }
 

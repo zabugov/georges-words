@@ -166,6 +166,43 @@ final class LLMFormatter {
         return output
     }
 
+    // MARK: - Edit commands (backlog 4.4)
+
+    /// Command mode's prompt is separate from the polish pass on purpose:
+    /// this one TRANSFORMS text because the user asked it to, which the
+    /// polish pass must never do on its own.
+    private static let editSystemPrompt = """
+    You edit text. Apply the INSTRUCTION to the TEXT and output only the edited text.
+    Rules:
+    - Output the complete edited text and nothing else — no explanations, no quotes, no preamble.
+    - Apply the instruction exactly; keep everything it doesn't mention unchanged.
+    - If the instruction asks for a translation, output only the translation.
+    - If the instruction makes no sense for this text, output the text unchanged.
+    """
+
+    private static let editFewShot: [[String: String]] = [
+        ["role": "user", "content": "INSTRUCTION: remove the word basically\nTEXT: Basically we should ship it basically now."],
+        ["role": "assistant", "content": "We should ship it now."],
+        ["role": "user", "content": "INSTRUCTION: make it more formal\nTEXT: hey can you send me that file when you get a sec"],
+        ["role": "assistant", "content": "Hello — could you please send me that file when you have a moment?"],
+        ["role": "user", "content": "INSTRUCTION: turn it into a bulleted list\nTEXT: We need milk, eggs and bread."],
+        ["role": "assistant", "content": "- Milk\n- Eggs\n- Bread"],
+    ]
+
+    /// Apply a spoken edit instruction to the last dictation (4.4).
+    func applyInstruction(_ instruction: String, to text: String, model: String) async -> String? {
+        var messages: [[String: String]] = [["role": "system", "content": Self.editSystemPrompt]]
+        messages += Self.editFewShot
+        messages.append(["role": "user", "content": "INSTRUCTION: \(instruction)\nTEXT: \(text)"])
+
+        let output = await chat(messages: messages, model: model, maxTokens: 900, timeout: 20)
+        guard let output, !output.isEmpty else { return nil }
+        // Translations and expansions legitimately grow text — only
+        // reject runaway generation.
+        guard output.count <= text.count * 3 + 400 else { return nil }
+        return output
+    }
+
     /// Reject obviously-broken rewrites so a misbehaving model can never
     /// make the result worse than the rule-cleaned transcript.
     private static func isSane(input: String, output: String) -> Bool {

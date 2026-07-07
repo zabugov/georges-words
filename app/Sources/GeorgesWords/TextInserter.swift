@@ -87,6 +87,39 @@ final class TextInserter {
         return true
     }
 
+    /// Replace the most recent insertion in place (command mode, 4.4;
+    /// also the machinery Undo Last Insertion needs — backlog 5.5):
+    /// select the last occurrence of `old` in the field and set the
+    /// selection to `new` — the same select-and-replace door insert()
+    /// uses. Prefers the tracked element from insertion time; falls back
+    /// to the focused element. Returns false when the text can't be
+    /// found or the field refuses (caller decides the fallback).
+    func replaceLastInsertion(of old: String, with new: String, target: AXUIElement?) -> Bool {
+        guard AXIsProcessTrusted() else { return false }
+        guard let element = target ?? AXFocus.systemWideFocusedElement(),
+              let value = fieldValue(of: element) else { return false }
+
+        // AX text ranges count UTF-16 units — go through NSString.
+        let nsValue = value as NSString
+        let range = nsValue.range(of: old, options: .backwards)
+        guard range.location != NSNotFound else { return false }
+
+        var cfRange = CFRange(location: range.location, length: range.length)
+        guard let axRange = AXValueCreate(.cfRange, &cfRange),
+              AXUIElementSetAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, axRange) == .success,
+              AXUIElementSetAttributeValue(element, kAXSelectedTextAttribute as CFString, new as CFString) == .success
+        else { return false }
+
+        // Same rule as insert(): never trust the claim — Chromium fields
+        // report success without changing anything.
+        guard let after = fieldValue(of: element), after != value else {
+            DebugLog.log("Replace: app claimed success but the field never changed")
+            return false
+        }
+        lastInsertionTarget = element
+        return true
+    }
+
     private func fieldValue(of element: AXUIElement) -> String? {
         var ref: AnyObject?
         guard AXUIElementCopyAttributeValue(

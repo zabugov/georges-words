@@ -81,6 +81,18 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Second hotkey: hold it and say how to change the last dictation
+    /// (command mode, backlog 4.4). Nil = off until the user picks a key.
+    @Published var commandHotkey: HotkeySpec? {
+        didSet {
+            if let commandHotkey, let data = try? JSONEncoder().encode(commandHotkey) {
+                defaults.set(data, forKey: "CommandHotkeySpec")
+            } else {
+                defaults.removeObject(forKey: "CommandHotkeySpec")
+            }
+        }
+    }
+
     @Published var launchAtLogin: Bool {
         didSet { applyLaunchAtLogin() }
     }
@@ -213,6 +225,12 @@ final class AppSettings: ObservableObject {
         } else {
             // Migrate the pre-5.4 three-choice setting.
             hotkey = HotkeySpec.legacy(defaults.string(forKey: "Hotkey")) ?? .fn
+        }
+        if let data = defaults.data(forKey: "CommandHotkeySpec"),
+           let saved = try? JSONDecoder().decode(HotkeySpec.self, from: data) {
+            commandHotkey = saved
+        } else {
+            commandHotkey = nil
         }
         launchAtLogin = SMAppService.mainApp.status == .enabled
         llmEnabled = defaults.object(forKey: "LLMEnabled") as? Bool ?? true

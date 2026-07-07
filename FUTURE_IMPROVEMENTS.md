@@ -52,9 +52,9 @@ Useful, but not blockers for a first commercial test.
 - [ ] **3.7 (S)** **Keep raw transcript + “use raw instead.”** Store the raw transcript alongside polished text and allow replacing the last insertion with the raw version.
 - [ ] **4.1 (M)** **Multilingual dictation.** Add language auto-detect and multilingual model support, including mid-sentence language changes if practical.
 - [ ] **4.2 (M)** **Snippets with placeholders.** Support expansions like “my intro [name]” with tab-through blanks.
-- [ ] **4.4 (M)** **Rebuild command mode with its own state machine.** Salvage the useful edit-command pieces from history, but do not reuse dictation’s hotkey/latch state machine.
-- [ ] **4.5 (M)** **Voice editing pack.** Add commands like delete last word/sentence, undo that, spoken punctuation, no-polish escape, and literal mode for code/URLs/identifiers.
-- [ ] **5.5 (S)** **Undo Last Insertion.** Menu/home action that removes the most recent insertion using the same select-and-replace machinery; pairs well with 3.7.
+- [ ] **4.4 (S)** **Verify command mode on-device.** Rebuilt 2026-07-07 as free-form LLM edit instructions with its own state machine (ADR 0010). Remaining: assign a command key in Settings → Hotkeys, dictate, then hold it and say "make it more formal" / "remove the word X" / "translate to French"; confirm in-place replacement and the clipboard fallback; retire when it behaves.
+- [ ] **4.5 (M)** **Voice editing pack — remainder.** Free-form commands (4.4, ADR 0010) now cover deletions/rewording/restructuring. Still open: literal mode for code/URLs/identifiers and spoken punctuation *during* dictation, plus a no-polish escape word.
+- [ ] **5.5 (S)** **Undo Last Insertion.** Menu/home action that removes the most recent insertion — `TextInserter.replaceLastInsertion` (ADR 0010) is exactly this machinery; what's left is UI wiring. Pairs well with 3.7.
 
 ## Distribution and scale-later work
 

@@ -48,6 +48,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// where the git-pull updater owns the job instead (ADR 0007).
     private var sparkle: SPUStandardUpdaterController?
     private var dictationHotkey: HotkeyMonitor?
+    private var commandHotkeyMonitor: HotkeyMonitor?
+    /// Voice edit commands (backlog 4.4) — its own state machine.
+    private var commandMode: CommandModeController!
+    /// What command mode edits: the last inserted text and, when the AX
+    /// path proved one, the exact field element it went into.
+    private var lastInsertion: (text: String, target: AXUIElement?)?
     private var cancellables = Set<AnyCancellable>()
     private var previewTask: Task<Void, Never>?
 
@@ -141,6 +147,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.cancelRecording(message: "Mac went to sleep — dictation cancelled")
             }
             self.dictationHotkey?.reset()
+            self.commandHotkeyMonitor?.reset()
+            self.commandMode.cancelListening()
             self.toggleLatched = false
             self.ignoreNextRelease = false
         }
@@ -171,6 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showUpdateNotice("Updated to the latest version ✓")
         }
 
+        wireCommandMode()
         // During onboarding, holding fn must do nothing until the Try-it
         // page — the wizard turns dictation on at that moment.
         if !needsOnboarding {
@@ -279,11 +288,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onPress: { [weak self] in self?.beginRecording() },
             onRelease: { [weak self] in self?.endRecording() }
         )
+        // Command hotkey: off until assigned, and never the dictation key
+        // (Settings refuses the conflict; this guard covers stale data).
+        commandHotkeyMonitor = nil
+        if let spec = settings.commandHotkey, spec != settings.hotkey {
+            commandHotkeyMonitor = HotkeyMonitor(
+                hotkey: spec,
+                onPress: { [weak self] in self?.commandMode.keyDown() },
+                onRelease: { [weak self] in self?.commandMode.keyUp() }
+            )
+        }
+    }
+
+    private func wireCommandMode() {
+        commandMode = CommandModeController(
+            recorder: recorder,
+            transcriber: transcriber,
+            llmFormatter: llmFormatter,
+            inserter: inserter,
+            pill: pill,
+            settings: settings
+        )
+        commandMode.isDictationBusy = { [weak self] in
+            guard let self else { return true }
+            if case .idle = self.state { return false }
+            return true
+        }
+        commandMode.lastInsertion = { [weak self] in self?.lastInsertion }
+        commandMode.didEdit = { [weak self] edited in
+            guard let self else { return }
+            // The edit becomes the new "last dictation" so commands chain
+            // ("make it formal" … "now translate it to French").
+            self.lastInsertion = (edited, self.lastInsertion?.target)
+            self.lastTranscript = edited
+            self.appStatus.lastTranscript = edited
+            HistoryStore.shared.add(edited)
+        }
     }
 
     private func observeSettings() {
         settings.$hotkey
             .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.installHotkeys() }
+            .store(in: &cancellables)
+
+        settings.$commandHotkey
+            .dropFirst()
+            .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.installHotkeys() }
             .store(in: &cancellables)
@@ -365,7 +417,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let escMonitorGlobal { NSEvent.removeMonitor(escMonitorGlobal) }
         if let escMonitorLocal { NSEvent.removeMonitor(escMonitorLocal) }
         let handle: (NSEvent) -> Bool = { [weak self] event in
-            guard let self, event.keyCode == 53, case .recording = self.state else { return false }
+            guard let self, event.keyCode == 53 else { return false }
+            if self.commandMode.phase == .listening {
+                self.commandMode.cancelListening()
+                return true
+            }
+            guard case .recording = self.state else { return false }
             self.cancelRecording(message: "Cancelled")
             return true
         }
@@ -411,6 +468,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             toggleLatched = false
             ignoreNextRelease = true
             finishRecording()
+            return
+        }
+
+        // The microphone is single-owner: a voice command in progress
+        // keeps it until it resolves.
+        if commandMode.isBusy {
+            pill.flash("A voice command is in progress…", seconds: 2)
             return
         }
 
@@ -524,6 +588,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     if AppContext.current().bundleID == context.bundleID {
                         outcome = self.inserter.insert(text)
                         if outcome == .inserted {
+                            self.lastInsertion = (text, self.inserter.lastInsertionTarget)
                             self.scheduleCorrectionCheck(
                                 inserted: text,
                                 context: context,
