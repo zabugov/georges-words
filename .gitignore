@@ -20,3 +20,6 @@ models/
 # Env / secrets
 .env
 .env.*
+
+# Personal workflow notes — never commit
+*.local.md
