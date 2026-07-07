@@ -22,6 +22,7 @@ struct HotkeySpec: Codable, Equatable {
     static let fn = HotkeySpec(keyCode: 63, modifierFlagRawValue: NSEvent.ModifierFlags.function.rawValue, displayName: "Fn (🌐)")
     static let rightCommand = HotkeySpec(keyCode: 54, modifierFlagRawValue: NSEvent.ModifierFlags.command.rawValue, displayName: "Right ⌘")
     static let rightOption = HotkeySpec(keyCode: 61, modifierFlagRawValue: NSEvent.ModifierFlags.option.rawValue, displayName: "Right ⌥")
+    static let rightControl = HotkeySpec(keyCode: 62, modifierFlagRawValue: NSEvent.ModifierFlags.control.rawValue, displayName: "Right ⌃")
 
     /// Pre-5.4 settings stored a three-choice enum's raw value.
     static func legacy(_ raw: String?) -> HotkeySpec? {

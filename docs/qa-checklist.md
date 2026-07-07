@@ -13,7 +13,7 @@ Console or TextEdit; newest lines are at the bottom.
 ## Setup (2 min)
 
 - [ ] Build and launch. The menu-bar mic icon appears; Home says "Ready".
-- [ ] Settings → Hotkeys → set **"Hold for a voice command"** to Right ⌥ (needed for test 4).
+- [ ] Settings → Hotkeys → confirm **"Hold for a voice command"** already shows **Right ⌥** (on by default). The **Presets** dropdown offers Right ⌘ / Right ⌃; **Turn Off** disables it.
 - [ ] Settings → add two dictionary lines for later: a name you use
       (e.g. `Kubernetes`) and anything else ≥3 letters.
 

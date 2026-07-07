@@ -339,6 +339,12 @@ struct SettingsView: View {
         @StateObject private var capture = HotkeyCapture()
         @State private var conflictWarning = false
 
+        /// Comfortable hold-to-activate modifiers, minus whatever the
+        /// dictation key already claims (one key, one job).
+        private var presets: [HotkeySpec] {
+            [.rightOption, .rightCommand, .rightControl].filter { $0 != conflictsWith }
+        }
+
         var body: some View {
             LabeledContent(title) {
                 HStack(spacing: 8) {
@@ -358,6 +364,15 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    Menu("Presets") {
+                        ForEach(presets, id: \.keyCode) { candidate in
+                            Button(candidate.displayName) {
+                                conflictWarning = false
+                                spec = candidate
+                            }
+                        }
+                    }
+                    .fixedSize()
                     if spec != nil {
                         Button("Turn Off") { spec = nil }
                     }

@@ -20,8 +20,11 @@ the commercial dictation tools' command modes behave.
 1. **A second hotkey, hold-only.** `CommandModeController` (new file)
    is its own three-state machine (idle → listening → processing),
    fully separate from dictation's hold/latch logic. No quick-tap
-   latch, no preview, Esc cancels. Off until the user assigns a key in
-   Settings (the dictation key is refused — one key, one job).
+   latch, no preview, Esc cancels. **On by default with Right Option
+   (⌥)** since 2026-07-07; a Settings dropdown offers other comfortable
+   hold keys (Right ⌘, Right ⌃) and the dictation key is refused — one
+   key, one job. Turning it off is remembered across launches (a
+   separate flag) so the default-on doesn't re-enable it.
 2. **The target is the last insertion.** Hold, speak the instruction,
    release: the instruction is transcribed and applied to the last
    inserted text via a dedicated LLM prompt (separate from polish —

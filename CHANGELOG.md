@@ -6,9 +6,10 @@ The "Unreleased" section becomes the release notes of the next update
 
 ## Unreleased
 
-- **Voice commands.** Set a second key in Settings → Hotkeys, hold it,
-  and say how to change what you just dictated — "make it more formal",
-  "remove the word actually", "translate to French".
+- **Voice commands.** Hold **Right Option (⌥)** and say how to change
+  what you just dictated — "make it more formal", "remove the word
+  actually", "translate to French". On by default; pick a different key
+  or turn it off in Settings → Hotkeys.
 - **Polish can match your writing.** Paste a sample of how you write in
   Settings → Your writing style, and full polish imitates your voice
   instead of a generic one.

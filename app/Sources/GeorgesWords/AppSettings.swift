@@ -160,13 +160,17 @@ final class AppSettings: ObservableObject {
     }
 
     /// Second hotkey: hold it and say how to change the last dictation
-    /// (command mode, backlog 4.4). Nil = off until the user picks a key.
+    /// (command mode, backlog 4.4). On by default (Right ⌥); nil = the
+    /// user turned it off. The separate "off" flag lets that choice
+    /// survive relaunch instead of being re-defaulted back on.
     @Published var commandHotkey: HotkeySpec? {
         didSet {
             if let commandHotkey, let data = try? JSONEncoder().encode(commandHotkey) {
                 defaults.set(data, forKey: "CommandHotkeySpec")
+                defaults.set(false, forKey: "CommandHotkeyOff")
             } else {
                 defaults.removeObject(forKey: "CommandHotkeySpec")
+                defaults.set(true, forKey: "CommandHotkeyOff")
             }
         }
     }
@@ -307,8 +311,12 @@ final class AppSettings: ObservableObject {
         if let data = defaults.data(forKey: "CommandHotkeySpec"),
            let saved = try? JSONDecoder().decode(HotkeySpec.self, from: data) {
             commandHotkey = saved
-        } else {
+        } else if defaults.bool(forKey: "CommandHotkeyOff") {
             commandHotkey = nil
+        } else {
+            // On by default (backlog 4.4): first run — or upgrading from
+            // before command mode existed — gets Right Option.
+            commandHotkey = .rightOption
         }
         if let data = defaults.data(forKey: "StyleSamples"),
            let saved = try? JSONDecoder().decode([String: String].self, from: data) {
