@@ -45,7 +45,7 @@ These reduce support load and make failures explainable.
 - [ ] **6.7 (S)** **Verify the completed factory reset on-device.** Landed 2026-07-07: now also removes the FluidAudio/WhisperKit model caches, unregisters launch-at-login, waits (≤5 s) for the polish engine to exit before deleting its files, and shows an alert listing anything it couldn't remove.
 - [ ] **7.8 (S)** **Verify settings export/import on-device.** Landed 2026-07-07: Settings → Backup. Export, change something, import, confirm it restores (history and learned suggestions intentionally excluded).
 - [ ] **7.9 (M)** **Incremental internal hardening.** Adopt `@MainActor` on UI/state owners, enable stricter concurrency checks once clean, and extract pieces of `AppDelegate` opportunistically when touching them. No big-bang refactor.
-- [ ] **9.9 (S)** **Release notes as support.** Maintain a changelog, Sparkle update notes, website notes, and a short known-issues section for common compatibility problems.
+- [ ] **9.9 (S)** **Release notes as support — remainder.** CHANGELOG.md landed 2026-07-07 and the release pipeline now lifts its Unreleased section into both the GitHub release notes and the Sparkle update notes (visible in the update prompt), rolling the heading automatically. Still open: a website known-issues section once there are real recurring issues to list.
 
 ## Product improvements
 

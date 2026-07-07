@@ -319,13 +319,30 @@ jobs:
             esac
           fi
 
+          # Release notes come from CHANGELOG.md's Unreleased section
+          # (9.9); the generic line is the fallback so notes can never
+          # block a release.
+          python3 - <<'NOTESEOF'
+          import re
+          notes = "Notarized, stapled, auto-updating build."
+          try:
+              text = open("CHANGELOG.md").read()
+              match = re.search(r"## Unreleased\n(.*?)(?=\n## |\Z)", text, re.S)
+              body = match.group(1).strip() if match else ""
+              if body:
+                  notes = body
+          except OSError:
+              pass
+          open("/tmp/release-notes.md", "w").write(notes + "\n")
+          NOTESEOF
+
           # A stable-named copy so the download page can always link
           # releases/latest/download/GeorgesWords.dmg (9.2).
           cp "dist/$DMG" "dist/GeorgesWords.dmg"
           GH_TOKEN="$RELEASE_TOKEN" gh release create "$TAG" "dist/$DMG" "dist/GeorgesWords.dmg" \
             --repo "$TARGET_REPO" \
             --title "George's Words ${VERSION} (build ${GITHUB_RUN_NUMBER})" \
-            --notes "Notarized, stapled, auto-updating build."
+            --notes-file /tmp/release-notes.md
           # EdDSA-sign the archive for Sparkle when the key exists (7.10);
           # until the secret is added this quietly no-ops.
           ED_SIG=""
@@ -343,10 +360,24 @@ jobs:
           LENGTH=$(stat -f%z "dist/$DMG")
           URL="https://github.com/${TARGET_REPO}/releases/download/${TAG}/${DMG}"
           python3 - "$VERSION" "$GITHUB_RUN_NUMBER" "$URL" "$LENGTH" "$ED_SIG" <<'PYEOF'
-          import sys, email.utils, time
+          import html, sys, email.utils, time
           version, build, url, length = sys.argv[1:5]
           ed_sig = sys.argv[5] if len(sys.argv) > 5 else ""
           sig_attr = f' sparkle:edSignature="{ed_sig}"' if ed_sig else ""
+          # Sparkle shows the item description as the update notes (9.9) —
+          # same text the GitHub release gets, minimally HTML-ified.
+          description = ""
+          try:
+              notes = open("/tmp/release-notes.md").read().strip()
+              if notes:
+                  rendered = "<br>".join(
+                      html.escape(line.strip()).replace("- ", "&bull; ", 1) if line.strip().startswith("- ")
+                      else html.escape(line.strip())
+                      for line in notes.splitlines() if line.strip()
+                  ).replace("**", "")
+                  description = f"<description><![CDATA[{rendered}]]></description>"
+          except OSError:
+              pass
           appcast = f"""<?xml version="1.0" encoding="utf-8"?>
           <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
             <channel>
@@ -357,6 +388,7 @@ jobs:
                 <sparkle:version>{build}</sparkle:version>
                 <sparkle:shortVersionString>{version}</sparkle:shortVersionString>
                 <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+                {description}
                 <enclosure url="{url}" length="{length}"{sig_attr} type="application/octet-stream"/>
               </item>
             </channel>
@@ -367,10 +399,32 @@ jobs:
           PYEOF
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Roll the changelog: this release's notes get its version
+          # heading, and the next release starts a fresh Unreleased
+          # section (9.9). Defensive — a changelog hiccup must never
+          # block the feed commit below.
+          python3 - "$VERSION" "$GITHUB_RUN_NUMBER" <<'ROLLEOF'
+          import sys, datetime, re
+          try:
+              version, build = sys.argv[1], sys.argv[2]
+              text = open("CHANGELOG.md").read()
+              if re.search(r"## Unreleased\n+(?=[^\n#])", text):
+                  stamp = datetime.date.today().isoformat()
+                  text = text.replace(
+                      "## Unreleased",
+                      f"## Unreleased\n\n## {version} (build {build}) — {stamp}",
+                      1,
+                  )
+                  open("CHANGELOG.md", "w").write(text)
+          except Exception as error:
+              print(f"::warning::changelog roll skipped: {error}")
+          ROLLEOF
+
           # swift build may have refreshed Package.resolved — commit it too
           # so local checkouts stay clean, and autostash any other noise
           # (run #13 died here on an unstaged-changes refusal).
-          git add appcast.xml app/Package.resolved
+          git add appcast.xml app/Package.resolved CHANGELOG.md
           git commit -m "Appcast: ${VERSION} build ${GITHUB_RUN_NUMBER}"
           git pull --rebase --autostash origin main
           git push origin main
