@@ -10,16 +10,18 @@ import SwiftUI
 struct MainWindowView: View {
     @ObservedObject var status = AppStatus.shared
     @ObservedObject var settings = AppSettings.shared
-    @ObservedObject private var corrections = CorrectionStore.shared
 
     var body: some View {
         NavigationSplitView {
+            // NOTE: do NOT add .badge() to these rows — on macOS it breaks
+            // the sidebar's selection hit-testing and the whole sidebar
+            // stops responding to clicks (regression, 2026-07-07). The
+            // "unreviewed corrections" nudge lives in the pill flash on
+            // capture instead; re-add a sidebar cue only via a route that
+            // doesn't touch row selection.
             List(MainSection.sidebarSections, selection: $status.selectedSection) { section in
                 Label(section.title, systemImage: section.symbol)
                     .tag(section)
-                    // Freshly-learned correction suggestions wait silently
-                    // otherwise — a count makes the Dictionary tab findable.
-                    .badge(section == .dictionary ? corrections.unreviewedCount : 0)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 UpdateFooter(status: status)

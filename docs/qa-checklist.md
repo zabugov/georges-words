@@ -33,8 +33,7 @@ Console or TextEdit; newest lines are at the bottom.
 
 - [ ] Dictate a sentence containing a made-up-sounding word into Notes.
 - [ ] Within ~15 s, hand-edit one word to something similar (e.g. "quay" → "key").
-- [ ] Within a minute: pill flashes **"Noticed your fix…"** and the
-      **Dictionary sidebar item shows a numbered badge**.
+- [ ] Within a minute: pill flashes **"Noticed your fix…"**.
 - [ ] Open Dictionary → the suggestion row is there; Add appends a `heard -> Correct` line.
 - [ ] Fix a word at the *very end* of a dictation too — that also gets noticed (was impossible before).
 - [ ] debug.log shows `Correction check 6s/20s/60s` lines.

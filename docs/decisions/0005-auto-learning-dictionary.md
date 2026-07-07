@@ -89,8 +89,10 @@ same design shape (observe → suggest → human click; nothing auto-added):
    the 60% survival gate by arithmetic, not by intent. Texts ≤ 12 words
    under the gate now learn — but only a single candidate at ≥ 0.55
    similarity; several "fixes" in barely-surviving text is a rewrite.
-5. **Captures are no longer silent.** New suggestions badge the
-   Dictionary sidebar item, and the pill flashes a 3 s notice right
-   after the fix is noticed. Every skipped/failed re-read now writes a
-   stage-and-lengths-only line to debug.log (transcript text stays out,
-   per DebugLog policy), so "it never learns" reports become diagnosable.
+5. **Captures are no longer silent.** The pill flashes a 3 s notice
+   right after a fix is noticed. Every skipped/failed re-read now writes
+   a stage-and-lengths-only line to debug.log (transcript text stays
+   out, per DebugLog policy), so "it never learns" reports become
+   diagnosable. (A sidebar badge was tried too, but `.badge()` on the
+   sidebar rows froze sidebar selection on macOS and was reverted the
+   same day — re-add a cue only off the row hit-testing path.)
