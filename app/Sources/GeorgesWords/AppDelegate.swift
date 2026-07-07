@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let model: String
         let strength: PolishStrength
         let instruction: String?
+        let styleSample: String?
         let polished: String
     }
 
@@ -744,13 +745,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let model = settings.effectiveLLMModel
         let strength = settings.polishStrength
         let instruction = settings.appInstruction(for: context.bundleID)
+        let styleSample = settings.styleSample(for: context.tone)
 
         // The prize: a pause-time speculation that still matches means the
         // polish already happened while the user was silent.
         if let guess = await MainActor.run(body: { self.speculativeGuess }),
            guess.cleaned == cleaned, guess.tone == context.tone,
            guess.dictionary == dictionary, guess.model == model,
-           guess.strength == strength, guess.instruction == instruction {
+           guess.strength == strength, guess.instruction == instruction,
+           guess.styleSample == styleSample {
             DebugLog.log("Speculative polish: hit (\(cleaned.count) chars)")
             await updateTiming(transcribe: transcribeSeconds, polish: 0)
             return guess.polished
@@ -763,7 +766,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             dictionary: dictionary,
             model: model,
             strength: strength,
-            customInstruction: instruction
+            customInstruction: instruction,
+            styleSample: styleSample
         )
         await updateTiming(transcribe: transcribeSeconds, polish: Date().timeIntervalSince(polishStart))
         return polished ?? cleaned
@@ -885,13 +889,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let model = settings.effectiveLLMModel
         let strength = settings.polishStrength
         let instruction = settings.appInstruction(for: context.bundleID)
+        let styleSample = settings.styleSample(for: context.tone)
         guard let polished = await llmFormatter.format(
             cleaned,
             tone: context.tone,
             dictionary: dictionary,
             model: model,
             strength: strength,
-            customInstruction: instruction
+            customInstruction: instruction,
+            styleSample: styleSample
         ) else { return }
 
         // A newer recording may have started while we polished — never
@@ -904,6 +910,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             model: model,
             strength: strength,
             instruction: instruction,
+            styleSample: styleSample,
             polished: polished
         )
         DebugLog.log("Speculative polish: guess ready (\(cleaned.count) chars)")

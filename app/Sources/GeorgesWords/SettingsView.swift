@@ -5,6 +5,8 @@ struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @State private var ollamaRunning: Bool?
     @State private var installedModels: [String]?
+    /// Which tone profile's writing sample is being edited (3.3).
+    @State private var styleTone: ToneProfile = .casual
 
     private struct RunningApp: Identifiable {
         let name: String
@@ -137,6 +139,24 @@ struct SettingsView: View {
 
 
                 Text("Fixes self-corrections (“Tuesday — no wait, Friday”), sentence structure, and tone, matched to the app you’re dictating into. The app runs its own private engine, entirely on this Mac — nothing is installed system-wide and nothing is sent anywhere. Its files live in Application Support → GeorgesWords → PolishEngine.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Your writing style") {
+                Picker("Writing for", selection: $styleTone) {
+                    ForEach(ToneProfile.allCases, id: \.rawValue) { tone in
+                        Text(tone.displayName).tag(tone)
+                    }
+                }
+                TextEditor(text: Binding(
+                    get: { settings.styleSamples[styleTone.rawValue] ?? "" },
+                    set: { settings.styleSamples[styleTone.rawValue] = $0 }
+                ))
+                .font(.body)
+                .frame(minHeight: 90)
+                .disabled(!settings.llmEnabled)
+                Text("Paste a short sample of how YOU write in this kind of app — a real chat message, a real email. Full polish will match its voice instead of a generic style. Stays on this Mac; leave empty to skip. Applies with the Full polish style only.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

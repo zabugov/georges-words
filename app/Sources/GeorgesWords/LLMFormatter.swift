@@ -125,9 +125,9 @@ final class LLMFormatter {
         return messages
     }
 
-    private static func userMessage(text: String, tone: ToneProfile, dictionary: [String], strength: PolishStrength, customInstruction: String?) -> String {
+    private static func userMessage(text: String, tone: ToneProfile, dictionary: [String], strength: PolishStrength, customInstruction: String?, styleSample: String? = nil) -> String {
         // Light mode carries no STYLE line — style hints invite rewording,
-        // so per-app notes also apply only to full rewrites.
+        // so per-app notes and voice samples also apply only to full rewrites.
         var lines: [String] = []
         if strength != .light {
             var style = "STYLE: \(tone.styleDescription)"
@@ -135,6 +135,11 @@ final class LLMFormatter {
                 style += ". App-specific notes from the user: \(customInstruction)"
             }
             lines.append(style)
+            // Personal style matching (3.3): a sample of the user's own
+            // writing beats any generic style adjective.
+            if let styleSample, !styleSample.isEmpty {
+                lines.append("VOICE: match the tone, phrasing, and formality of this sample of the user's own writing (imitate its voice, never its content):\n\(styleSample)")
+            }
         }
         let terms = dictionary.filter { !$0.isEmpty }
         if !terms.isEmpty {
@@ -151,9 +156,9 @@ final class LLMFormatter {
         let message: Message
     }
 
-    func format(_ text: String, tone: ToneProfile, dictionary: [String], model: String, strength: PolishStrength, customInstruction: String? = nil) async -> String? {
+    func format(_ text: String, tone: ToneProfile, dictionary: [String], model: String, strength: PolishStrength, customInstruction: String? = nil, styleSample: String? = nil) async -> String? {
         var messages = Self.prefixMessages(strength: strength)
-        messages.append(["role": "user", "content": Self.userMessage(text: text, tone: tone, dictionary: dictionary, strength: strength, customInstruction: customInstruction)])
+        messages.append(["role": "user", "content": Self.userMessage(text: text, tone: tone, dictionary: dictionary, strength: strength, customInstruction: customInstruction, styleSample: styleSample)])
 
         let output = await chat(messages: messages, model: model, maxTokens: 700, timeout: 12)
         guard let output, Self.isSane(input: text, output: output) else { return nil }

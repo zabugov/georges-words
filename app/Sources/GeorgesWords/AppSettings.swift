@@ -81,6 +81,25 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Personal style samples by tone profile (backlog 3.3): the user's
+    /// own writing, pasted in Settings, that full polish should imitate.
+    /// Keyed by ToneProfile rawValue; empty strings mean "no sample".
+    @Published var styleSamples: [String: String] {
+        didSet {
+            if let data = try? JSONEncoder().encode(styleSamples) {
+                defaults.set(data, forKey: "StyleSamples")
+            }
+        }
+    }
+
+    /// The sample the polish prompt should imitate for this tone, trimmed
+    /// and bounded — long pastes would slow every polish call.
+    func styleSample(for tone: ToneProfile) -> String? {
+        let sample = (styleSamples[tone.rawValue] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !sample.isEmpty else { return nil }
+        return String(sample.prefix(700))
+    }
+
     /// Second hotkey: hold it and say how to change the last dictation
     /// (command mode, backlog 4.4). Nil = off until the user picks a key.
     @Published var commandHotkey: HotkeySpec? {
@@ -231,6 +250,12 @@ final class AppSettings: ObservableObject {
             commandHotkey = saved
         } else {
             commandHotkey = nil
+        }
+        if let data = defaults.data(forKey: "StyleSamples"),
+           let saved = try? JSONDecoder().decode([String: String].self, from: data) {
+            styleSamples = saved
+        } else {
+            styleSamples = [:]
         }
         launchAtLogin = SMAppService.mainApp.status == .enabled
         llmEnabled = defaults.object(forKey: "LLMEnabled") as? Bool ?? true

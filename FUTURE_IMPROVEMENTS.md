@@ -12,6 +12,14 @@ Effort guide: **S** = hours, **M** = days, **L** = a milestone. Item numbers are
 - **Business discipline:** do not overbuild business infrastructure until demand proves it. Prefer hosted checkout/license issuance; avoid accounts, dashboards, subscriptions, teams, or always-online DRM for v1.
 - **Licensing posture:** the dependency stack is commercially usable, but model/library licenses and attributions must stay tracked in release artifacts. Do not add an open-source license for the app’s own code while a paid future is on the table.
 
+## Owner action queue (added 2026-07-07 — clear these, then delete the section)
+
+Everything below needs the owner's hands or judgment; agents have taken these as far as they can.
+
+1. **Finish the two-repo split configuration (ADR 0009 steps 2 + Pages).** On github.com: create the fine-grained PAT (Developer settings → Fine-grained tokens; scope: only `georges-words-releases`; permission: Contents Read & write; 1-year expiry — set a renewal reminder), add it to the **code** repo as Actions secret `RELEASES_REPO_TOKEN`, add Actions variable `RELEASES_REPO` = `zabugov/georges-words-releases`, and on the **releases** repo enable Settings → Pages → Source: GitHub Actions. The release pipeline is blocked (by design) until this is done.
+2. **Test the checkout build** (`app/build.sh`), exercising the 2026-07-07 batch: correction learning (2.5 — fix a word within a minute, expect the Dictionary badge + pill notice), speculative polish (1.2 — pause before releasing; timing line should say "polish done during a pause"), command mode (4.4 — set a command key in Settings → Hotkeys first), and style matching (3.3 — paste a sample under Settings → Your writing style).
+3. **Give the go-ahead for the migration release** (ADR 0009 step 5) once 1 and 2 look good. After it ships: verify one Mac updates from an older build via Check for Updates (that's also the 7.10 sign-off), confirm the DMG's Applications icon renders (Finder fix rides this release), get every family Mac onto it, and only then flip the code repo private (step 8).
+
 ## Immediate pre-commercial work
 
 These are the highest-leverage items before sharing broadly or charging.
@@ -47,7 +55,7 @@ Useful, but not blockers for a first commercial test.
 - [ ] **1.3 (L)** **True streaming polish.** Polish sentence-by-sentence while speaking. Hard cases: self-corrections across sentence boundaries, tone consistency, and segmentation on unstable ASR output.
 - [ ] **1.5 (M)** **Apple Foundation Models polish engine.** Explore macOS 26+ on-device models as a way to remove the managed Ollama dependency for newer Macs.
 - [ ] **2.2 (M)** **Dictionary biasing inside speech recognition.** Research done (docs/research/dictionary-biasing-in-asr.md): the pinned FluidAudio 0.15.4 already ships acoustic vocabulary boosting (CTC word spotter + rescorer) — remaining work is wiring it into the Parakeet path with learned corrections as aliases, behind a toggle, with lazy CTC-model download (~98 MB). WhisperKit prompt tokens for the fallback are unwired today and need a bug-check (WhisperKit #372) before shipping.
-- [ ] **3.3 (L)** **Personal style matching.** Learn tone from local user-provided writing samples instead of generic style presets.
+- [ ] **3.3 (S)** **Verify personal style matching on-device.** Landed 2026-07-07 (ADR 0011): paste a writing sample per app type under Settings → Your writing style; full polish imitates its voice. Remaining: paste real samples, dictate in a matching app with Full polish, judge the imitation; retire when it behaves.
 - [ ] **3.5 (S)** **Grow the few-shot bank.** Keep a small local corpus of messy transcript → ideal output examples from real failures.
 - [ ] **3.7 (S)** **Keep raw transcript + “use raw instead.”** Store the raw transcript alongside polished text and allow replacing the last insertion with the raw version.
 - [ ] **4.1 (M)** **Multilingual dictation.** Add language auto-detect and multilingual model support, including mid-sentence language changes if practical.
