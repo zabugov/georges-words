@@ -90,6 +90,14 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Acoustic dictionary boosting in the Parakeet engine (backlog 2.2,
+    /// docs/research/dictionary-biasing-in-asr.md). Off by default: it
+    /// downloads a ~100 MB helper model on first use and adds a beat to
+    /// each dictation.
+    @Published var dictionaryBoostEnabled: Bool {
+        didSet { defaults.set(dictionaryBoostEnabled, forKey: "DictionaryBoost") }
+    }
+
     /// Microphone chosen in Settings (6.5); nil follows the system default.
     @Published var inputDeviceUID: String? {
         didSet {
@@ -317,6 +325,7 @@ final class AppSettings: ObservableObject {
             privateApps = []
         }
         inputDeviceUID = defaults.string(forKey: "InputDeviceUID")
+        dictionaryBoostEnabled = defaults.object(forKey: "DictionaryBoost") as? Bool ?? false
         launchAtLogin = SMAppService.mainApp.status == .enabled
         llmEnabled = defaults.object(forKey: "LLMEnabled") as? Bool ?? true
         polishStrength = PolishStrength(rawValue: defaults.string(forKey: "PolishStrength") ?? "") ?? .light

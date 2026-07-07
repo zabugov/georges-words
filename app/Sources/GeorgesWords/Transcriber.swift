@@ -57,7 +57,10 @@ actor Transcriber {
         DebugLog.log(String(format: "Model load: whisper ready in %.1fs (incl. warm-up)", -start.timeIntervalSinceNow))
     }
 
-    func transcribe(_ samples: [Float]) async -> String {
+    /// `boost` opts this pass into dictionary boosting (2.2) — the final
+    /// and speculative passes use it; the live preview never does (it
+    /// would pay the CTC cost every 1.2 s for throwaway text).
+    func transcribe(_ samples: [Float], boost: Bool = false) async -> String {
         // Actors are REENTRANT at await points: while load() is suspended
         // (downloading/compiling the model), a call used to slip in here,
         // see a nil backend, and silently return "" — the "first fn press
@@ -82,7 +85,12 @@ actor Transcriber {
                 // across calls is only for streaming chunk mode).
                 var decoderState = TdtDecoderState.make()
                 let result = try await manager.transcribe(samples, decoderState: &decoderState)
-                return tidy(result.text)
+                var text = result.text
+                if boost, AppSettings.shared.dictionaryBoostEnabled,
+                   let boosted = await boostAgainstDictionary(result: result, samples: samples) {
+                    text = boosted
+                }
+                return tidy(text)
             #endif
             }
         } catch {
@@ -97,6 +105,90 @@ actor Transcriber {
     private func warmUp() async {
         _ = await transcribe([Float](repeating: 0, count: 16_000))
     }
+
+    #if PARAKEET
+    // MARK: - Dictionary boosting (backlog 2.2, opt-in)
+    //
+    // A second, small Parakeet CTC model scores each dictionary term
+    // against the AUDIO, and the transcript is rescored only where a
+    // term has stronger acoustic evidence than what was decoded —
+    // NVIDIA's CTC word-spotter method, shipped inside FluidAudio.
+    // Every failure path returns nil: boosting can improve a transcript
+    // but can never lose a dictation (same contract as LLM polish).
+
+    private var boostSpotter: CtcKeywordSpotter?
+    private var boostRescorer: VocabularyRescorer?
+    private var boostVocabulary: CustomVocabularyContext?
+    /// Which dictionary the loaded pipeline was built for.
+    private var boostKey: String?
+
+    private func boostAgainstDictionary(result: ASRResult, samples: [Float]) async -> String? {
+        // Docs guidance: boost works best on a modest list of real
+        // words — 3+ characters, at most ~100 terms.
+        let terms = AppSettings.shared.dictionaryTerms
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { $0.count >= 3 }
+        guard !terms.isEmpty, terms.count <= 100 else { return nil }
+        guard let tokenTimings = result.tokenTimings, !tokenTimings.isEmpty else { return nil }
+
+        do {
+            let key = terms.joined(separator: "\u{1F}")
+            if key != boostKey || boostSpotter == nil || boostRescorer == nil || boostVocabulary == nil {
+                // loadWithCtcTokens reads one term per line and fetches
+                // the CTC model on first use (~100 MB, cached locally).
+                let vocabFile = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("gw-boost-vocab.txt")
+                try terms.joined(separator: "\n").write(to: vocabFile, atomically: true, encoding: .utf8)
+                let (vocabulary, models) = try await CustomVocabularyContext.loadWithCtcTokens(from: vocabFile.path)
+                let spotter = CtcKeywordSpotter(models: models, blankId: models.vocabulary.count)
+                let rescorer = try await VocabularyRescorer.create(
+                    spotter: spotter,
+                    vocabulary: vocabulary,
+                    config: .default,
+                    ctcModelDirectory: CtcModels.defaultCacheDirectory(for: models.variant)
+                )
+                boostVocabulary = vocabulary
+                boostSpotter = spotter
+                boostRescorer = rescorer
+                boostKey = key
+                DebugLog.log("Dictionary boost: pipeline ready (\(terms.count) terms)")
+            }
+            guard let boostSpotter, let boostRescorer, let boostVocabulary else { return nil }
+
+            let spot = try await boostSpotter.spotKeywordsWithLogProbs(
+                audioSamples: samples,
+                customVocabulary: boostVocabulary,
+                minScore: nil
+            )
+            guard !spot.logProbs.isEmpty else { return nil }
+            let output = boostRescorer.ctcTokenRescore(
+                transcript: result.text,
+                tokenTimings: tokenTimings,
+                logProbs: spot.logProbs,
+                frameDuration: spot.frameDuration,
+                // Upstream defaults: cbw 3.0 (weight of the dictionary's
+                // vote), similarity floor 0.52 (how closely the decoded
+                // word must resemble the term before a swap is allowed).
+                cbw: 3.0,
+                marginSeconds: ContextBiasingConstants.defaultMarginSeconds,
+                minSimilarity: 0.52
+            )
+            guard output.wasModified else { return nil }
+            DebugLog.log("Dictionary boost: \(output.replacements.count) replacement(s)")
+            return output.text
+        } catch {
+            DebugLog.log("Dictionary boost failed (transcript kept as-is): \(error.localizedDescription)")
+            // Clear so the next dictation rebuilds from scratch — a
+            // transient failure (e.g. the first model download without
+            // network) shouldn't wedge boosting forever.
+            boostKey = nil
+            boostSpotter = nil
+            boostRescorer = nil
+            boostVocabulary = nil
+            return nil
+        }
+    }
+    #endif
 
     /// Strip Whisper artifacts: special tokens like <|startoftranscript|> and
     /// non-speech markers like [BLANK_AUDIO] or (music).
