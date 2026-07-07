@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import Carbon.HIToolbox
 
 /// Voice edit commands (backlog 4.4): hold the command hotkey, say how
 /// the last dictation should change — "make it more formal", "remove
