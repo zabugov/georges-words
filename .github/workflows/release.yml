@@ -139,8 +139,45 @@ jobs:
           # is occasionally flaky on runners — cosmetics must never block
           # a release, so fall back to a plain DMG on any failure.
           brew install --quiet create-dmg || true
+
+          # macOS 26 Finder hides the Applications symlink's icon in DMG
+          # windows (create-dmg#202, open upstream) — the drop target shows
+          # as a blank dashed square. Bake the real folder icon into the
+          # background at the drop position instead: the symlink stays the
+          # actual drop target, and older Finders draw the same artwork on
+          # top of it, so nothing doubles visibly. Coordinates must match
+          # the --icon-size/--app-drop-link values below.
+          cat > /tmp/composite-bg.swift <<'EOF'
+          import AppKit
+          let args = CommandLine.arguments
+          guard args.count == 3, let bg = NSImage(contentsOfFile: args[1]) else { exit(1) }
+          let windowW: CGFloat = 600, windowH: CGFloat = 360, iconSize: CGFloat = 110
+          let center = NSPoint(x: 430, y: 160) // create-dmg --app-drop-link, top-left origin
+          let icon = NSWorkspace.shared.icon(forFile: "/Applications")
+          guard let rep = NSBitmapImageRep(
+              bitmapDataPlanes: nil, pixelsWide: Int(windowW * 2), pixelsHigh: Int(windowH * 2),
+              bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+              colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+          ), let context = NSGraphicsContext(bitmapImageRep: rep) else { exit(1) }
+          rep.size = NSSize(width: windowW, height: windowH) // 2x pixels in 1x points = 144 dpi
+          NSGraphicsContext.saveGraphicsState()
+          NSGraphicsContext.current = context
+          bg.draw(in: NSRect(x: 0, y: 0, width: windowW, height: windowH))
+          // AppKit's origin is bottom-left; create-dmg's is top-left.
+          icon.draw(in: NSRect(x: center.x - iconSize / 2, y: (windowH - center.y) - iconSize / 2,
+                               width: iconSize, height: iconSize))
+          NSGraphicsContext.restoreGraphicsState()
+          guard let png = rep.representation(using: .png, properties: [:]) else { exit(1) }
+          try! png.write(to: URL(fileURLWithPath: args[2]))
+          EOF
+          BG_SRC="app/dmg/background@2x.png"
+          if swift /tmp/composite-bg.swift "$BG_SRC" /tmp/background-composited@2x.png; then
+            BG_SRC="/tmp/background-composited@2x.png"
+          else
+            echo "::warning::Background compositing failed — shipping the plain background"
+          fi
           BG="app/dmg/background.png"
-          sips -Z 1200 -s dpiHeight 144 -s dpiWidth 144 "app/dmg/background@2x.png" --out "$BG" >/dev/null
+          sips -Z 1200 -s dpiHeight 144 -s dpiWidth 144 "$BG_SRC" --out "$BG" >/dev/null
           if command -v create-dmg >/dev/null && create-dmg \
             --volname "George's Words" \
             --volicon "app/icon/AppIcon.icns" \
