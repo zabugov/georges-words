@@ -158,8 +158,17 @@ enum CorrectionDetector {
             pendingHeard.append(a[i])
             i += 1
         }
-        // Trailing field text isn't "inserted words" — the user may simply
-        // have kept typing. Only flush if a heard-run is pending too.
+        // Trailing field text pairs with a trailing deleted run — the user
+        // replaced the final words (previously undetectable). With nothing
+        // deleted it's just the user typing onward, never a correction.
+        // A long trailing run (deleted a word, then kept writing) fails
+        // the 1–3 word filter in flush(), so it can't learn garbage.
+        if !pendingHeard.isEmpty {
+            while j < m {
+                pendingCorrected.append(b[j])
+                j += 1
+            }
+        }
         if !pendingHeard.isEmpty && pendingCorrected.isEmpty {
             pendingHeard = []
         }

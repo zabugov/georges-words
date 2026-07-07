@@ -85,6 +85,17 @@ final class CorrectionDetectorTests: XCTestCase {
         XCTAssertEqual(subs, [CorrectionDetector.Substitution(heard: "coober netties", corrected: "Kubernetes")])
     }
 
+    func testDetectsFixOfFinalWords() {
+        // Corrections at the very end of the dictation used to be
+        // invisible: the walk consumed the deleted run but never paired
+        // the trailing field text with it.
+        let subs = CorrectionDetector.substitutions(
+            from: "we should deploy coober netties",
+            to: "we should deploy Kubernetes"
+        )
+        XCTAssertEqual(subs, [CorrectionDetector.Substitution(heard: "coober netties", corrected: "Kubernetes")])
+    }
+
     func testStrictModeRejectsMultipleCandidates() {
         // Low survival AND several "fixes" = a rewrite wearing a costume.
         let subs = CorrectionDetector.substitutions(
