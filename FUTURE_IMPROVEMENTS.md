@@ -66,10 +66,20 @@ The stack is already commercially clean: Ollama (MIT), Qwen 2.5 **1.5B** (Apache
 
 Two standing guardrails (from the 2026-07-06 external review, both adopted): **sharing the app free is unblocked today — the extra gates below apply to *charging***; and **do not overbuild business infrastructure** (no accounts, sync, dashboards, analytics, subscriptions, or license servers beyond activation until real demand exists — local-first simplicity is the product's strongest differentiator).
 
+**Pending owner actions (updated 2026-07-07):** the code/pipeline halves of the "any scale" items are done; these are the manual clicks only Zach can do, roughly in priority order:
+
+- [ ] **Test the download-page button** — do one fresh install through the site's exact "Download" button (`GeorgesWords.dmg`) right after the next release is cut; only then share the link (`https://zabugov.github.io/georges-words/`) with anyone non-technical. *(The stable-named asset ships from the next release onward — see 9.2.)*
+- [ ] **Enable Discussions** — repo Settings → General → Features → Discussions. *(9.3)*
+- [ ] **Enable private vulnerability reporting** — repo Settings → Advanced Security → Private vulnerability reporting. *(SECURITY.md already points at it.)*
+- [ ] **Sparkle EdDSA keys** — run `generate_keys` on the Mac, add the exported private key as repo secret `SPARKLE_ED_PRIVATE_KEY`, paste the PUBLIC key into chat for `Info.plist`. Not urgent — required before charging money, not before free sharing. *(7.10)*
+- [ ] **Homebrew tap repo** — create empty public `zabugov/homebrew-georges-words`; the cask + automation follow. Lowest priority — a "when people ask for `brew install`" item, not a launch blocker. *(9.6)*
+
+*(Done 2026-07-07: repo made public; GitHub Pages source set to "GitHub Actions" and the download page deployed live.)*
+
 **Any scale (do first):**
 
 - [x] **9.1** ~~Parakeet attribution line in About~~ — shipped 2026-07-06 (About → App section credits Parakeet/CC-BY-4.0, FluidAudio, WhisperKit, Ollama/Qwen, Sparkle).
-- [ ] **9.2 (S)** **User-facing download page** — BUILT 2026-07-06 (`site/index.html` + `pages.yml` deploy workflow; releases now also attach a stable-named `GeorgesWords.dmg` so the page's download button always works). **Waiting on one owner click:** repo Settings → Pages → Source: "GitHub Actions". Note (review): the stable `GeorgesWords.dmg` asset ships from the NEXT release onward — test one fresh install through the page's exact button before sharing the link with anyone non-technical.
+- [ ] **9.2 (S)** **User-facing download page** — BUILT 2026-07-06, DEPLOYED LIVE 2026-07-07 at `https://zabugov.github.io/georges-words/` (`site/index.html` + `pages.yml`; Pages source now set to "GitHub Actions"). Releases attach a stable-named `GeorgesWords.dmg` so the page's download button survives version bumps. **One thing still open:** the stable `GeorgesWords.dmg` asset ships from the NEXT release onward — test one fresh install through the page's exact button before sharing the link with anyone non-technical. Until then the button will 404; the Releases page links work today.
 - [ ] **9.3 (S)** **Issue templates + Discussions** — templates shipped 2026-07-06 (bug report asks for the 9.5 diagnostic file). **Waiting on one owner click:** repo Settings → General → Features → enable Discussions.
 
 **Hundreds of users:**
