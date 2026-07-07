@@ -57,6 +57,7 @@ enum DiagnosticReport {
         lines.append("Sounds: \(settings.soundsEnabled)")
         lines.append("Launch at login: \(settings.launchAtLogin)")
         lines.append("Dictionary entries: \(settings.dictionaryTerms.count)")
+        lines.append("Correction suggestions waiting: \(CorrectionStore.shared.suggestions.count)")
         lines.append("Snippets: \(settings.snippets.count)")
         lines.append("Per-app notes: \(settings.appInstructions.count)")
         lines.append("History entries: \(HistoryStore.shared.entries.count)")

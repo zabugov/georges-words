@@ -19,6 +19,13 @@ enum FocusedFieldReader {
 
     static func read() -> String? {
         guard let element = AXFocus.focusedElement(logContext: "Correction re-read") else { return nil }
+        return read(element: element)
+    }
+
+    /// Reads a specific element — used when the inserter remembered exactly
+    /// which field it wrote into, so the re-read can follow the field itself
+    /// instead of trusting whatever happens to have focus later.
+    static func read(element: AXUIElement) -> String? {
         var valueRef: AnyObject?
         guard AXUIElementCopyAttributeValue(
             element,
@@ -81,9 +88,15 @@ enum CorrectionDetector {
             }
         }
 
-        // If well under 60% of the inserted words survive, we're not
-        // looking at a lightly-corrected version of our text — learn nothing.
-        guard dp[0][0] * 10 >= n * 6 else { return [] }
+        // If well under 60% of the inserted words survive, we're usually
+        // not looking at a lightly-corrected version of our text. Short
+        // dictations are the exception: fixing two words out of four is a
+        // "heavy rewrite" by percentage but exactly what a mishearing fix
+        // looks like. Those run in strict mode — a single candidate at a
+        // higher similarity bar — instead of learning nothing (backlog 2.5).
+        let survivalOK = dp[0][0] * 10 >= n * 6
+        let strict = !survivalOK
+        guard survivalOK || n <= 12 else { return [] }
 
         // Walk the alignment; between matches, a run of deleted words next
         // to a run of inserted words is a candidate substitution.
@@ -108,7 +121,21 @@ enum CorrectionDetector {
                 pendingHeard.map(\.normalized).joined(),
                 pendingCorrected.map(\.normalized).joined()
             )
-            guard similarity >= 0.35 else { return }
+            if strict {
+                // Low word survival: only a strongly-resembling single fix
+                // is trusted (the exactly-one rule is enforced after the walk).
+                guard similarity >= 0.55 else { return }
+            } else if similarity < 0.35 {
+                // Sound-alike fixes spelled differently ("quay" → "key")
+                // can fail the letter distance — give phonetics a second
+                // vote. Suggestions still need a human click, so a looser
+                // gate here costs a dismissal, never a bad auto-entry.
+                let phonetic = Self.similarity(
+                    pendingHeard.map { Self.phoneticKey($0.normalized) }.joined(),
+                    pendingCorrected.map { Self.phoneticKey($0.normalized) }.joined()
+                )
+                guard phonetic >= 0.5 else { return }
+            }
             results.append(Substitution(heard: heard, corrected: corrected))
         }
 
@@ -138,7 +165,44 @@ enum CorrectionDetector {
         }
         flush()
 
+        // Strict mode trusts exactly one strong fix; several "fixes" in a
+        // barely-surviving text is a rewrite wearing a costume.
+        if strict && results.count != 1 { return [] }
         return results
+    }
+
+    /// Reduce a word to a rough consonant skeleton so sound-alike spellings
+    /// compare close ("quay" → "kw", "key" → "k"). Deliberately crude: it
+    /// only grants a second chance to candidates that already passed every
+    /// other filter, and a wrong grant costs one dismissable suggestion.
+    private static func phoneticKey(_ word: String) -> String {
+        var text = word.filter(\.isLetter)
+        // Silent/aliased clusters first, while their context is intact.
+        for (from, to) in [
+            ("kn", "n"), ("gn", "n"), ("pn", "n"), ("wr", "r"),
+            ("wh", "w"), ("qu", "kw"), ("ph", "f"), ("ck", "k")
+        ] {
+            text = text.replacingOccurrences(of: from, with: to)
+        }
+        var skeleton = ""
+        for (offset, ch) in text.enumerated() {
+            let mapped: Character
+            switch ch {
+            case "a", "e", "i", "o", "u", "y", "h":
+                // Vowels (and near-silent h) vary freely between a
+                // mishearing and its fix — keep one only word-initially.
+                if offset == 0 { mapped = ch } else { continue }
+            case "c", "q": mapped = "k"
+            case "z": mapped = "s"
+            case "j": mapped = "g"
+            case "d": mapped = "t"
+            case "b": mapped = "p"
+            case "v": mapped = "f"
+            default: mapped = ch
+            }
+            if skeleton.last != mapped { skeleton.append(mapped) }
+        }
+        return skeleton
     }
 
     private static func tokenize(_ text: String) -> [Token] {
@@ -193,9 +257,14 @@ final class CorrectionStore: ObservableObject {
     private struct Saved: Codable {
         var suggestions: [Suggestion]
         var dismissed: [String]
+        // Optional: absent in files written before the badge existed.
+        var unreviewed: Int?
     }
 
     @Published private(set) var suggestions: [Suggestion] = []
+    /// Suggestions captured since the Dictionary tab was last opened —
+    /// drives the sidebar badge so captures aren't silent (backlog 2.5).
+    @Published private(set) var unreviewedCount = 0
     private var dismissed: [String] = []
     private let fileURL: URL
 
@@ -209,6 +278,7 @@ final class CorrectionStore: ObservableObject {
            let saved = try? JSONDecoder().decode(Saved.self, from: data) {
             suggestions = saved.suggestions
             dismissed = saved.dismissed
+            unreviewedCount = min(saved.unreviewed ?? 0, saved.suggestions.count)
         }
     }
 
@@ -216,13 +286,18 @@ final class CorrectionStore: ObservableObject {
         heard.lowercased() + "\u{1F}" + corrected.lowercased()
     }
 
-    func add(heard: String, corrected: String, settings: AppSettings) {
+    /// Returns true when a brand-new suggestion was queued (as opposed to a
+    /// repeat sighting, a dismissed pair, or an already-mapped word) — the
+    /// caller uses that to decide whether the capture is worth announcing.
+    @discardableResult
+    func add(heard: String, corrected: String, settings: AppSettings) -> Bool {
         let key = Self.key(heard, corrected)
-        guard !dismissed.contains(key) else { return }
+        guard !dismissed.contains(key) else { return false }
         // Already fixed by an existing dictionary mapping — nothing to learn.
         let heardLower = heard.lowercased()
-        guard !settings.dictionaryReplacements.contains(where: { $0.heard.lowercased() == heardLower }) else { return }
+        guard !settings.dictionaryReplacements.contains(where: { $0.heard.lowercased() == heardLower }) else { return false }
 
+        var isNew = false
         if let index = suggestions.firstIndex(where: { Self.key($0.heard, $0.corrected) == key }) {
             suggestions[index].timesSeen += 1
             suggestions[index].lastSeen = Date()
@@ -234,7 +309,17 @@ final class CorrectionStore: ObservableObject {
             if suggestions.count > Self.maxSuggestions {
                 suggestions.removeLast(suggestions.count - Self.maxSuggestions)
             }
+            unreviewedCount += 1
+            isNew = true
         }
+        save()
+        return isNew
+    }
+
+    /// The Dictionary tab was opened — everything in it has been seen.
+    func markReviewed() {
+        guard unreviewedCount != 0 else { return }
+        unreviewedCount = 0
         save()
     }
 
@@ -258,7 +343,8 @@ final class CorrectionStore: ObservableObject {
     }
 
     private func save() {
-        guard let data = try? JSONEncoder().encode(Saved(suggestions: suggestions, dismissed: dismissed)) else { return }
+        let saved = Saved(suggestions: suggestions, dismissed: dismissed, unreviewed: unreviewedCount)
+        guard let data = try? JSONEncoder().encode(saved) else { return }
         try? data.write(to: fileURL, options: .atomic)
     }
 }

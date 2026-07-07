@@ -53,4 +53,44 @@ final class CorrectionDetectorTests: XCTestCase {
         )
         XCTAssertEqual(subs, [])
     }
+
+    // MARK: - Backlog 2.5 filter changes
+
+    func testPhoneticSecondChance() {
+        // "quay" → "key" fails plain letter distance (0.25) but is exactly
+        // the sound-alike shape mishearings take — phonetics rescue it.
+        let subs = CorrectionDetector.substitutions(
+            from: "meet me at the quay tomorrow",
+            to: "meet me at the key tomorrow"
+        )
+        XCTAssertEqual(subs, [CorrectionDetector.Substitution(heard: "quay", corrected: "key")])
+    }
+
+    func testPhoneticDoesNotRescueWordingEdits() {
+        // Dissimilar in letters AND sound — stays a wording edit.
+        let subs = CorrectionDetector.substitutions(
+            from: "that was a strange meeting today",
+            to: "that was a peculiar meeting today"
+        )
+        XCTAssertEqual(subs, [])
+    }
+
+    func testShortDictationHeavyFixLearnsInStrictMode() {
+        // Two of four words fixed = under the 60% survival gate, but it's
+        // one strong mishearing fix — strict mode must still learn it.
+        let subs = CorrectionDetector.substitutions(
+            from: "deploy coober netties now",
+            to: "deploy Kubernetes now"
+        )
+        XCTAssertEqual(subs, [CorrectionDetector.Substitution(heard: "coober netties", corrected: "Kubernetes")])
+    }
+
+    func testStrictModeRejectsMultipleCandidates() {
+        // Low survival AND several "fixes" = a rewrite wearing a costume.
+        let subs = CorrectionDetector.substitutions(
+            from: "alpha to beta",
+            to: "alfa to betta"
+        )
+        XCTAssertEqual(subs, [])
+    }
 }

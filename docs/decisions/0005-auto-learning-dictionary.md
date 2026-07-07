@@ -1,6 +1,6 @@
 # ADR 0005: Auto-learning dictionary
 
-**Date:** 2026-07-03 · **Status:** accepted
+**Date:** 2026-07-03 · **Status:** accepted · **Amended:** 2026-07-07 (backlog 2.5, see below)
 
 ## Context
 
@@ -63,3 +63,34 @@ device (ADR 0001).
 - Backlog 2.2 (feeding dictionary terms to the STT model as a decoding
   prompt) remains open and complements this: 2.3 fixes text after the
   fact, 2.2 would prevent the mishearing at the source.
+
+## Amendment — 2026-07-07 (backlog 2.5)
+
+Detection missed too many real corrections in daily use. Five changes,
+same design shape (observe → suggest → human click; nothing auto-added):
+
+1. **Widening re-read schedule.** The single fixed 6 s peek missed every
+   fix made after it (mouse round-trip, re-reading the sentence). The
+   check now peeks at ~6 s, ~20 s and ~60 s; a newer dictation's check
+   retires any still-pending attempts, and the same fix seen by two
+   peeks counts once.
+2. **Exact-element tracking.** AX insertions remember the precise
+   `AXUIElement` written into and later re-read *it* — the 2.5 suspect
+   "validating only the frontmost app instead of the exact edited field."
+   Paste-fallback insertions capture the focused element ~1 s after the
+   paste lands. Reading the tracked element no longer requires the app
+   to be frontmost (it targets the exact field we wrote — a stronger
+   check than bundle ID); the focus-based fallback still does.
+3. **Phonetic second chance.** Sound-alike fixes spelled differently
+   ("quay" → "key") failed the 0.35 letter-similarity gate. Candidates
+   that fail it are re-scored on crude consonant skeletons (≥ 0.5 to
+   pass). Cost of a wrong grant is one dismissable suggestion.
+4. **Strict mode for short dictations.** Fixing two words of four fails
+   the 60% survival gate by arithmetic, not by intent. Texts ≤ 12 words
+   under the gate now learn — but only a single candidate at ≥ 0.55
+   similarity; several "fixes" in barely-surviving text is a rewrite.
+5. **Captures are no longer silent.** New suggestions badge the
+   Dictionary sidebar item, and the pill flashes a 3 s notice right
+   after the fix is noticed. Every skipped/failed re-read now writes a
+   stage-and-lengths-only line to debug.log (transcript text stays out,
+   per DebugLog policy), so "it never learns" reports become diagnosable.

@@ -9,12 +9,16 @@ import SwiftUI
 struct MainWindowView: View {
     @ObservedObject var status = AppStatus.shared
     @ObservedObject var settings = AppSettings.shared
+    @ObservedObject private var corrections = CorrectionStore.shared
 
     var body: some View {
         NavigationSplitView {
             List(MainSection.sidebarSections, selection: $status.selectedSection) { section in
                 Label(section.title, systemImage: section.symbol)
                     .tag(section)
+                    // Freshly-learned correction suggestions wait silently
+                    // otherwise — a count makes the Dictionary tab findable.
+                    .badge(section == .dictionary ? corrections.unreviewedCount : 0)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 UpdateFooter(status: status)
@@ -650,6 +654,7 @@ struct DictionaryView: View {
         .onAppear {
             correctionDraft = status.lastTranscript ?? ""
             learnFeedback = nil
+            corrections.markReviewed()
         }
     }
 }

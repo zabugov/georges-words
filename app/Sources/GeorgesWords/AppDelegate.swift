@@ -47,6 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Increments per recording so the max-duration watchdog can tell
     /// whether "its" recording is still the live one.
     private var recordingGeneration = 0
+    /// Increments per correction check so a newer insertion retires the
+    /// re-read attempts still pending for the previous one.
+    private var correctionCheckGeneration = 0
 
     // Quick-tap toggle (hands-free) state.
     private var pressStartedAt: Date?
@@ -491,7 +494,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     if AppContext.current().bundleID == context.bundleID {
                         outcome = self.inserter.insert(text)
                         if outcome == .inserted {
-                            self.scheduleCorrectionCheck(inserted: text, context: context)
+                            self.scheduleCorrectionCheck(
+                                inserted: text,
+                                context: context,
+                                target: self.inserter.lastInsertionTarget
+                            )
                         }
                     } else {
                         // Different app frontmost than where dictation
@@ -516,24 +523,100 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Auto-learning dictionary (ADR 0005)
 
-    /// A few seconds after inserting, re-read the focused field and diff it
-    /// against what was inserted — the user's quick fixes become dictionary
-    /// suggestions. Entirely local, and bails out unless we're clearly still
-    /// looking at the same text in the same app.
-    private func scheduleCorrectionCheck(inserted: String, context: AppContext) {
+    /// After inserting, re-read the edited field on a widening schedule and
+    /// diff it against what was inserted — the user's fixes become dictionary
+    /// suggestions (ADR 0005, amended for backlog 2.5). Prefers re-reading
+    /// the exact element the text went into; only the focus-based fallback
+    /// still requires the same app to be frontmost. Entirely local, and a
+    /// newer dictation's check silently retires this one.
+    private func scheduleCorrectionCheck(inserted: String, context: AppContext, target: AXUIElement?) {
+        correctionCheckGeneration += 1
+        let generation = correctionCheckGeneration
+
         Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 6_000_000_000)
-            guard let self else { return }
-            // Same app still frontmost, and not mid-dictation.
-            guard AppContext.current().bundleID == context.bundleID else { return }
-            guard case .idle = self.state else { return }
-            guard let fieldText = FocusedFieldReader.read(), !fieldText.isEmpty else { return }
-            for substitution in CorrectionDetector.substitutions(from: inserted, to: fieldText) {
-                CorrectionStore.shared.add(
-                    heard: substitution.heard,
-                    corrected: substitution.corrected,
-                    settings: self.settings
-                )
+            var target = target
+            var waited = 0.0
+            var alreadySuggested = Set<String>()
+
+            // The paste fallback proves nothing about elements — grab the
+            // focused one a beat after the paste lands, while the caret is
+            // still almost certainly in the field we typed into.
+            if target == nil {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                waited = 1
+                guard let self, generation == self.correctionCheckGeneration else { return }
+                if case .idle = self.state, AppContext.current().bundleID == context.bundleID {
+                    target = AXFocus.focusedElement(logContext: "Correction target capture")
+                }
+            }
+
+            // One fixed 6 s peek (the original design) missed every fix made
+            // after it — reaching for the mouse, re-reading the sentence.
+            // Three peeks on a widening schedule catch the slow tail too.
+            for mark in [6.0, 20.0, 60.0] {
+                try? await Task.sleep(nanoseconds: UInt64((mark - waited) * 1_000_000_000))
+                waited = mark
+                guard let self, generation == self.correctionCheckGeneration else { return }
+                let label = "Correction check \(Int(mark))s"
+
+                // Mid-dictation reads would race the next insertion.
+                guard case .idle = self.state else {
+                    DebugLog.log("\(label): busy, skipped")
+                    continue
+                }
+
+                var fieldText: String?
+                if let element = target {
+                    fieldText = FocusedFieldReader.read(element: element)
+                    if fieldText == nil {
+                        // Window closed or the app recycled the element —
+                        // the reference is dead; stop trying it.
+                        DebugLog.log("\(label): tracked element gone")
+                        target = nil
+                    }
+                }
+                if fieldText == nil {
+                    // Focus is only meaningful in the app we dictated into;
+                    // anything else would read some unrelated field.
+                    guard AppContext.current().bundleID == context.bundleID else {
+                        DebugLog.log("\(label): other app frontmost, skipped")
+                        continue
+                    }
+                    fieldText = FocusedFieldReader.read()
+                }
+                guard let fieldText, !fieldText.isEmpty else {
+                    DebugLog.log("\(label): no field text")
+                    continue
+                }
+
+                let candidates = CorrectionDetector.substitutions(from: inserted, to: fieldText)
+                var newCount = 0
+                for substitution in candidates {
+                    // A later peek re-seeing the same fix isn't a second
+                    // sighting — only count it once per insertion.
+                    let key = substitution.heard.lowercased() + "\u{1F}" + substitution.corrected.lowercased()
+                    guard alreadySuggested.insert(key).inserted else { continue }
+                    if CorrectionStore.shared.add(
+                        heard: substitution.heard,
+                        corrected: substitution.corrected,
+                        settings: self.settings
+                    ) {
+                        newCount += 1
+                    }
+                }
+                DebugLog.log("\(label): field \(fieldText.count) chars, \(candidates.count) candidate(s), \(newCount) new")
+
+                // The capture used to be silent, so the suggestion queue
+                // went undiscovered (backlog 2.5) — one quiet, transient
+                // nudge right after the user made the fix.
+                if newCount > 0 {
+                    self.pill.flash(
+                        newCount == 1
+                            ? "Noticed your fix — suggestion waiting in Dictionary"
+                            : "Noticed \(newCount) fixes — suggestions waiting in Dictionary",
+                        seconds: 3
+                    )
+                }
             }
         }
     }

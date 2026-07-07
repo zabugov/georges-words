@@ -21,8 +21,15 @@ final class TextInserter {
 
     private static let vKeyCode: CGKeyCode = 9
 
+    /// The element the AX path most recently wrote into, kept so the
+    /// correction learner can re-read the exact field later instead of
+    /// trusting whatever happens to have focus then (backlog 2.5). Nil
+    /// after a paste-fallback insertion — no element was proven there.
+    private(set) var lastInsertionTarget: AXUIElement?
+
     @discardableResult
     func insert(_ text: String) -> Outcome {
+        lastInsertionTarget = nil
         guard AXIsProcessTrusted() else {
             // Without Accessibility we can neither use the AX API nor
             // simulate ⌘V — leave the text on the clipboard so the user can
@@ -76,6 +83,7 @@ final class TextInserter {
             DebugLog.log("Insert: app claimed success but the field never changed — using paste")
             return false
         }
+        lastInsertionTarget = element
         return true
     }
 
