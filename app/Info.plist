@@ -23,7 +23,7 @@
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>SUFeedURL</key>
-    <string>https://raw.githubusercontent.com/zabugov/georges-words/main/appcast.xml</string>
+    <string>https://raw.githubusercontent.com/zabugov/georges-words-releases/main/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string>coOCvT2Q/GoQGBw0PzT3LV5ccqnNhdy24ks5uIusKwU=</string>
     <key>SUEnableAutomaticChecks</key>
