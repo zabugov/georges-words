@@ -6,6 +6,12 @@ The "Unreleased" section becomes the release notes of the next update
 
 ## Unreleased
 
+- **Phone numbers and emails come out formatted.** Say a phone number
+  ("five five five one two three four") and it lands as `555-1234`;
+  ten digits become `(800) 555-1212`. Say an email ("john dot smith at
+  gmail dot com") and it lands as `john.smith@gmail.com`. Large spoken
+  numbers like "one hundred twenty three" now come out as `123` too.
+  All of this happens on-device with no AI needed.
 - **Voice commands.** Hold **Right Option (⌥)** and say how to change
   what you just dictated — "make it more formal", "remove the word
   actually", "translate to French". On by default; pick a different key

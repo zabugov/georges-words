@@ -36,4 +36,30 @@ final class SpokenNumbersTests: XCTestCase {
         // Prose numbers without a unit stay as spoken.
         XCTAssertEqual(SpokenNumbers.normalize("one of those days"), "one of those days")
     }
+
+    // MARK: - Cardinals (magnitude numbers)
+
+    func testCardinalValueParsing() {
+        XCTAssertEqual(SpokenNumbers.cardinalValue(of: "one hundred twenty three"), 123)
+        XCTAssertEqual(SpokenNumbers.cardinalValue(of: "one thousand two hundred"), 1200)
+        XCTAssertEqual(SpokenNumbers.cardinalValue(of: "two thousand twenty six"), 2026)
+        XCTAssertEqual(SpokenNumbers.cardinalValue(of: "five million"), 5_000_000)
+        XCTAssertEqual(SpokenNumbers.cardinalValue(of: "fifteen"), 15)
+        XCTAssertNil(SpokenNumbers.cardinalValue(of: "banana"))
+    }
+
+    func testCardinalNormalization() {
+        XCTAssertEqual(SpokenNumbers.normalize("we sold one hundred twenty three units"),
+                       "we sold 123 units")
+        XCTAssertEqual(SpokenNumbers.normalize("about two thousand people"), "about 2000 people")
+        XCTAssertEqual(SpokenNumbers.normalize("the year two thousand twenty six"), "the year 2026")
+    }
+
+    func testCardinalsLeaveSmallAndIdiomaticFormsAlone() {
+        // No magnitude word → small counts stay as words.
+        XCTAssertEqual(SpokenNumbers.normalize("twenty five people"), "twenty five people")
+        // Bare scale word with no number → idioms survive.
+        XCTAssertEqual(SpokenNumbers.normalize("thanks a million"), "thanks a million")
+        XCTAssertEqual(SpokenNumbers.normalize("hundred people showed up"), "hundred people showed up")
+    }
 }

@@ -52,6 +52,38 @@ final class TranscriptCleanerTests: XCTestCase {
         XCTAssertEqual(cleaner.clean("meet at three thirty pm", dictionary: []), "Meet at 3:30 PM")
     }
 
+    func testCardinalNumbers() {
+        XCTAssertEqual(cleaner.clean("give me one hundred dollars", dictionary: []), "Give me $100")
+        XCTAssertEqual(cleaner.clean("we shipped two thousand units", dictionary: []), "We shipped 2000 units")
+    }
+
+    // MARK: - Phone numbers & emails
+
+    func testPhoneNumberFormatting() {
+        XCTAssertEqual(
+            cleaner.clean("call me at five five five one two three four", dictionary: []),
+            "Call me at 555-1234"
+        )
+        XCTAssertEqual(
+            cleaner.clean("my number is eight zero zero five five five one two one two", dictionary: []),
+            "My number is (800) 555-1212"
+        )
+    }
+
+    func testEmailFormatting() {
+        XCTAssertEqual(
+            cleaner.clean("send it to john dot smith at gmail dot com", dictionary: []),
+            "Send it to john.smith@gmail.com"
+        )
+    }
+
+    func testLeadingEmailStaysLowercase() {
+        XCTAssertEqual(
+            cleaner.clean("jane at proton dot me is my address", dictionary: []),
+            "jane@proton.me is my address"
+        )
+    }
+
     // MARK: - Spoken commands (3.1)
 
     func testNewLineCommand() {

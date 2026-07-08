@@ -41,21 +41,30 @@ struct TranscriptCleaner {
             )
         }
 
-        // Common spoken-number forms.
+        // Phone numbers and emails: "five five five one two three four" →
+        // "555-1234", "john at gmail dot com" → "john@gmail.com".
+        result = SpokenContacts.normalize(result)
+
+        // Spelled-out numbers: "twenty five percent", "three thirty pm",
+        // "one hundred twenty three" → "123". Runs before the digit-adjacent
+        // rules below so cardinals like "five hundred dollars" → "500 dollars"
+        // get the "$" treatment too.
+        result = SpokenNumbers.normalize(result)
+
+        // Digit-adjacent spoken-number forms.
         result = result.replacingOccurrences(of: #"(\d+)\s+percent\b"#, with: "$1%", options: .regularExpression)
         result = result.replacingOccurrences(of: #"(\d+)\s+dollars\b"#, with: "\\$$1", options: .regularExpression)
         result = result.replacingOccurrences(of: #"(\d+)\s+degrees\b"#, with: "$1°", options: .regularExpression)
-
-        // Spelled-out numbers: "twenty five percent", "three thirty pm".
-        result = SpokenNumbers.normalize(result)
 
         // Tidy whitespace: collapse runs, remove space before punctuation.
         result = result.replacingOccurrences(of: #"\s{2,}"#, with: " ", options: .regularExpression)
         result = result.replacingOccurrences(of: #"\s+([,.!?;:])"#, with: "$1", options: .regularExpression)
         result = result.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Capitalize the first letter.
-        if let first = result.first, first.isLowercase {
+        // Capitalize the first letter — unless the transcript opens with an
+        // email address, which must stay lowercase.
+        let firstToken = result.prefix { !$0.isWhitespace }
+        if let first = result.first, first.isLowercase, !firstToken.contains("@") {
             result = first.uppercased() + result.dropFirst()
         }
 

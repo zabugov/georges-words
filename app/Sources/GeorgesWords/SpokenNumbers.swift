@@ -46,10 +46,77 @@ enum SpokenNumbers {
     private static let minutePattern =
         #"(?:oh[ -]"# + onesPattern + #"|(?:twenty|thirty|forty|fifty)(?:[ -]"# + onesPattern + #")?|"# + teensPattern + #")"#
 
+    private static let scales: [String: Int] = [
+        "hundred": 100, "thousand": 1_000, "million": 1_000_000,
+        "billion": 1_000_000_000,
+    ]
+
     static func normalize(_ text: String) -> String {
         var result = text
+        // Cardinals first: "five hundred dollars" → "500 dollars", which the
+        // caller's digit-adjacent "$" rule then finishes.
+        result = normalizeCardinals(result)
         result = normalizeUnits(result)
         result = normalizeTimes(result)
+        return result
+    }
+
+    /// Parse a full spelled-out cardinal ("one thousand two hundred and five")
+    /// into its integer value, or nil if any token isn't a number word.
+    static func cardinalValue(of phrase: String) -> Int? {
+        let words = phrase.lowercased()
+            .replacingOccurrences(of: "-", with: " ")
+            .split(separator: " ")
+            .map(String.init)
+            .filter { $0 != "and" }
+        guard !words.isEmpty else { return nil }
+
+        var total = 0
+        var current = 0
+        for word in words {
+            if let unit = units[word] {
+                current += unit
+            } else if let ten = tens[word] {
+                current += ten
+            } else if word == "hundred" {
+                current = max(current, 1) * 100
+            } else if let scale = scales[word], scale >= 1_000 {
+                total += max(current, 1) * scale
+                current = 0
+            } else {
+                return nil
+            }
+        }
+        return total + current
+    }
+
+    private static let cardinalWord =
+        #"(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|"#
+        + #"thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|"#
+        + #"twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|"#
+        + #"hundred|thousand|million|billion)"#
+
+    /// Convert spelled-out numbers that carry a magnitude word to digits:
+    /// "one hundred twenty three" → "123", "two thousand" → "2000".
+    /// Deliberately conservative — a phrase is only converted when it contains
+    /// BOTH a scale word (hundred/thousand/…) and an ordinary number word, so
+    /// small prose counts ("three ideas") and idioms ("thanks a million") are
+    /// left as spoken.
+    private static func normalizeCardinals(_ text: String) -> String {
+        let pattern = #"\b("# + cardinalWord + #"(?:[\s-]+(?:and[\s-]+)?"# + cardinalWord + #")*)\b"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return text }
+
+        var result = text
+        let matches = regex.matches(in: result, range: NSRange(result.startIndex..., in: result))
+        for match in matches.reversed() {
+            guard let whole = Range(match.range, in: result) else { continue }
+            let phrase = String(result[whole]).lowercased()
+            let tokens = Set(phrase.replacingOccurrences(of: "-", with: " ").split(separator: " ").map(String.init))
+            let hasScale = tokens.contains { scales[$0] != nil }
+            let hasPlainNumber = tokens.contains { units[$0] != nil || tens[$0] != nil }
+            guard hasScale, hasPlainNumber, let value = cardinalValue(of: phrase) else { continue }
+            result.replaceSubrange(whole, with: String(value))
+        }
         return result
     }
 
