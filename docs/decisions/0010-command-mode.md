@@ -31,9 +31,16 @@ the commercial dictation tools' command modes behave.
    this pass *transforms* text because the user asked, which polish
    must never do on its own). The result replaces the previous text in
    place via select-and-replace on the exact field element tracked at
-   insertion time (ADR 0005 amendment machinery); if the field refuses
-   or the text is gone, the result lands on the clipboard with a ⌘V
-   prompt instead. Never type into the unknown.
+   insertion time (ADR 0005 amendment machinery). **Electron/Chromium
+   fields (Claude Desktop, VS Code, Slack) don't accept that AX range
+   replace** — for them there is a keyboard fallback (added 2026-07-07):
+   select the last N characters (Shift+←) and paste the new text over
+   them, which works anywhere ⌘V does. It assumes the caret still sits
+   at the end of the inserted text — true in the normal flow — and can't
+   be verified in Electron, so it runs only after the verifiable AX path
+   fails. If even that isn't possible, the result lands on the clipboard
+   with a "select your last dictation and press ⌘V" prompt. Never type
+   into the unknown.
 3. **Edits chain.** A successful command's output becomes the new
    "last dictation" (and a history entry), so "make it formal" …
    "now translate it" composes.

@@ -40,15 +40,20 @@ Console or TextEdit; newest lines are at the bottom.
 
 ## 4. Command mode (4.4)
 
-- [ ] Dictate a casual sentence. Hold Right ⌥, say **"make it more formal"**, release → pill shows "Working on it…", then the text is replaced in place.
+Do the first block in a **native** app (Notes/TextEdit), the second in an
+**Electron** app (Claude Desktop) — they use different replacement paths.
+
+- [ ] **Native (Notes):** Dictate a casual sentence. Hold Right ⌥, say **"make it more formal"**, release → pill shows "Working on it…", then the text is replaced in place.
 - [ ] Hold again, say **"translate to French"** → the (already formal) text becomes French — commands chain.
 - [ ] Hold Right ⌥ *before ever dictating* (fresh launch) → pill says "Dictate something first…".
 - [ ] Esc while it's listening → "Cancelled".
+- [ ] **Electron (Claude Desktop) — the keyboard fallback:** on a **throwaway message**, dictate a sentence, then hold Right ⌥ and say **"make it more formal"**. Expect: the old text gets selected and replaced in place (a brief flurry as it selects, then the new text). Verify **no leftover duplicate** of the old text remains. Do **not** click elsewhere between dictating and commanding — the fallback assumes the cursor is still at the end of what you dictated. If it selects the wrong thing, that's the caveat firing; note it.
 
 ## 5. Menu-bar actions (3.7, 5.5)
 
 - [ ] Dictate something the polish visibly reworded (ramble with "um"s, Full polish style helps). Menu bar → **Use Unpolished Version** → your exact words replace the polished text in the field.
 - [ ] Dictate again, then menu bar → **Undo Last Insertion** → the text vanishes from the field.
+- [ ] Repeat both once in **Claude Desktop** (throwaway message) to exercise the same keyboard fallback there.
 
 ## 6. Style matching (3.3)
 

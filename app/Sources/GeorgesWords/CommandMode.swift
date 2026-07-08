@@ -130,14 +130,18 @@ final class CommandModeController {
             if self.inserter.replaceLastInsertion(of: last.text, with: edited, target: last.target) {
                 self.didEdit(edited)
                 self.pill.flash("Done", seconds: 2)
+            } else if await self.inserter.replaceLastInsertionByKeyboard(previousLength: last.text.count, with: edited) {
+                // Electron/Chromium fields (Claude Desktop, VS Code…) don't
+                // accept the AX range replace — select-and-paste by keyboard.
+                self.didEdit(edited)
+                self.pill.flash("Done", seconds: 2)
             } else {
-                // The field moved on (or refuses edits) — never type into
-                // the unknown; hand the result over via the clipboard.
+                // Last resort — hand the result over via the clipboard.
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
                 pasteboard.setString(edited, forType: .string)
                 self.didEdit(edited)
-                self.pill.flashAlert("Couldn't edit in place — the new version is copied, press ⌘V")
+                self.pill.flashAlert("Couldn't edit in place — the new version is copied; select your last dictation and press ⌘V")
             }
         }
     }

@@ -1118,18 +1118,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         if inserter.replaceLastInsertion(of: last.text, with: raw, target: last.target) {
-            lastInsertion = (raw, last.target)
-            lastRawAlternative = nil
-            lastTranscript = raw
-            appStatus.lastTranscript = raw
-            HistoryStore.shared.add(raw)
-            pill.flash("Swapped in your exact words", seconds: 2)
+            finishRawSwap(raw: raw, target: last.target)
         } else {
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            pasteboard.setString(raw, forType: .string)
-            pill.flashAlert("Couldn't swap it in place — your exact words are copied, press ⌘V")
+            // Electron/Chromium fields refuse the AX replace — try the
+            // keyboard select-and-paste, then the clipboard as last resort.
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if await self.inserter.replaceLastInsertionByKeyboard(previousLength: last.text.count, with: raw) {
+                    self.finishRawSwap(raw: raw, target: last.target)
+                } else {
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(raw, forType: .string)
+                    self.pill.flashAlert("Couldn't swap it in place — your exact words are copied; select your last dictation and press ⌘V")
+                }
+            }
         }
+    }
+
+    private func finishRawSwap(raw: String, target: AXUIElement?) {
+        lastInsertion = (raw, target)
+        lastRawAlternative = nil
+        lastTranscript = raw
+        appStatus.lastTranscript = raw
+        HistoryStore.shared.add(raw)
+        pill.flash("Swapped in your exact words", seconds: 2)
     }
 
     /// 5.5: remove the most recent insertion entirely.
@@ -1139,12 +1152,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         if inserter.replaceLastInsertion(of: last.text, with: "", target: last.target) {
-            lastInsertion = nil
-            lastRawAlternative = nil
-            pill.flash("Last insertion removed", seconds: 2)
+            finishUndo()
         } else {
-            pill.flashAlert("Couldn't remove it automatically — delete it by hand")
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if await self.inserter.replaceLastInsertionByKeyboard(previousLength: last.text.count, with: "") {
+                    self.finishUndo()
+                } else {
+                    self.pill.flashAlert("Couldn't remove it automatically — delete it by hand")
+                }
+            }
         }
+    }
+
+    private func finishUndo() {
+        lastInsertion = nil
+        lastRawAlternative = nil
+        pill.flash("Last insertion removed", seconds: 2)
     }
 
     /// The ad-hoc-signing trap: after a rebuild macOS silently invalidates

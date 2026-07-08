@@ -173,11 +173,57 @@ final class TextInserter {
     }
 
     private func simulatePaste() {
+        postKey(Self.vKeyCode, flags: .maskCommand)
+    }
+
+    // MARK: - Strategy 3: keyboard select-and-replace (Electron fallback)
+
+    private static let leftArrowKeyCode: CGKeyCode = 123
+    private static let deleteKeyCode: CGKeyCode = 51
+    /// Above this, character-by-character selection is too slow to be
+    /// worth it — fall back to the clipboard message instead.
+    private static let maxKeyboardReplaceLength = 2000
+
+    /// Replace the previous insertion by keyboard when the AX path can't
+    /// (Electron/Chromium fields — Claude Desktop, VS Code, Slack…):
+    /// select the last `length` characters (Shift+←) and paste `new` over
+    /// them, or delete them when `new` is empty (Undo). Real keystrokes,
+    /// so it works anywhere ⌘V does.
+    ///
+    /// It assumes the caret still sits at the END of that text — true in
+    /// the normal flow (insert, then immediately command). We can't read
+    /// Electron fields to verify, so this is optimistic like the paste
+    /// path; the caller uses it only after the verifiable AX path fails.
+    /// Returns false only when it declines up front (no permission, or an
+    /// out-of-range length).
+    @MainActor
+    @discardableResult
+    func replaceLastInsertionByKeyboard(previousLength length: Int, with new: String) async -> Bool {
+        guard AXIsProcessTrusted(), (1...Self.maxKeyboardReplaceLength).contains(length) else { return false }
+
+        // Select the inserted run: Shift+← once per character. Paced so a
+        // busy target app doesn't drop events mid-selection.
+        for _ in 0..<length {
+            postKey(Self.leftArrowKeyCode, flags: .maskShift)
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        // Let the selection settle before replacing it.
+        try? await Task.sleep(nanoseconds: 30_000_000)
+
+        if new.isEmpty {
+            postKey(Self.deleteKeyCode, flags: [])
+        } else {
+            insertViaPasteboard(new)
+        }
+        return true
+    }
+
+    private func postKey(_ keyCode: CGKeyCode, flags: CGEventFlags) {
         let source = CGEventSource(stateID: .combinedSessionState)
-        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: Self.vKeyCode, keyDown: true)
-        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: Self.vKeyCode, keyDown: false)
-        keyDown?.flags = .maskCommand
-        keyUp?.flags = .maskCommand
+        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true)
+        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
+        keyDown?.flags = flags
+        keyUp?.flags = flags
         keyDown?.post(tap: .cghidEventTap)
         keyUp?.post(tap: .cghidEventTap)
     }
