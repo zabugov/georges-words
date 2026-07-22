@@ -32,8 +32,8 @@ The "Unreleased" section becomes the release notes of the next update
   think — release the key after a pause and the text often lands
   instantly.
 - **It learns your fixes more reliably**, including fixes to the last
-  words you said, and shows a count on the Dictionary tab when it has
-  suggestions waiting.
+  words you said, and quietly tells you when it has a suggestion
+  waiting in Dictionary.
 - **New privacy controls.** Choose how long dictation history is kept,
   turn correction-learning off entirely, or mark specific apps private
   (Settings → Privacy).
