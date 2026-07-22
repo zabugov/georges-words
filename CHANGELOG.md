@@ -6,6 +6,10 @@ The "Unreleased" section becomes the release notes of the next update
 
 ## Unreleased
 
+- **Your name comes out right even when it's misheard a new way.** The
+  dictionary now matches by sound: if a word clearly sounds like one of
+  your dictionary words ("Abagoff", "Abakov"…), it becomes that word's
+  exact spelling — no more adding a fix for every new misspelling.
 - **Phone numbers and emails come out formatted.** Say a phone number
   ("five five five one two three four") and it lands as `555-1234`;
   ten digits become `(800) 555-1212`. Say an email ("john dot smith at

@@ -41,6 +41,15 @@ struct TranscriptCleaner {
             )
         }
 
+        // Sound-alike dictionary matching (2026-07-22): the ASR invents a
+        // NEW misspelling of an unknown name every time — "Abagoff",
+        // "Abigoff", "Abakov" for "Abugov" — so exact heard -> correct
+        // lines can never keep up. Any word that clearly SOUNDS like a
+        // dictionary word becomes that word. Conservative on purpose
+        // (skeleton AND letter similarity must both agree): a wrong swap
+        // here would corrupt silently.
+        result = Self.applyPhoneticDictionary(result, dictionary: dictionary)
+
         // Phone numbers and emails: "five five five one two three four" →
         // "555-1234", "john at gmail dot com" → "john@gmail.com".
         result = SpokenContacts.normalize(result)
@@ -72,6 +81,49 @@ struct TranscriptCleaner {
         // whitespace tidy above.
         result = Self.applySpokenCommands(result)
 
+        return result
+    }
+
+    // MARK: - Sound-alike dictionary matching
+
+    /// Replace transcript words that sound like a dictionary word with
+    /// that word's exact spelling. Gates: only dictionary words of 5+
+    /// letters become targets (short words collide phonetically), the
+    /// transcript word must have 4+ letters, and BOTH the consonant
+    /// skeleton must match exactly AND the letter similarity must reach
+    /// 0.40 (real-world calibration: "Abakoff" → "Abugov" sits at 0.43;
+    /// the skeleton equality is the primary gate, the letter floor only
+    /// blocks coincidental skeleton collisions). Multi-word terms
+    /// contribute their individual words.
+    static func applyPhoneticDictionary(_ text: String, dictionary: [String]) -> String {
+        var targets: [(word: String, key: String)] = []
+        var dictionaryWords = Set<String>()
+        for term in dictionary where !term.contains("@") {
+            for part in term.split(separator: " ") {
+                let target = String(part)
+                let lower = target.lowercased()
+                guard dictionaryWords.insert(lower).inserted else { continue }
+                guard target.count >= 5, target.first?.isLetter == true else { continue }
+                targets.append((target, Phonetics.key(lower)))
+            }
+        }
+        guard !targets.isEmpty else { return text }
+        guard let wordRegex = try? NSRegularExpression(pattern: #"[A-Za-z][A-Za-z']*"#) else { return text }
+
+        var result = text
+        // Back to front so earlier ranges stay valid as we edit.
+        let matches = wordRegex.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed()
+        for match in matches {
+            let word = (result as NSString).substring(with: match.range)
+            let lower = word.lowercased()
+            guard lower.count >= 4, !dictionaryWords.contains(lower) else { continue }
+            let key = Phonetics.key(lower)
+            for target in targets where key == target.key
+                && Phonetics.similarity(lower, target.word.lowercased()) >= 0.40 {
+                result = (result as NSString).replacingCharacters(in: match.range, with: target.word)
+                break
+            }
+        }
         return result
     }
 

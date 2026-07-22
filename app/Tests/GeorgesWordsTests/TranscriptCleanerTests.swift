@@ -117,4 +117,27 @@ final class TranscriptCleanerTests: XCTestCase {
             "The new line looks great"
         )
     }
+
+    // MARK: - Sound-alike dictionary matching (2026-07-22)
+
+    func testPhoneticDictionaryFixesUnseenMisspellings() {
+        // The four real-world ASR inventions for one unknown surname —
+        // every one spelled differently, so exact mappings can't keep up.
+        for heard in ["Abagoff", "Abigoff", "Abakoff", "Abakov"] {
+            let out = cleaner.clean("hi my name is Zach \(heard)", dictionary: ["Zach Abugov"])
+            XCTAssertEqual(out, "Hi my name is Zach Abugov", "\(heard) should become Abugov")
+        }
+    }
+
+    func testPhoneticDictionaryLeavesOrdinaryWordsAlone() {
+        let out = cleaner.clean("above the garage we keep a kayak and a backup bag", dictionary: ["Zach Abugov"])
+        XCTAssertFalse(out.contains("Abugov"), "no ordinary word should turn into a name: \(out)")
+    }
+
+    func testPhoneticDictionarySkipsShortTermsAndEmails() {
+        // "Zach" (4 letters) is below the 5-letter target floor, and email
+        // terms never become phonetic targets.
+        let out = cleaner.clean("shack sack jack", dictionary: ["Zach", "zach@example.com"])
+        XCTAssertEqual(out, "Shack sack jack")
+    }
 }

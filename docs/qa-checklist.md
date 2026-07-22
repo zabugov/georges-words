@@ -23,6 +23,7 @@ Console or TextEdit; newest lines are at the bottom.
 - [ ] Quick-tap fn → hands-free mode latches; tap again to stop → text inserts.
 - [ ] Esc mid-recording cancels with a "Cancelled" flash.
 - [ ] (Added 2026-07-15) Dictate "call me at five five five one two three four" → `555-1234`; "john dot smith at gmail dot com" → `john.smith@gmail.com`; "one hundred twenty three dollars" → `123`-style digits.
+- [ ] (Added 2026-07-22) With just your full name as a plain dictionary line (no `->` mappings needed), dictate "hi my name is …" several times → the surname comes out spelled right every time, even though the recognizer mishears it differently each time. Also dictate a couple of name-free sentences → no name appears where you didn't say it.
 
 ## 2. Speculative polish (1.2)
 
