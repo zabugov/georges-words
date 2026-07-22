@@ -136,6 +136,25 @@ final class TranscriptCleanerTests: XCTestCase {
         XCTAssertFalse(out.contains("Abugov"), "no ordinary word should turn into a name: \(out)")
     }
 
+    func testPhoneticDictionaryDoesNotConvertRealNameSnaps() {
+        // When the ASR snaps an unknown name to a REAL name it knows
+        // ("Abugov" heard as "Abigail", 2026-07-22), the sound skeletons
+        // genuinely differ (…l vs …v) and the phonetic pass must NOT
+        // bridge that gap — loosening far enough to catch real-word
+        // snaps converts ordinary words too. Real-word snaps are stable
+        // spellings; the exact-mapping layer ("Abigail -> Abugov") is
+        // the intended fix, and this test pins that boundary.
+        let out = cleaner.clean("hi my name is Zach Abigail", dictionary: ["Zach Abugov"])
+        XCTAssertEqual(out, "Hi my name is Zach Abigail")
+        // With the mapping line, the exact layer handles it instead.
+        let mapped = cleaner.clean(
+            "hi my name is Zach Abigail",
+            dictionary: ["Zach Abugov"],
+            replacements: [(heard: "Abigail", correct: "Abugov")]
+        )
+        XCTAssertEqual(mapped, "Hi my name is Zach Abugov")
+    }
+
     func testPhoneticDictionarySkipsShortTermsAndEmails() {
         // "Zach" (4 letters) is below the 5-letter target floor, and email
         // terms never become phonetic targets.
