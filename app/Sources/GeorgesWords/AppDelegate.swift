@@ -240,6 +240,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.title = "Welcome to George's Words"
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
+            // Closing the wizard early is a skip, not a dead end: the
+            // hotkeys still get installed so dictation works this run,
+            // and the wizard returns on the next launch/reopen because
+            // OnboardingCompleted was never set (review P2, 2026-07-22).
+            NotificationCenter.default.addObserver(
+                forName: NSWindow.willCloseNotification, object: window, queue: .main
+            ) { [weak self] _ in
+                guard let self,
+                      !UserDefaults.standard.bool(forKey: "OnboardingCompleted")
+                else { return }
+                self.installHotkeys()
+                self.installEscMonitor()
+                self.installDisturbanceMonitor()
+            }
             onboardingWindow = window
         }
         onboardingWindow?.center()
@@ -260,8 +274,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Dock icon clicked (or app re-opened) with no visible windows.
+    /// Unfinished onboarding resumes instead of jumping to the main
+    /// window — a closed wizard would otherwise be unreachable this run.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        openMainWindow()
+        if !UserDefaults.standard.bool(forKey: "OnboardingCompleted") {
+            showOnboarding()
+        } else {
+            openMainWindow()
+        }
         return false
     }
 

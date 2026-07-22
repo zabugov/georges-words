@@ -595,11 +595,28 @@ enum FactoryReset {
 
         let appSupportRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         remove(appSupportRoot.appendingPathComponent("GeorgesWords", isDirectory: true), "App data")
-        // The speech models cache outside the app's own folder: FluidAudio
-        // keeps Parakeet under its own Application Support directory,
-        // WhisperKit under ~/Documents/huggingface. Scoped to exactly
-        // those model folders — both re-download on demand.
-        remove(appSupportRoot.appendingPathComponent("FluidAudio", isDirectory: true), "Speech model cache (Parakeet)")
+
+        // The speech models cache outside the app's own folder, in
+        // directories SHARED by any app using the same frameworks —
+        // delete only the model folders this app actually downloads
+        // (Parakeet ones for FluidAudio, the whisperkit-coreml repo for
+        // WhisperKit), never a framework's whole cache (review P2,
+        // 2026-07-22). Everything re-downloads on demand.
+        func removeParakeetModels(under root: URL, depth: Int = 0) {
+            guard depth <= 2,
+                  let entries = try? FileManager.default.contentsOfDirectory(
+                      at: root, includingPropertiesForKeys: [.isDirectoryKey]
+                  )
+            else { return }
+            for entry in entries {
+                if entry.lastPathComponent.lowercased().contains("parakeet") {
+                    remove(entry, "Speech model cache (\(entry.lastPathComponent))")
+                } else if (try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                    removeParakeetModels(under: entry, depth: depth + 1)
+                }
+            }
+        }
+        removeParakeetModels(under: appSupportRoot.appendingPathComponent("FluidAudio", isDirectory: true))
         let whisperCache = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml", isDirectory: true)
         remove(whisperCache, "Speech model cache (Whisper)")
