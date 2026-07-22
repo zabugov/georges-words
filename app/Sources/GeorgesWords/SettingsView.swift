@@ -239,7 +239,8 @@ struct SettingsView: View {
                             }
                             .buttonStyle(.borderless)
                         }
-                        TextField("e.g. use markdown headings; keep it terse", text: $entry.instruction)
+                        TextField("Type a note — e.g. use markdown headings; keep it terse", text: $entry.instruction)
+                            .textFieldStyle(.roundedBorder)
                         Text(entry.bundleID)
                             .font(.caption)
                             .foregroundStyle(.tertiary)

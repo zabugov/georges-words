@@ -748,24 +748,31 @@ struct SnippetsView: View {
     var body: some View {
         Form {
             Section("Voice snippets") {
+                // Visible borders on purpose: in a grouped form, borderless
+                // fields read as static labels and nobody realizes they can
+                // click into them (owner feedback, 2026-07-22).
                 ForEach($settings.snippets) { $snippet in
-                    HStack {
-                        TextField("Say…", text: $snippet.trigger)
+                    HStack(spacing: 8) {
+                        TextField("What you say — e.g. my email", text: $snippet.trigger)
+                            .textFieldStyle(.roundedBorder)
                         Image(systemName: "arrow.right")
                             .foregroundStyle(.secondary)
-                        TextField("Insert…", text: $snippet.expansion)
+                        TextField("What gets typed — e.g. you@example.com", text: $snippet.expansion)
+                            .textFieldStyle(.roundedBorder)
                         Button {
                             settings.snippets.removeAll { $0.id == snippet.id }
                         } label: {
                             Image(systemName: "trash")
                         }
                         .buttonStyle(.borderless)
+                        .help("Remove this snippet")
                     }
+                    .padding(.vertical, 2)
                 }
                 Button("Add Snippet") {
                     settings.snippets.append(Snippet(trigger: "", expansion: ""))
                 }
-                Text("Voice shortcuts: saying the trigger phrase inserts the expansion exactly as written — e.g. “my sign off” → your full email signature.")
+                Text("Click a box and type. Saying the left phrase while dictating inserts the right text exactly as written — the reliable way to speak your email address (“my email”), a signature (“my sign off”), or anything else that must come out letter-perfect.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
