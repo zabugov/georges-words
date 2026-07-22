@@ -156,9 +156,27 @@ final class TranscriptCleanerTests: XCTestCase {
     }
 
     func testPhoneticDictionarySkipsShortTermsAndEmails() {
-        // "Zach" (4 letters) is below the 5-letter target floor, and email
-        // terms never become phonetic targets.
+        // "Zach" (4 letters) is below the 5-letter target floor, and a
+        // full email address is never itself a sound-target (its short
+        // name-part "zach" is below the floor too).
         let out = cleaner.clean("shack sack jack", dictionary: ["Zach", "zach@example.com"])
         XCTAssertEqual(out, "Shack sack jack")
+    }
+
+    func testPhoneticDictionaryFixesEmailNamePart() {
+        // Real-world failures (2026-07-22): the spoken name-part of the
+        // user's own email got mangled a new way each attempt, and the
+        // exact mapping line couldn't keep up. The part before the @ is
+        // a sound-target; SpokenContacts then assembles the address.
+        for heard in ["zacapgov", "zacabogov"] {
+            let out = cleaner.clean(
+                "email me at \(heard) at gmail dot com",
+                dictionary: ["zachabugov@gmail.com"]
+            )
+            XCTAssertEqual(out, "Email me at zachabugov@gmail.com", "\(heard) should snap to the address")
+        }
+        // The full address must never bleed into unrelated text.
+        let untouched = cleaner.clean("email me when you land", dictionary: ["zachabugov@gmail.com"])
+        XCTAssertEqual(untouched, "Email me when you land")
     }
 }

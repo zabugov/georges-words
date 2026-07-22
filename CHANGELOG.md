@@ -9,7 +9,9 @@ The "Unreleased" section becomes the release notes of the next update
 - **Your name comes out right even when it's misheard a new way.** The
   dictionary now matches by sound: if a word clearly sounds like one of
   your dictionary words ("Abagoff", "Abakov"…), it becomes that word's
-  exact spelling — no more adding a fix for every new misspelling.
+  exact spelling — no more adding a fix for every new misspelling. The
+  name-part of an email address in your dictionary gets the same
+  treatment, so spoken addresses assemble correctly too.
 - **Releasing the key mid-word no longer garbles the last word.** If
   you let go while still speaking, the app keeps listening for a brief
   moment so the recognizer hears the whole word; releasing after a

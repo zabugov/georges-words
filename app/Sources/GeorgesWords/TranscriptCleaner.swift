@@ -100,13 +100,27 @@ struct TranscriptCleaner {
     static func applyPhoneticDictionary(_ text: String, dictionary: [String]) -> String {
         var targets: [(word: String, key: String)] = []
         var dictionaryWords = Set<String>()
-        for term in dictionary where !term.contains("@") {
-            for part in term.split(separator: " ") {
-                let target = String(part)
-                let lower = target.lowercased()
-                guard dictionaryWords.insert(lower).inserted else { continue }
-                guard target.count >= 5, target.first?.isLetter == true else { continue }
-                targets.append((target, Phonetics.key(lower)))
+        func addTarget(_ target: String) {
+            let lower = target.lowercased()
+            guard dictionaryWords.insert(lower).inserted else { return }
+            guard target.count >= 5, target.first?.isLetter == true else { return }
+            targets.append((target, Phonetics.key(lower)))
+        }
+        for term in dictionary {
+            if let atIndex = term.firstIndex(of: "@") {
+                // Email terms: the full address is never a sound-target,
+                // but the name-part before the @ is exactly what people
+                // dictate ("zachabugov at gmail dot com") and gets
+                // mangled like any unknown name. Its letter-fragments
+                // become targets so the spelling snaps right before
+                // SpokenContacts assembles the address (2026-07-22).
+                for fragment in term[..<atIndex].split(whereSeparator: { !$0.isLetter }) {
+                    addTarget(String(fragment))
+                }
+            } else {
+                for part in term.split(separator: " ") {
+                    addTarget(String(part))
+                }
             }
         }
         guard !targets.isEmpty else { return text }
