@@ -1,6 +1,12 @@
 # ADR 0011: Personal style matching from writing samples
 
-**Date:** 2026-07-07 · **Status:** accepted · **Backlog:** 3.3
+**Date:** 2026-07-07 · **Status:** parked (feature removed 2026-07-22) · **Backlog:** 3.3
+
+> **2026-07-22:** Owner decision during QA — style matching and the
+> per-app style notes it rides alongside are advanced features to
+> revisit later; both were removed from the app before ever shipping
+> in a release. This ADR stays as the design record for the re-add
+> (see FUTURE_IMPROVEMENTS 3.2/3.3 for the restore pointers).
 
 ## Context
 

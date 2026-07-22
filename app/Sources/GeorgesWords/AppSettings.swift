@@ -46,15 +46,6 @@ enum PolishStrength: String, CaseIterable, Identifiable {
     }
 }
 
-/// A user style note attached to one app: "in Obsidian, use markdown
-/// headings". Matched against the frontmost app's bundle identifier.
-struct AppInstruction: Codable, Identifiable, Equatable {
-    var id = UUID()
-    var appName: String
-    var bundleID: String
-    var instruction: String
-}
-
 /// An app the user marked private (backlog 8.1): dictations into it are
 /// never kept in history and its fields are never re-read for
 /// correction learning. Dictation itself still works normally.
@@ -140,24 +131,11 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(correctionLearningEnabled, forKey: "CorrectionLearningEnabled") }
     }
 
-    /// Personal style samples by tone profile (backlog 3.3): the user's
-    /// own writing, pasted in Settings, that full polish should imitate.
-    /// Keyed by ToneProfile rawValue; empty strings mean "no sample".
-    @Published var styleSamples: [String: String] {
-        didSet {
-            if let data = try? JSONEncoder().encode(styleSamples) {
-                defaults.set(data, forKey: "StyleSamples")
-            }
-        }
-    }
-
-    /// The sample the polish prompt should imitate for this tone, trimmed
-    /// and bounded — long pastes would slow every polish call.
-    func styleSample(for tone: ToneProfile) -> String? {
-        let sample = (styleSamples[tone.rawValue] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !sample.isEmpty else { return nil }
-        return String(sample.prefix(700))
-    }
+    // Personal style matching (3.3) and per-app style notes (3.2) were
+    // removed 2026-07-22 (owner decision: advanced features, revisit
+    // later — see FUTURE_IMPROVEMENTS). Any saved data stays parked in
+    // UserDefaults under "StyleSamples" / "AppInstructions" so a future
+    // re-add finds it intact.
 
     /// Second hotkey: hold it and say how to change the last dictation
     /// (command mode, backlog 4.4). On by default (Right ⌥); nil = the
@@ -264,32 +242,6 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    /// Per-app style notes, applied on top of the built-in tone profile
-    /// in full-rewrite polish (backlog 3.2).
-    @Published var appInstructions: [AppInstruction] {
-        didSet {
-            if let data = try? JSONEncoder().encode(appInstructions) {
-                defaults.set(data, forKey: "AppInstructions")
-            }
-        }
-    }
-
-    /// The style note matching a frontmost-app bundle ID, if any.
-    func appInstruction(for bundleID: String) -> String? {
-        Self.matchInstruction(appInstructions, bundleID: bundleID)
-    }
-
-    static func matchInstruction(_ instructions: [AppInstruction], bundleID: String) -> String? {
-        guard !bundleID.isEmpty else { return nil }
-        for entry in instructions {
-            let key = entry.bundleID.trimmingCharacters(in: .whitespaces).lowercased()
-            let note = entry.instruction.trimmingCharacters(in: .whitespaces)
-            guard !key.isEmpty, !note.isEmpty else { continue }
-            if bundleID.lowercased().contains(key) { return note }
-        }
-        return nil
-    }
-
     static let modelOptions: [(name: String, label: String)] = [
         ("base.en", "base.en — fastest, rough accuracy (~150 MB)"),
         ("small.en", "small.en — good balance (default, ~500 MB)"),
@@ -318,12 +270,6 @@ final class AppSettings: ObservableObject {
             // before command mode existed — gets Right Option.
             commandHotkey = .rightOption
         }
-        if let data = defaults.data(forKey: "StyleSamples"),
-           let saved = try? JSONDecoder().decode([String: String].self, from: data) {
-            styleSamples = saved
-        } else {
-            styleSamples = [:]
-        }
         historyRetention = HistoryRetention(rawValue: defaults.string(forKey: "HistoryRetention") ?? "") ?? .standard
         correctionLearningEnabled = defaults.object(forKey: "CorrectionLearningEnabled") as? Bool ?? true
         if let data = defaults.data(forKey: "PrivateApps"),
@@ -346,12 +292,6 @@ final class AppSettings: ObservableObject {
             snippets = saved
         } else {
             snippets = []
-        }
-        if let data = defaults.data(forKey: "AppInstructions"),
-           let saved = try? JSONDecoder().decode([AppInstruction].self, from: data) {
-            appInstructions = saved
-        } else {
-            appInstructions = []
         }
     }
 

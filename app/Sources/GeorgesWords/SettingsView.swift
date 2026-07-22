@@ -5,8 +5,6 @@ struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @State private var ollamaRunning: Bool?
     @State private var installedModels: [String]?
-    /// Which tone profile's writing sample is being edited (3.3).
-    @State private var styleTone: ToneProfile = .casual
     /// Available input devices for the microphone picker (6.5).
     @State private var inputDevices: [AudioInputDevices.Device] = []
     /// Outcome line after an import attempt (7.8).
@@ -16,22 +14,6 @@ struct SettingsView: View {
         let name: String
         let bundleID: String
         var id: String { bundleID }
-    }
-
-    /// Regular apps currently running, minus ones that already have a note.
-    private var runningApps: [RunningApp] {
-        var seen = Set<String>()
-        return NSWorkspace.shared.runningApplications
-            .filter { $0.activationPolicy == .regular }
-            .compactMap { app -> RunningApp? in
-                guard let id = app.bundleIdentifier?.lowercased(), !id.isEmpty,
-                      let name = app.localizedName
-                else { return nil }
-                guard seen.insert(id).inserted else { return nil }
-                guard !settings.appInstructions.contains(where: { $0.bundleID == id }) else { return nil }
-                return RunningApp(name: name, bundleID: id)
-            }
-            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     var body: some View {
@@ -169,24 +151,6 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Your writing style") {
-                Picker("Writing for", selection: $styleTone) {
-                    ForEach(ToneProfile.allCases, id: \.rawValue) { tone in
-                        Text(tone.displayName).tag(tone)
-                    }
-                }
-                TextEditor(text: Binding(
-                    get: { settings.styleSamples[styleTone.rawValue] ?? "" },
-                    set: { settings.styleSamples[styleTone.rawValue] = $0 }
-                ))
-                .font(.body)
-                .frame(minHeight: 90)
-                .disabled(!settings.llmEnabled)
-                Text("Paste a short sample of how YOU write in this kind of app — a real chat message, a real email. Full polish will match its voice instead of a generic style. Stays on this Mac; leave empty to skip. Applies with the Full polish style only.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
             Section("Privacy") {
                 Picker("Keep dictation history", selection: $settings.historyRetention) {
                     ForEach(HistoryRetention.allCases) { retention in
@@ -225,42 +189,6 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Per-app style notes") {
-                ForEach($settings.appInstructions) { $entry in
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(entry.appName.isEmpty ? entry.bundleID : entry.appName)
-                                .fontWeight(.medium)
-                            Spacer()
-                            Button {
-                                settings.appInstructions.removeAll { $0.id == entry.id }
-                            } label: {
-                                Image(systemName: "trash")
-                            }
-                            .buttonStyle(.borderless)
-                        }
-                        TextField("Type a note — e.g. use markdown headings; keep it terse", text: $entry.instruction)
-                            .textFieldStyle(.roundedBorder)
-                        Text(entry.bundleID)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(.vertical, 2)
-                }
-                Menu("Add App…") {
-                    ForEach(runningApps) { app in
-                        Button(app.name) {
-                            settings.appInstructions.append(
-                                AppInstruction(appName: app.name, bundleID: app.bundleID, instruction: "")
-                            )
-                        }
-                    }
-                }
-                Text("Your own style notes for specific apps — “use markdown headings”, “sign off with -Z”. Applied on top of the built-in tone when the polish style is “Rewrite for clarity”. The menu lists apps that are currently running.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
             Section {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
             }
@@ -275,7 +203,7 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                Text("One file with your settings, dictionary, snippets, per-app notes, writing samples, and private-app list — for moving to a new Mac or keeping a backup. History and learned suggestions stay on this Mac. Nothing is uploaded anywhere.")
+                Text("One file with your settings, dictionary, snippets, and private-app list — for moving to a new Mac or keeping a backup. History and learned suggestions stay on this Mac. Nothing is uploaded anywhere.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -314,8 +242,7 @@ struct SettingsView: View {
         }
     }
 
-    /// Running apps not yet marked private (8.1) — same source as the
-    /// per-app notes menu.
+    /// Running apps not yet marked private (8.1).
     private var privateAppCandidates: [RunningApp] {
         var seen = Set<String>()
         return NSWorkspace.shared.runningApplications

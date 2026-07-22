@@ -59,7 +59,6 @@ enum DiagnosticReport {
         lines.append("Dictionary entries: \(settings.dictionaryTerms.count)")
         lines.append("Correction suggestions waiting: \(CorrectionStore.shared.suggestions.count)")
         lines.append("Snippets: \(settings.snippets.count)")
-        lines.append("Per-app notes: \(settings.appInstructions.count)")
         lines.append("History entries: \(HistoryStore.shared.entries.count)")
         lines.append("History retention: \(settings.historyRetention.rawValue)")
         lines.append("Correction learning: \(settings.correctionLearningEnabled)")

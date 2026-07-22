@@ -57,10 +57,12 @@ Do the first block in a **native** app (Notes/TextEdit), the second in an
 - [ ] Dictate again, then menu bar → **Undo Last Insertion** → the text vanishes from the field.
 - [ ] Repeat both once in **Claude Desktop** (throwaway message) to exercise the same keyboard fallback there.
 
-## 6. Style matching (3.3)
+## 6. Style matching (3.3) — REMOVED 2026-07-22, skip
 
-- [ ] Settings → Your writing style → "Casual (chat apps)" → paste a real chat message of yours.
-- [ ] Set polish style to **Rewrite for clarity**, dictate into a chat app (or set Neutral's sample and use Notes) → the output should lean toward your sample's tone (greeting habits, formality). Judgment call — "does this sound more like me?"
+Owner decision mid-QA: style matching and per-app style notes are
+advanced features for later — both were removed from the app and parked
+in `FUTURE_IMPROVEMENTS.md` (3.2/3.3). Nothing to test here; see the
+§13 bullet that confirms the Settings sections are gone.
 
 ## 7. Privacy controls (8.1, 8.2, 8.3)
 
@@ -134,9 +136,8 @@ the `zacov at gmail -> …` mapping can be deleted.
       `zachabugov@gmail.com` assembled correctly.
 - [ ] **Email snippet:** add snippet "my email" → your address; say
       "email me at my email" → the address, letter-perfect.
-- [ ] **Visible fields:** Snippets tab and Settings → Per-app style
-      notes now show bordered, obviously-clickable text boxes with
-      example placeholders.
+- [ ] **Visible fields:** the Snippets tab now shows bordered,
+      obviously-clickable text boxes with example placeholders.
 - [ ] **Spoken decimals:** "that costs 126453 point 3 dollars" →
       `$126453.3` (not "point $3"); "growth was 12 point 5 percent" →
       `12.5%`; "I want to make a point 3 times" stays plain words.
@@ -163,6 +164,11 @@ the `zacov at gmail -> …` mapping can be deleted.
       new version lands in its place. No copy prepended at the start
       (the old selection method broke in Chromium; it now deletes with
       plain keystrokes instead).
+- [ ] **Removed features are gone:** Settings no longer shows a
+      "Your writing style" or "Per-app style notes" section (both
+      parked in FUTURE_IMPROVEMENTS as later features), and everything
+      else in Settings still renders and saves normally. Export
+      Settings once → the file saves without error.
 
 ---
 

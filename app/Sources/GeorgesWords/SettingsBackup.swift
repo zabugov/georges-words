@@ -2,10 +2,12 @@ import AppKit
 import UniformTypeIdentifiers
 
 /// One-file export/import of the user's configuration (backlog 7.8):
-/// settings, dictionary, snippets, per-app notes, writing samples, and
-/// the private-app list. Deliberately excluded: history and the
-/// learned-suggestion queue (observations of this Mac, not settings)
-/// and launch-at-login (a per-machine system registration).
+/// settings, dictionary, snippets, and the private-app list.
+/// Deliberately excluded: history and the learned-suggestion queue
+/// (observations of this Mac, not settings) and launch-at-login (a
+/// per-machine system registration). Older exports may carry
+/// appInstructions/styleSamples keys from removed features — the
+/// decoder ignores unknown keys, so those files still import.
 struct SettingsBackup: Codable {
 
     var version = 1
@@ -20,8 +22,6 @@ struct SettingsBackup: Codable {
     var previewEnabled: Bool
     var soundsEnabled: Bool
     var snippets: [Snippet]
-    var appInstructions: [AppInstruction]
-    var styleSamples: [String: String]
     var privateApps: [PrivateApp]
     var historyRetention: String
     var correctionLearningEnabled: Bool
@@ -41,8 +41,6 @@ struct SettingsBackup: Codable {
             previewEnabled: settings.previewEnabled,
             soundsEnabled: settings.soundsEnabled,
             snippets: settings.snippets,
-            appInstructions: settings.appInstructions,
-            styleSamples: settings.styleSamples,
             privateApps: settings.privateApps,
             historyRetention: settings.historyRetention.rawValue,
             correctionLearningEnabled: settings.correctionLearningEnabled,
@@ -67,8 +65,6 @@ struct SettingsBackup: Codable {
         settings.previewEnabled = previewEnabled
         settings.soundsEnabled = soundsEnabled
         settings.snippets = snippets
-        settings.appInstructions = appInstructions
-        settings.styleSamples = styleSamples
         settings.privateApps = privateApps
         if let value = HistoryRetention(rawValue: historyRetention) { settings.historyRetention = value }
         settings.correctionLearningEnabled = correctionLearningEnabled

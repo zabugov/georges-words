@@ -29,9 +29,6 @@ The "Unreleased" section becomes the release notes of the next update
   actually", "translate to French". On by default; pick a different key
   or turn it off in Settings → Hotkeys. Works in your regular apps
   including Electron ones like Claude Desktop and VS Code.
-- **Polish can match your writing.** Paste a sample of how you write in
-  Settings → Your writing style, and full polish imitates your voice
-  instead of a generic one.
 - **Faster results when you pause.** The app now polishes while you
   think — release the key after a pause and the text often lands
   instantly.
@@ -47,7 +44,7 @@ The "Unreleased" section becomes the release notes of the next update
   AI reworded something (basic cleanup stays); "Undo Last Insertion"
   removes what was just typed — and both now refuse, rather than
   guess, if you've edited the text since.
-- **Settings backup.** Export everything (dictionary, snippets, styles,
+- **Settings backup.** Export everything (dictionary, snippets,
   settings) to one file and import it on a new Mac.
 - **Troubleshooting:** a "Test a Text Field…" button tells you how
   dictation will insert into any app, and the installer's Applications
