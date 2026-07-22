@@ -218,7 +218,13 @@ final class TextInserter {
         return true
     }
 
+    /// When this inserter last posted a synthetic keystroke — the
+    /// disturbance monitor uses it to tell our own echoes apart from
+    /// real user input.
+    private(set) var lastSyntheticKeyAt = Date.distantPast
+
     private func postKey(_ keyCode: CGKeyCode, flags: CGEventFlags) {
+        lastSyntheticKeyAt = Date()
         let source = CGEventSource(stateID: .combinedSessionState)
         let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true)
         let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)

@@ -43,9 +43,10 @@ The "Unreleased" section becomes the release notes of the next update
   (Settings → Privacy).
 - **Pick your microphone** (Settings → Microphone) — and if a recording
   hears only silence, the app now says so instead of shrugging.
-- **Menu bar:** "Use Unpolished Version" restores your exact words if
-  polish reworded something; "Undo Last Insertion" removes what was
-  just typed.
+- **Menu bar:** "Undo AI Rewording" restores your own wording if the
+  AI reworded something (basic cleanup stays); "Undo Last Insertion"
+  removes what was just typed — and both now refuse, rather than
+  guess, if you've edited the text since.
 - **Settings backup.** Export everything (dictionary, snippets, styles,
   settings) to one file and import it on a new Mac.
 - **Troubleshooting:** a "Test a Text Field…" button tells you how

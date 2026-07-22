@@ -56,8 +56,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// path proved one, the exact field element it went into.
     private var lastInsertion: (text: String, target: AXUIElement?)?
     /// The pre-polish text when the LLM reworded the last insertion —
-    /// "Use Unpolished Version" (3.7) swaps it back in.
+    /// "Undo AI Rewording" (3.7) swaps it back in.
     private var lastRawAlternative: String?
+    /// True once the user typed or clicked in ANOTHER app after the last
+    /// insertion. The blind keyboard fallback (Electron apps) rests
+    /// entirely on "the caret still sits at the end of an untouched
+    /// insertion" — once this flips, destructive fallbacks refuse rather
+    /// than guess (QA finding, 2026-07-22: Undo ate surrounding text).
+    /// Privacy: the monitor records a single boolean — never which key.
+    private var lastInsertionDisturbed = false
+    private var disturbanceMonitor: Any?
     private var cancellables = Set<AnyCancellable>()
     private var previewTask: Task<Void, Never>?
 
@@ -193,6 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !needsOnboarding {
             installHotkeys()
             installEscMonitor()
+            installDisturbanceMonitor()
         }
         observeSettings()
 
@@ -223,6 +232,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 onReachedPractice: { [weak self] in
                     self?.installHotkeys()
                     self?.installEscMonitor()
+                    self?.installDisturbanceMonitor()
                 }
             )
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
@@ -244,6 +254,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // never receive events — install fresh ones now.
         installHotkeys()
         installEscMonitor()
+        installDisturbanceMonitor()
         openMainWindow()
     }
 
@@ -323,6 +334,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return true
         }
         commandMode.lastInsertion = { [weak self] in self?.lastInsertion }
+        commandMode.isLastInsertionUndisturbed = { [weak self] in
+            self.map { !$0.lastInsertionDisturbed } ?? false
+        }
         commandMode.didEdit = { [weak self] edited in
             guard let self else { return }
             // The edit becomes the new "last dictation" so commands chain
@@ -330,6 +344,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // unpolished alternative no longer corresponds to it.
             self.lastInsertion = (edited, self.lastInsertion?.target)
             self.lastRawAlternative = nil
+            self.lastInsertionDisturbed = false
             self.lastTranscript = edited
             self.appStatus.lastTranscript = edited
             HistoryStore.shared.add(edited)
@@ -429,6 +444,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // MARK: - Recording
+
+    /// GLOBAL monitor only, deliberately: it fires for events in OTHER
+    /// apps — exactly the ones that move the target field's caret. Our
+    /// own windows (menu clicks, Settings typing) never disturb the
+    /// target, and our own synthetic keystrokes are filtered out by
+    /// their timestamp. Records only that SOMETHING was pressed.
+    private func installDisturbanceMonitor() {
+        if let disturbanceMonitor { NSEvent.removeMonitor(disturbanceMonitor) }
+        disturbanceMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.keyDown, .leftMouseDown, .rightMouseDown]
+        ) { [weak self] _ in
+            guard let self else { return }
+            guard Date().timeIntervalSince(self.inserter.lastSyntheticKeyAt) > 0.5 else { return }
+            self.lastInsertionDisturbed = true
+        }
+    }
 
     private func installEscMonitor() {
         if let escMonitorGlobal { NSEvent.removeMonitor(escMonitorGlobal) }
@@ -638,6 +669,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         if outcome == .inserted {
                             self.lastInsertion = (text, self.inserter.lastInsertionTarget)
                             self.lastRawAlternative = rawAlternative
+                            self.lastInsertionDisturbed = false
                             self.scheduleCorrectionCheck(
                                 inserted: text,
                                 context: context,
@@ -1051,7 +1083,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         correctLast.target = self
         menu.addItem(correctLast)
 
-        let useRaw = NSMenuItem(title: "Use Unpolished Version", action: #selector(useRawTranscript), keyEquivalent: "")
+        let useRaw = NSMenuItem(title: "Undo AI Rewording", action: #selector(useRawTranscript), keyEquivalent: "")
         useRaw.target = self
         menu.addItem(useRaw)
 
@@ -1137,14 +1169,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// pre-polish text back into the field, in place.
     @objc private func useRawTranscript() {
         guard let last = lastInsertion, let raw = lastRawAlternative else {
-            pill.flash("The last dictation is already your exact words", seconds: 2.5)
+            pill.flash("The AI didn\u{2019}t reword the last dictation \u{2014} nothing to undo", seconds: 2.5)
             return
         }
         if inserter.replaceLastInsertion(of: last.text, with: raw, target: last.target) {
             finishRawSwap(raw: raw, target: last.target)
+        } else if lastInsertionDisturbed {
+            // The field changed since the insertion — the blind keyboard
+            // path would hit the wrong text. Hand over via clipboard.
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(raw, forType: .string)
+            pill.flashAlert("The text changed since it was inserted — your original words are copied; select the text and press ⌘V")
         } else {
             // Electron/Chromium fields refuse the AX replace — try the
-            // keyboard select-and-paste, then the clipboard as last resort.
+            // keyboard delete-and-paste, then the clipboard as last resort.
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 if await self.inserter.replaceLastInsertionByKeyboard(previousLength: last.text.count, with: raw) {
@@ -1176,6 +1215,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if inserter.replaceLastInsertion(of: last.text, with: "", target: last.target) {
             finishUndo()
+        } else if lastInsertionDisturbed {
+            pill.flashAlert("Can't undo automatically — the text changed after it was inserted. Delete it by hand.")
         } else {
             Task { @MainActor [weak self] in
                 guard let self else { return }

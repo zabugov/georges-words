@@ -53,7 +53,7 @@ Do the first block in a **native** app (Notes/TextEdit), the second in an
 
 ## 5. Menu-bar actions (3.7, 5.5)
 
-- [ ] Dictate something the polish visibly reworded (ramble with "um"s, Full polish style helps). Menu bar → **Use Unpolished Version** → your exact words replace the polished text in the field.
+- [ ] Dictate something the polish visibly reworded (ramble with "um"s, Full polish style helps). Menu bar → **Undo AI Rewording** → your own wording replaces the AI's version. NOTE: "um"s stay gone — fillers are stripped by the deterministic rules, not the AI; this action undoes only what the AI changed.
 - [ ] Dictate again, then menu bar → **Undo Last Insertion** → the text vanishes from the field.
 - [ ] Repeat both once in **Claude Desktop** (throwaway message) to exercise the same keyboard fallback there.
 
@@ -149,6 +149,14 @@ the `zacov at gmail -> …` mapping can be deleted.
       pill flashes "Noticed your fix…" and the suggestion appears in
       Dictionary. (Previously the older unedited copy hijacked the
       comparison and the fix was invisible.)
+- [ ] **Undo refuses when the field moved on:** in Claude Desktop,
+      dictate, type a few extra characters by hand, then menu →
+      Undo Last Insertion → the app refuses with "the text changed
+      after it was inserted" and nothing is deleted. Then dictate
+      fresh and undo immediately → exactly the dictation disappears.
+- [ ] **"Undo AI Rewording" (renamed from Use Unpolished Version):**
+      returns your pre-AI wording — "um"s are still stripped (that's
+      the rules layer, not the AI).
 - [ ] **Electron command mode, again:** in Claude Desktop on a
       throwaway message, dictate, then Right ⌥ → "make it more formal"
       → the old text visibly deletes character-by-character and the

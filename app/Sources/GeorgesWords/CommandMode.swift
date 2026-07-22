@@ -39,6 +39,9 @@ final class CommandModeController {
     /// The text most recently inserted, and (when known) the exact field
     /// element it went into.
     var lastInsertion: () -> (text: String, target: AXUIElement?)? = { nil }
+    /// False once the user typed/clicked in the target app after the
+    /// insertion — the blind keyboard fallback must then refuse.
+    var isLastInsertionUndisturbed: () -> Bool = { false }
     /// Called with the edited text after a successful command, so the
     /// app's "last dictation" state follows it and commands can chain
     /// ("make it formal" … "now translate it to French").
@@ -130,9 +133,12 @@ final class CommandModeController {
             if self.inserter.replaceLastInsertion(of: last.text, with: edited, target: last.target) {
                 self.didEdit(edited)
                 self.pill.flash("Done", seconds: 2)
-            } else if await self.inserter.replaceLastInsertionByKeyboard(previousLength: last.text.count, with: edited) {
+            } else if self.isLastInsertionUndisturbed(),
+                      await self.inserter.replaceLastInsertionByKeyboard(previousLength: last.text.count, with: edited) {
                 // Electron/Chromium fields (Claude Desktop, VS Code…) don't
-                // accept the AX range replace — select-and-paste by keyboard.
+                // accept the AX range replace — delete-and-paste by keyboard,
+                // but only while the caret provably hasn't moved since the
+                // insertion (the blind path must never guess).
                 self.didEdit(edited)
                 self.pill.flash("Done", seconds: 2)
             } else {
