@@ -278,7 +278,15 @@ final class AppSettings: ObservableObject {
         } else {
             privateApps = []
         }
-        inputDeviceUID = defaults.string(forKey: "InputDeviceUID")
+        // A saved ghost aggregate (selectable before 2026-07-22, and gone
+        // once its owning app quits) heals back to system default.
+        if let savedInput = defaults.string(forKey: "InputDeviceUID"),
+           !AudioInputDevices.isTransientAggregate(uid: savedInput) {
+            inputDeviceUID = savedInput
+        } else {
+            inputDeviceUID = nil
+            defaults.removeObject(forKey: "InputDeviceUID")
+        }
         dictionaryBoostEnabled = defaults.object(forKey: "DictionaryBoost") as? Bool ?? false
         launchAtLogin = SMAppService.mainApp.status == .enabled
         llmEnabled = defaults.object(forKey: "LLMEnabled") as? Bool ?? true

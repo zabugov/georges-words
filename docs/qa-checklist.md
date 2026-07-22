@@ -169,6 +169,13 @@ the `zacov at gmail -> …` mapping can be deleted.
       parked in FUTURE_IMPROVEMENTS as later features), and everything
       else in Settings still renders and saves normally. Export
       Settings once → the file saves without error.
+- [ ] **No ghost microphones:** Settings → Microphone lists only real
+      devices — no "CADefaultDeviceAggregate-…" entry (that was a
+      temporary echo-cancelling wrapper macOS creates for
+      voice-processing apps; it leaked into the picker and one was
+      selected during QA). After updating, the picker should be back
+      on **System default** (the ghost selection heals itself) —
+      leave it there and dictate once to confirm the mic still works.
 
 ---
 

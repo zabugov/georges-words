@@ -13,11 +13,21 @@ enum AudioInputDevices {
         var id: String { uid }
     }
 
+    /// System-created transient aggregates (echo-cancelling wrappers that
+    /// CoreAudio spins up for voice-processing apps and tears down when
+    /// they quit). They wrap the real default input and were never meant
+    /// to be user-facing — keep them out of the picker, and treat a saved
+    /// selection of one as "system default".
+    static func isTransientAggregate(uid: String) -> Bool {
+        uid.hasPrefix("CADefaultDeviceAggregate")
+    }
+
     /// All devices currently offering input channels.
     static func list() -> [Device] {
         allDeviceIDs().compactMap { id in
             guard hasInput(id),
                   let uid = stringProperty(id, kAudioDevicePropertyDeviceUID),
+                  !isTransientAggregate(uid: uid),
                   let name = stringProperty(id, kAudioObjectPropertyName)
             else { return nil }
             return Device(uid: uid, name: name)
