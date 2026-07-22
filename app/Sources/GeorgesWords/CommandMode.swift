@@ -130,7 +130,13 @@ final class CommandModeController {
                 return
             }
 
-            if self.inserter.replaceLastInsertion(of: last.text, with: edited, target: last.target) {
+            // Typing or clicking since the insertion makes EVERY automatic
+            // replacement unsafe — the AX path targets the last occurrence
+            // of the text (a newer duplicate would be hit), and the
+            // keyboard path assumes the caret never moved. Refuse both and
+            // hand over via clipboard (review P1+P2, 2026-07-22).
+            if self.isLastInsertionUndisturbed(),
+               self.inserter.replaceLastInsertion(of: last.text, with: edited, target: last.target) {
                 self.didEdit(edited)
                 self.pill.flash("Done", seconds: 2)
             } else if self.isLastInsertionUndisturbed(),
@@ -143,10 +149,13 @@ final class CommandModeController {
                 self.pill.flash("Done", seconds: 2)
             } else {
                 // Last resort — hand the result over via the clipboard.
+                // The field still holds the OLD text, so the app's "last
+                // insertion" state must NOT advance: recording the edited
+                // version here would let a follow-up command blindly
+                // delete text that was never inserted (review P1).
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
                 pasteboard.setString(edited, forType: .string)
-                self.didEdit(edited)
                 self.pill.flashAlert("Couldn't edit in place — the new version is copied; select your last dictation and press ⌘V")
             }
         }

@@ -63,6 +63,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// than guess (QA finding, 2026-07-22: Undo ate surrounding text).
     /// Privacy: the monitor records a single boolean — never which key.
     private var lastInsertionDisturbed = false
+    /// True when the last insertion went into a private app (8.1): later
+    /// edits of it (command mode, raw swap) must stay out of History too.
+    private var lastInsertionPrivate = false
     private var disturbanceMonitor: Any?
     private var cancellables = Set<AnyCancellable>()
     private var previewTask: Task<Void, Never>?
@@ -345,7 +348,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.lastInsertionDisturbed = false
             self.lastTranscript = edited
             self.appStatus.lastTranscript = edited
-            HistoryStore.shared.add(edited)
+            // A dictation born in a private app stays out of History
+            // through every later edit too (review P1, 2026-07-22).
+            if !self.lastInsertionPrivate {
+                HistoryStore.shared.add(edited)
+            }
         }
     }
 
@@ -668,6 +675,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                             self.lastInsertion = (text, self.inserter.lastInsertionTarget)
                             self.lastRawAlternative = rawAlternative
                             self.lastInsertionDisturbed = false
+                            self.lastInsertionPrivate = self.settings.isPrivateApp(context.bundleID)
                             self.scheduleCorrectionCheck(
                                 inserted: text,
                                 context: context,
@@ -1162,15 +1170,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             pill.flash("The AI didn\u{2019}t reword the last dictation \u{2014} nothing to undo", seconds: 2.5)
             return
         }
-        if inserter.replaceLastInsertion(of: last.text, with: raw, target: last.target) {
-            finishRawSwap(raw: raw, target: last.target)
-        } else if lastInsertionDisturbed {
-            // The field changed since the insertion — the blind keyboard
-            // path would hit the wrong text. Hand over via clipboard.
+        if lastInsertionDisturbed {
+            // The field changed since the insertion. Even the AX replace
+            // is unsafe now: it targets the LAST occurrence of the text,
+            // and typing since could have created a newer duplicate
+            // (review P2, 2026-07-22). Hand over via clipboard.
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
             pasteboard.setString(raw, forType: .string)
             pill.flashAlert("The text changed since it was inserted — your original words are copied; select the text and press ⌘V")
+        } else if inserter.replaceLastInsertion(of: last.text, with: raw, target: last.target) {
+            finishRawSwap(raw: raw, target: last.target)
         } else {
             // Electron/Chromium fields refuse the AX replace — try the
             // keyboard delete-and-paste, then the clipboard as last resort.
@@ -1193,7 +1203,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastRawAlternative = nil
         lastTranscript = raw
         appStatus.lastTranscript = raw
-        HistoryStore.shared.add(raw)
+        if !lastInsertionPrivate {
+            HistoryStore.shared.add(raw)
+        }
         pill.flash("Swapped in your exact words", seconds: 2)
     }
 
@@ -1203,10 +1215,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             pill.flash("Nothing to undo yet", seconds: 2)
             return
         }
-        if inserter.replaceLastInsertion(of: last.text, with: "", target: last.target) {
-            finishUndo()
-        } else if lastInsertionDisturbed {
+        if lastInsertionDisturbed {
+            // Refuse before even the AX replace: it targets the last
+            // OCCURRENCE, and edits since the insertion could have
+            // created a newer duplicate of the same text.
             pill.flashAlert("Can't undo automatically — the text changed after it was inserted. Delete it by hand.")
+        } else if inserter.replaceLastInsertion(of: last.text, with: "", target: last.target) {
+            finishUndo()
         } else {
             Task { @MainActor [weak self] in
                 guard let self else { return }
