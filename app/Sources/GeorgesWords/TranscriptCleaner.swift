@@ -102,6 +102,15 @@ struct TranscriptCleaner {
     ///   with at most one inserted consonant (clipped audio inserts
     ///   strays: "Abercov", "Abergoff") and letter similarity is ≥ 0.50.
     /// Multi-word terms contribute their individual words.
+    ///
+    /// The overriding guard: a word the system word list knows is NEVER
+    /// snapped. With `Lauren` in the dictionary, "learn" has the identical
+    /// consonant skeleton and 0.67 letter similarity — no threshold
+    /// separates them (review finding, 2026-07-22). Misheard names are
+    /// exactly the words that AREN'T real words ("Abakoff", "Cremoneza"),
+    /// so the guard costs nothing; a mishearing that lands ON a real word
+    /// ("Abigail") was already out of phonetic reach by design and stays
+    /// the job of an exact `heard -> Correct` mapping.
     static func applyPhoneticDictionary(_ text: String, dictionary: [String]) -> String {
         var targets: [(word: String, key: String)] = []
         var dictionaryWords = Set<String>()
@@ -138,6 +147,7 @@ struct TranscriptCleaner {
             let word = (result as NSString).substring(with: match.range)
             let lower = word.lowercased()
             guard lower.count >= 4, !dictionaryWords.contains(lower) else { continue }
+            guard !Self.systemWords.contains(lower) else { continue }
             let key = Phonetics.key(lower)
             for target in targets {
                 let letterSimilarity = Phonetics.similarity(lower, target.word.lowercased())
@@ -157,6 +167,23 @@ struct TranscriptCleaner {
         }
         return result
     }
+
+    /// The macOS word list (~235k entries), lowercased, once. Words the
+    /// language already owns are off-limits to phonetic snapping. An
+    /// unreadable list degrades to an empty set — matching then behaves
+    /// as before the guard, which is still bounded by the similarity
+    /// gates. Only ≥4-letter entries are kept (shorter can't be
+    /// candidates anyway).
+    private static let systemWords: Set<String> = {
+        guard let contents = try? String(contentsOfFile: "/usr/share/dict/words", encoding: .utf8) else {
+            return []
+        }
+        var words = Set<String>()
+        for line in contents.split(separator: "\n") where line.count >= 4 {
+            words.insert(line.lowercased())
+        }
+        return words
+    }()
 
     // MARK: - Spoken control commands (backlog 3.1)
 

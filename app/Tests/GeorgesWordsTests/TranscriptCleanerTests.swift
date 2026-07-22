@@ -154,6 +154,28 @@ final class TranscriptCleanerTests: XCTestCase {
         XCTAssertFalse(out.contains("Abugov"), "no ordinary word should turn into a name: \(out)")
     }
 
+    func testPhoneticDictionaryNeverCorruptsRealEnglishWords() {
+        // Common first names share consonant skeletons with everyday
+        // words ("Lauren"/"learn", "David"/"devoid" are identical) — no
+        // similarity threshold separates them. The system word list is
+        // the guard (review finding, 2026-07-22).
+        let cases: [(sentence: String, dictionary: [String])] = [
+            ("i want to learn something new", ["Lauren"]),
+            ("the room felt devoid of light", ["David"]),
+            ("good morning everyone", ["Marina Cremonese"]),
+            ("i am so sorry about that", ["Sarah"]),
+        ]
+        for entry in cases {
+            let out = cleaner.clean(entry.sentence, dictionary: entry.dictionary)
+            for name in entry.dictionary.flatMap({ $0.split(separator: " ") }) {
+                XCTAssertFalse(
+                    out.contains(String(name)),
+                    "\(entry.dictionary) must not replace ordinary words: \(out)"
+                )
+            }
+        }
+    }
+
     func testPhoneticDictionaryDoesNotConvertRealNameSnaps() {
         // When the ASR snaps an unknown name to a REAL name it knows
         // ("Abugov" heard as "Abigail", 2026-07-22), the sound skeletons
