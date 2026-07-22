@@ -176,19 +176,21 @@ final class TextInserter {
         postKey(Self.vKeyCode, flags: .maskCommand)
     }
 
-    // MARK: - Strategy 3: keyboard select-and-replace (Electron fallback)
+    // MARK: - Strategy 3: keyboard delete-and-paste (Electron fallback)
 
-    private static let leftArrowKeyCode: CGKeyCode = 123
     private static let deleteKeyCode: CGKeyCode = 51
-    /// Above this, character-by-character selection is too slow to be
+    /// Above this, character-by-character deletion is too slow to be
     /// worth it — fall back to the clipboard message instead.
     private static let maxKeyboardReplaceLength = 2000
 
     /// Replace the previous insertion by keyboard when the AX path can't
     /// (Electron/Chromium fields — Claude Desktop, VS Code, Slack…):
-    /// select the last `length` characters (Shift+←) and paste `new` over
-    /// them, or delete them when `new` is empty (Undo). Real keystrokes,
-    /// so it works anywhere ⌘V does.
+    /// press Delete once per character of the old text, then paste the
+    /// replacement. Plain, unmodified keystrokes on purpose: Chromium
+    /// drops the shift flag on synthetic Shift+← events, so the earlier
+    /// select-then-paste variant walked the caret to the START instead
+    /// of selecting, and pasted the new text in front of the old
+    /// (on-device, 2026-07-22).
     ///
     /// It assumes the caret still sits at the END of that text — true in
     /// the normal flow (insert, then immediately command). We can't read
@@ -201,18 +203,16 @@ final class TextInserter {
     func replaceLastInsertionByKeyboard(previousLength length: Int, with new: String) async -> Bool {
         guard AXIsProcessTrusted(), (1...Self.maxKeyboardReplaceLength).contains(length) else { return false }
 
-        // Select the inserted run: Shift+← once per character. Paced so a
-        // busy target app doesn't drop events mid-selection.
-        for _ in 0..<length {
-            postKey(Self.leftArrowKeyCode, flags: .maskShift)
-            try? await Task.sleep(nanoseconds: 1_000_000)
-        }
-        // Let the selection settle before replacing it.
-        try? await Task.sleep(nanoseconds: 30_000_000)
-
-        if new.isEmpty {
+        for index in 0..<length {
             postKey(Self.deleteKeyCode, flags: [])
-        } else {
+            // Paced so a busy renderer doesn't drop keystrokes, with a
+            // longer breather every burst for long deletions.
+            try? await Task.sleep(nanoseconds: (index + 1) % 16 == 0 ? 12_000_000 : 1_500_000)
+        }
+        // Let the field settle before the replacement arrives.
+        try? await Task.sleep(nanoseconds: 40_000_000)
+
+        if !new.isEmpty {
             insertViaPasteboard(new)
         }
         return true

@@ -67,6 +67,14 @@ enum CorrectionDetector {
     /// Compare the inserted transcript against the field's current text and
     /// return plausible mishearing fixes. Returns [] when the field no
     /// longer resembles what was inserted (user rewrote or moved on).
+    ///
+    /// The comparison anchors to the LATEST place the inserted text
+    /// plausibly starts: a field that already holds an older, unedited
+    /// copy of the same sentence (repeated dictations!) would otherwise
+    /// outscore the copy the user just fixed — the diff bound to the old
+    /// copy and the fix became invisible (QA finding, 2026-07-22). Only
+    /// when no anchored window resembles the insertion is the whole
+    /// field diffed as before.
     static func substitutions(from inserted: String, to fieldText: String) -> [Substitution] {
         var a = tokenize(inserted)
         var b = tokenize(fieldText)
@@ -77,6 +85,30 @@ enum CorrectionDetector {
         if a.count > 400 { a = Array(a.prefix(400)) }
         if b.count > 2000 { b = Array(b.suffix(2000)) }
 
+        // Room for the (possibly edited) copy plus a little typing after
+        // it — but never enough to swallow a whole earlier copy as well.
+        let windowLength = a.count + max(8, a.count / 2)
+        // Anchor on the first inserted word; if the user edited that very
+        // word, the second word serves. Latest occurrences first.
+        for anchorOffset in 0..<min(2, a.count) {
+            let anchor = a[anchorOffset].normalized
+            var positions: [Int] = []
+            for (index, token) in b.enumerated() where token.normalized == anchor {
+                positions.append(index)
+            }
+            for position in positions.suffix(3).reversed() {
+                let start = max(0, position - anchorOffset)
+                let window = Array(b[start..<min(b.count, start + windowLength)])
+                if let found = align(a, window, anchored: true) { return found }
+            }
+        }
+        return align(a, b, anchored: false) ?? []
+    }
+
+    /// One aligned comparison. Returns nil when this window doesn't
+    /// resemble the insertion — the caller then tries the next anchor,
+    /// or the whole field as the last resort.
+    private static func align(_ a: [Token], _ b: [Token], anchored: Bool) -> [Substitution]? {
         let n = a.count
         let m = b.count
         var dp = Array(repeating: Array(repeating: 0, count: m + 1), count: n + 1)
@@ -96,7 +128,15 @@ enum CorrectionDetector {
         // higher similarity bar — instead of learning nothing (backlog 2.5).
         let survivalOK = dp[0][0] * 10 >= n * 6
         let strict = !survivalOK
-        guard survivalOK || n <= 12 else { return [] }
+        if anchored {
+            // An anchored window must genuinely resemble the insertion;
+            // the strict small-dictation rescue belongs to the whole-field
+            // fallback only, or a garbage window at some stray anchor
+            // would end the anchor search early.
+            guard survivalOK else { return nil }
+        } else {
+            guard survivalOK || n <= 12 else { return nil }
+        }
 
         // Walk the alignment; between matches, a run of deleted words next
         // to a run of inserted words is a candidate substitution.

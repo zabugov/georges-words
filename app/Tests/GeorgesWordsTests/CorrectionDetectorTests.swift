@@ -85,6 +85,18 @@ final class CorrectionDetectorTests: XCTestCase {
         XCTAssertEqual(subs, [CorrectionDetector.Substitution(heard: "coober netties", corrected: "Kubernetes")])
     }
 
+    func testDetectsFixWhenAnOlderCopyOfTheSentenceExists() {
+        // QA finding (2026-07-22): the field already held an identical,
+        // unedited copy from a previous attempt; the user fixed only the
+        // NEWEST copy's last word. The old copy matches the insertion
+        // perfectly and used to hijack the alignment, hiding the fix.
+        let subs = CorrectionDetector.substitutions(
+            from: "the quarterly report is ready",
+            to: "some earlier notes here\nthe quarterly report is ready\nthe quarterly report is reddy"
+        )
+        XCTAssertEqual(subs, [CorrectionDetector.Substitution(heard: "ready", corrected: "reddy")])
+    }
+
     func testDetectsFixOfFinalWords() {
         // Corrections at the very end of the dictation used to be
         // invisible: the walk consumed the deleted run but never paired

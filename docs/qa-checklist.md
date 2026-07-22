@@ -144,6 +144,17 @@ the `zacov at gmail -> …` mapping can be deleted.
       polish ("Rewrite for clarity") temporarily on → your email never
       appears uninvited (it's excluded from the AI's dictionary now).
       Switch back to "Keep my words" after.
+- [ ] **Correction learning with repeats:** in one note, dictate the
+      same sentence twice, then fix the last word of the NEWEST copy →
+      pill flashes "Noticed your fix…" and the suggestion appears in
+      Dictionary. (Previously the older unedited copy hijacked the
+      comparison and the fix was invisible.)
+- [ ] **Electron command mode, again:** in Claude Desktop on a
+      throwaway message, dictate, then Right ⌥ → "make it more formal"
+      → the old text visibly deletes character-by-character and the
+      new version lands in its place. No copy prepended at the start
+      (the old selection method broke in Chromium; it now deletes with
+      plain keystrokes instead).
 
 ---
 
