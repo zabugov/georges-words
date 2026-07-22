@@ -181,6 +181,34 @@ the `zacov at gmail -> …` mapping can be deleted.
       once with your name → still comes out right (that's the
       phonetic dictionary matching, which is unrelated and stays).
 
+The bullets below came from the written code review (2026-07-22,
+17 findings — all fixed the same day):
+
+- [ ] **Ordinary words survive name matching:** with `Lauren` and
+      `Marina Cremonese` in the dictionary, dictate "I want to learn
+      something" and "good morning everyone" → "learn" and "morning"
+      stay themselves. Your surname still snaps right (real English
+      words are now off-limits to sound-matching; invented
+      mishearings are not).
+- [ ] **"look at example dot com" stays prose** — no email address
+      is assembled without a real cue ("my address is bob at example
+      dot com" still converts).
+- [ ] **Private apps stay private through edits:** mark Notes
+      private, dictate, then Right ⌥ → "make it more formal" → the
+      edit works but History still shows nothing from Notes. Unmark.
+- [ ] **Failed command edits don't corrupt the next one:** if a
+      command ever says "Couldn't edit in place — copied", the app no
+      longer pretends the edit landed; a follow-up command still
+      targets the text actually in the field.
+- [ ] **Learning off means off, immediately:** dictate, then within
+      ~5 s toggle "Learn corrections from your edits" off → debug.log
+      shows "learning disabled since scheduling — stopped" instead of
+      later Correction check reads. Toggle back on.
+- [ ] **System default mic reattaches:** Settings → Microphone →
+      pick the MacBook mic, dictate; switch back to System default,
+      dictate again → both work (the second one actively re-selects
+      today's default device).
+
 ---
 
 ## Release-day checks (after the migration release, not before)
