@@ -121,9 +121,11 @@ final class TranscriptCleanerTests: XCTestCase {
     // MARK: - Sound-alike dictionary matching (2026-07-22)
 
     func testPhoneticDictionaryFixesUnseenMisspellings() {
-        // The four real-world ASR inventions for one unknown surname —
+        // The six real-world ASR inventions for one unknown surname —
         // every one spelled differently, so exact mappings can't keep up.
-        for heard in ["Abagoff", "Abigoff", "Abakoff", "Abakov"] {
+        // The last two carry a stray "r" from clipped audio and exercise
+        // the near-skeleton tier.
+        for heard in ["Abagoff", "Abigoff", "Abakoff", "Abakov", "Abercov", "Abergoff"] {
             let out = cleaner.clean("hi my name is Zach \(heard)", dictionary: ["Zach Abugov"])
             XCTAssertEqual(out, "Hi my name is Zach Abugov", "\(heard) should become Abugov")
         }

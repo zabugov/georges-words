@@ -86,6 +86,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pressStartedAt: Date?
     private var toggleLatched = false
     private var ignoreNextRelease = false
+    /// True while the end-of-speech grace beat (finishRecording) has been
+    /// granted for the current dictation — it is granted at most once.
+    private var finishGraceApplied = false
     private var escMonitorGlobal: Any?
     private var escMonitorLocal: Any?
 
@@ -455,6 +458,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = recorder.stop()
         toggleLatched = false
         ignoreNextRelease = false
+        finishGraceApplied = false
         recordingContext = nil
         state = .idle
         pill.flash(message, seconds: 1.5)
@@ -566,6 +570,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func finishRecording() {
         guard case .recording = state else { return }
+        // Released while — or a beat after — still speaking? Then the last
+        // word's audio is clipped, and rare words decode wrong from a
+        // clipped waveform ("Abugov" came out "Abercov"; on-device finding,
+        // 2026-07-22). Keep the mic open one grace beat so the decoder
+        // gets the whole word. Pause-then-release stays instant: the tail
+        // is already silent. One grace per dictation, so continuing to
+        // talk past the release can't stall the finish.
+        if !finishGraceApplied, !AudioTrim.isNearSilence(recorder.snapshotTail(seconds: 0.25)) {
+            finishGraceApplied = true
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                guard let self else { return }
+                // Esc or sleep may have cancelled the recording meanwhile.
+                guard case .recording = self.state else { return }
+                self.finishRecording()
+            }
+            return
+        }
+        finishGraceApplied = false
         previewTask?.cancel()
         // Stop hunting for pauses; a speculation already in flight keeps
         // running — the final pass may be about to collect its result.

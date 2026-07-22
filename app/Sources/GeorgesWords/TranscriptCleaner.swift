@@ -87,14 +87,16 @@ struct TranscriptCleaner {
     // MARK: - Sound-alike dictionary matching
 
     /// Replace transcript words that sound like a dictionary word with
-    /// that word's exact spelling. Gates: only dictionary words of 5+
+    /// that word's exact spelling. Gates (calibrated on the real-world
+    /// "Abugov" variant set, 2026-07-22): only dictionary words of 5+
     /// letters become targets (short words collide phonetically), the
-    /// transcript word must have 4+ letters, and BOTH the consonant
-    /// skeleton must match exactly AND the letter similarity must reach
-    /// 0.40 (real-world calibration: "Abakoff" → "Abugov" sits at 0.43;
-    /// the skeleton equality is the primary gate, the letter floor only
-    /// blocks coincidental skeleton collisions). Multi-word terms
-    /// contribute their individual words.
+    /// transcript word must have 4+ letters, and then EITHER
+    /// - the consonant skeletons match exactly and letter similarity is
+    ///   ≥ 0.40 ("Abakoff" sits at 0.43), OR
+    /// - the skeletons nearly match (≥ 0.75 — clipped audio inserts
+    ///   stray consonants: "Abercov", "Abergoff") and the letter
+    ///   similarity is ≥ 0.50 to compensate.
+    /// Multi-word terms contribute their individual words.
     static func applyPhoneticDictionary(_ text: String, dictionary: [String]) -> String {
         var targets: [(word: String, key: String)] = []
         var dictionaryWords = Set<String>()
@@ -118,8 +120,11 @@ struct TranscriptCleaner {
             let lower = word.lowercased()
             guard lower.count >= 4, !dictionaryWords.contains(lower) else { continue }
             let key = Phonetics.key(lower)
-            for target in targets where key == target.key
-                && Phonetics.similarity(lower, target.word.lowercased()) >= 0.40 {
+            for target in targets {
+                let letterSimilarity = Phonetics.similarity(lower, target.word.lowercased())
+                let matches = (key == target.key && letterSimilarity >= 0.40)
+                    || (Phonetics.similarity(key, target.key) >= 0.75 && letterSimilarity >= 0.50)
+                guard matches else { continue }
                 result = (result as NSString).replacingCharacters(in: match.range, with: target.word)
                 break
             }
