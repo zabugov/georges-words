@@ -176,6 +176,9 @@ the `zacov at gmail -> …` mapping can be deleted.
       selected during QA). After updating, the picker should be back
       on **System default** (the ghost selection heals itself) —
       leave it there and dictate once to confirm the mic still works.
+- [ ] **Silent mic shows no phantom preview:** mute the mic, hold fn
+      ~3 s, release → the pill preview stays empty the whole time (no
+      hallucinated "Thank you.") and the silence alert still appears.
 
 ---
 

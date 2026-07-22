@@ -907,6 +907,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // flowing to the very end instead of freezing at 30 s
                 // (Zach's report, 2026-07-06).
                 let snapshot = self.recorder.snapshotTail(seconds: 15)
+                // A muted/silent mic must show nothing: speech models
+                // hallucinate on empty audio ("Thank you." — QA finding,
+                // 2026-07-22), and the final pass would refuse this same
+                // recording with the silence alert. Don't transcribe it.
+                guard !AudioTrim.isNearSilence(snapshot) else { continue }
 
                 let text = await self.transcriber.transcribe(snapshot)
                 guard !Task.isCancelled, !text.isEmpty else { continue }
