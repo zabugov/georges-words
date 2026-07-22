@@ -29,10 +29,6 @@ struct SettingsView: View {
                         Text("Parakeet v3 (NVIDIA, via FluidAudio): much faster on Apple Silicon, top-ranked accuracy. English, 24 European languages, and Japanese. One-time ~600 MB download.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-                        Toggle("Boost my dictionary words (experimental)", isOn: $settings.dictionaryBoostEnabled)
-                        Text("A second, small speech model listens for your dictionary words specifically and fixes them from the audio itself — names and jargon come out right at the source. First use downloads about 100 MB; adds a moment to each dictation. All on this Mac.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
                     }
                 }
                 // Only meaningful when Whisper is the engine — hidden

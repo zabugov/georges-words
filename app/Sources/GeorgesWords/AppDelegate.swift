@@ -815,7 +815,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let transcribeStart = Date()
-        let raw = await transcriber.transcribe(samples, boost: true)
+        let raw = await transcriber.transcribe(samples)
         let transcribeSeconds = Date().timeIntervalSince(transcribeStart)
         guard !raw.isEmpty else { return ("", nil) }
 
@@ -963,9 +963,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     private func speculate(samples: [Float], context: AppContext, generation: Int) async {
-        // boost matches the final pass — a guess transcribed differently
-        // could never hit the cache.
-        let raw = await transcriber.transcribe(samples, boost: true)
+        let raw = await transcriber.transcribe(samples)
         guard !raw.isEmpty else { return }
         let (cleaned, eligible) = cleanForPolish(raw)
         // Same pause, same words as last time — the guess is already made.

@@ -78,30 +78,26 @@ in `FUTURE_IMPROVEMENTS.md` (3.2/3.3). Nothing to test here; see the
 ## 9. Insertion tester (6.6)
 
 - [ ] Troubleshooting → **Test a Text Field…** → click into Notes within 3 s → verdict: **Direct insertion** (green).
-- [ ] Repeat clicking into a browser URL bar or an Electron app → **Paste fallback (⌘V)** with an explanation.
+- [ ] Repeat in an Electron app (Claude Desktop) and a browser field → usually **Direct insertion** too, and that's correct: Chromium fields accept clean at-caret insertion (what they break is in-place *replacement* — command mode/Undo — which is why those have a keyboard fallback). **Paste fallback (⌘V)** is also a fine verdict — any answer with an explanation passes; only "No Accessibility permission" or "Paste, unverified" signals a problem. (Verdicts verified on-device 2026-07-22.)
 
 ## 10. Settings backup (7.8)
 
 - [ ] Settings → Backup → **Export Settings…** → save the file.
 - [ ] Change something visible (hotkey, a dictionary line), then **Import Settings…** with the file → the change reverts. "Settings imported." appears.
 
-## 11. Dictionary boosting — PARKED, keep OFF (2.2)
+## 11. Dictionary boosting — REMOVED 2026-07-22, skip (2.2)
 
-Owner decision 2026-07-22 after live testing: it fixed the known name
-at the source, but it also swapped an UNKNOWN proper name for random
-dictionary terms. Keep the toggle off. This section is the gate for
-any future re-attempt — all bullets must pass, especially the last:
+Owner decision after live testing: it fixed the known name at the
+source, but it also swapped an UNKNOWN proper name for random
+dictionary terms — parked the same morning, then fully removed from
+the app to simplify before sharing (see FUTURE_IMPROVEMENTS 2.2 for
+restore pointers). Nothing to test today beyond the §13 bullet that
+confirms the toggle is gone. If it's ever re-attempted, these are the
+re-entry gates — all must pass, especially the first:
 
-- [ ] Dictate "I met Marina Cremonese today" (any full name NOT in the
-      dictionary) three times → it must come out as spoken (possibly
-      misspelled) and NEVER as a dictionary word or email.
-
-For TODAY: just confirm the toggle is **off** (Settings → Speech
-recognition). The bullets below are for whenever it's re-attempted:
-
+- [ ] (future) Dictate "I met Marina Cremonese today" (any full name NOT in the dictionary) three times → it must come out as spoken (possibly misspelled) and NEVER as a dictionary word or email.
 - [ ] (future) Dictate a sentence with your dictionary name, half-mumbled → comes out spelled right; debug.log shows small-N "Dictionary boost: N replacement(s)".
 - [ ] (future) Two long sentences with NO dictionary words → untouched; watch debug.log for "rejected — … (cap …)" lines.
-- [ ] (future) The unknown-name sentence above three times → never a dictionary word or email.
 - [ ] (future) Judge the added latency.
 
 ## 12. Factory reset (6.7) — OPTIONAL, destructive, do LAST if at all
@@ -115,7 +111,7 @@ any deletion failures appear in an alert instead of being swallowed.
 
 Everything below was fixed live during today's QA session. **Check for
 Updates first** (About shows a new build stamp), then run these. Keep
-Polish style on "Keep my words" and the boost toggle OFF throughout.
+Polish style on "Keep my words" throughout.
 
 Dictionary end-state for these tests: plain lines `Zach Abugov`,
 `Lauralyn`, `Marina Cremonese`, the plain line `zachabugov@gmail.com`,
@@ -179,6 +175,11 @@ the `zacov at gmail -> …` mapping can be deleted.
 - [ ] **Silent mic shows no phantom preview:** mute the mic, hold fn
       ~3 s, release → the pill preview stays empty the whole time (no
       hallucinated "Thank you.") and the silence alert still appears.
+- [ ] **Boost toggle is gone:** Settings → Speech recognition no
+      longer shows "Boost my dictionary words (experimental)" — the
+      feature was fully removed (FUTURE_IMPROVEMENTS 2.2). Dictate
+      once with your name → still comes out right (that's the
+      phonetic dictionary matching, which is unrelated and stays).
 
 ---
 
