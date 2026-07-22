@@ -22,6 +22,7 @@ Console or TextEdit; newest lines are at the bottom.
 - [ ] Hold fn in Notes, speak a sentence, release → polished text appears at the cursor.
 - [ ] Quick-tap fn → hands-free mode latches; tap again to stop → text inserts.
 - [ ] Esc mid-recording cancels with a "Cancelled" flash.
+- [ ] (Added 2026-07-15) Dictate "call me at five five five one two three four" → `555-1234`; "john dot smith at gmail dot com" → `john.smith@gmail.com`; "one hundred twenty three dollars" → `123`-style digits.
 
 ## 2. Speculative polish (1.2)
 
