@@ -39,6 +39,22 @@ enum AudioInputDevices {
         allDeviceIDs().first { stringProperty($0, kAudioDevicePropertyDeviceUID) == uid }
     }
 
+    /// The input device macOS currently considers the default — what
+    /// "System default" in the picker should actively re-select.
+    static func systemDefaultInputID() -> AudioDeviceID? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var deviceID = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID
+        ) == noErr, deviceID != kAudioObjectUnknown else { return nil }
+        return deviceID
+    }
+
     private static func allDeviceIDs() -> [AudioDeviceID] {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,

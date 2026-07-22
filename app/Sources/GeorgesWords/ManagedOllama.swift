@@ -56,6 +56,7 @@ final class ManagedOllama: ObservableObject {
 
     private var serverProcess: Process?
     private var setupTask: Task<Void, Never>?
+    private var setupGeneration = 0
     private var crashRestarts = 0
 
     private let engineDir: URL
@@ -77,9 +78,17 @@ final class ManagedOllama: ObservableObject {
 
     func ensureReady(model: String) {
         setupTask?.cancel()
+        setupGeneration += 1
+        let generation = setupGeneration
         setupTask = Task {
             await self.run(model: model)
-            self.setupTask = nil
+            // Only the task that still owns the slot clears it: a
+            // cancelled predecessor finishing late must not erase the
+            // newer task's reference — that would leave the off switch
+            // with nothing to cancel (review P2, 2026-07-22).
+            if self.setupGeneration == generation {
+                self.setupTask = nil
+            }
         }
     }
 

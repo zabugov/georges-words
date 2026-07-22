@@ -29,30 +29,44 @@ actor Transcriber {
 
     private var backend: Backend?
     private var loadTask: Task<Void, Error>?
+    /// The actor is reentrant at await points, so two load() calls can
+    /// overlap while models download. Only the newest generation may
+    /// publish its backend — an older download finishing last must not
+    /// replace the newly selected engine (review P2, 2026-07-22).
+    private var loadGeneration = 0
 
     nonisolated var modelName: String { AppSettings.shared.modelName }
 
     func load() async throws {
+        loadTask?.cancel()
+        loadGeneration += 1
+        let generation = loadGeneration
         backend = nil
-        let task = Task { try await self.performLoad() }
+        let task = Task { try await self.performLoad(generation: generation) }
         loadTask = task
         try await task.value
     }
 
-    private func performLoad() async throws {
+    private func performLoad(generation: Int) async throws {
         let start = Date()
+        // Snapshot the configuration once: reading settings again after
+        // the downloads suspend could mix old and new choices.
+        let modelName = AppSettings.shared.modelName
         #if PARAKEET
         if AppSettings.shared.engine == .parakeet {
             let models = try await AsrModels.downloadAndLoad(version: .v3)
             let manager = AsrManager(config: .default)
             try await manager.loadModels(models)
+            guard generation == loadGeneration else { return }
             backend = .parakeet(manager)
             await warmUp()
             DebugLog.log(String(format: "Model load: parakeet ready in %.1fs (incl. warm-up)", -start.timeIntervalSinceNow))
             return
         }
         #endif
-        backend = .whisper(try await WhisperKit(WhisperKitConfig(model: modelName)))
+        let whisper = try await WhisperKit(WhisperKitConfig(model: modelName))
+        guard generation == loadGeneration else { return }
+        backend = .whisper(whisper)
         await warmUp()
         DebugLog.log(String(format: "Model load: whisper ready in %.1fs (incl. warm-up)", -start.timeIntervalSinceNow))
     }

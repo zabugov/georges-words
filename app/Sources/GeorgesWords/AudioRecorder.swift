@@ -78,20 +78,30 @@ final class AudioRecorder {
         lock.unlock()
 
         let input = engine.inputNode
-        // Select the chosen microphone before reading the format —
-        // the format follows the device.
+        // Select the microphone before reading the format — the format
+        // follows the device. Always assign explicitly: the audio unit
+        // keeps whatever device was set on a previous start, so switching
+        // the picker back to "System default" (or unplugging the chosen
+        // mic) must actively re-point it at today's default input, not
+        // just skip the selection (review P2, 2026-07-22).
+        var chosen: AudioDeviceID?
         if let uid = preferredInputUID {
-            if let deviceID = AudioInputDevices.deviceID(forUID: uid), let unit = input.audioUnit {
-                var device = deviceID
-                let status = AudioUnitSetProperty(
-                    unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
-                    &device, UInt32(MemoryLayout<AudioDeviceID>.size)
-                )
-                if status != noErr {
-                    DebugLog.log("Input device select failed (\(status)) — using system default")
-                }
-            } else {
+            chosen = AudioInputDevices.deviceID(forUID: uid)
+            if chosen == nil {
                 DebugLog.log("Chosen input device not present — using system default")
+            }
+        }
+        if chosen == nil {
+            chosen = AudioInputDevices.systemDefaultInputID()
+        }
+        if let deviceID = chosen, let unit = input.audioUnit {
+            var device = deviceID
+            let status = AudioUnitSetProperty(
+                unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+                &device, UInt32(MemoryLayout<AudioDeviceID>.size)
+            )
+            if status != noErr {
+                DebugLog.log("Input device select failed (\(status)) — using engine default")
             }
         }
         let inputFormat = input.outputFormat(forBus: 0)

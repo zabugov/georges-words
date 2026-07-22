@@ -123,11 +123,19 @@ final class PillController {
         model.previewText = text
     }
 
+    /// Each flash gets a token; only its OWN timer may hide it. Checking
+    /// just the phase let an older message's timer hide a newer message
+    /// of the same type early (review P3, 2026-07-22).
+    private var flashGeneration = 0
+
     /// Show a short informational message, then hide.
     func flash(_ text: String, seconds: TimeInterval = 2.5) {
+        flashGeneration += 1
+        let generation = flashGeneration
         show(.message(text))
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
-            guard let self, case .message = self.model.phase else { return }
+            guard let self, self.flashGeneration == generation,
+                  case .message = self.model.phase else { return }
             self.hide()
         }
     }
@@ -139,9 +147,12 @@ final class PillController {
         if AppSettings.shared.soundsEnabled {
             NSSound(named: "Glass")?.play()
         }
+        flashGeneration += 1
+        let generation = flashGeneration
         show(.alert(text))
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
-            guard let self, case .alert = self.model.phase else { return }
+            guard let self, self.flashGeneration == generation,
+                  case .alert = self.model.phase else { return }
             self.hide()
         }
     }

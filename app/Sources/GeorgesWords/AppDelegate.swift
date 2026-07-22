@@ -745,6 +745,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self, generation == self.correctionCheckGeneration else { return }
                 let label = "Correction check \(Int(mark))s"
 
+                // Settings can change while a check is pending: turning
+                // learning off (or marking the app private) must also stop
+                // reads scheduled BEFORE the change (review P2, 2026-07-22).
+                guard self.settings.correctionLearningEnabled,
+                      !self.settings.isPrivateApp(context.bundleID) else {
+                    DebugLog.log("\(label): learning disabled since scheduling — stopped")
+                    return
+                }
+
                 // Mid-dictation reads would race the next insertion.
                 guard case .idle = self.state else {
                     DebugLog.log("\(label): busy, skipped")
