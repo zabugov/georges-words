@@ -94,11 +94,13 @@ any future re-attempt — all bullets must pass, especially the last:
       dictionary) three times → it must come out as spoken (possibly
       misspelled) and NEVER as a dictionary word or email.
 
-- [ ] Settings → Speech recognition → enable **Boost my dictionary words**.
-- [ ] Dictate a sentence containing your dictionary name; expect a pause on the first use (~100 MB one-time download; watch debug.log for "Dictionary boost: pipeline ready").
-- [ ] Deliberately half-mumble the name → it should still come out spelled right when the audio supports it; debug.log logs any "Dictionary boost: N replacement(s)".
-- [ ] **The regression check:** dictate two long sentences that DON'T contain any dictionary word → the transcript must come out untouched. If names appear where you didn't say them, turn the toggle off and report it — debug.log will show either "rejected — N replacement(s) … (cap …)" (cap working, threshold still too loose) or small-N replacement lines (swaps sneaking under the cap).
-- [ ] Judge the added latency. If it annoys, turn the toggle off — everything else is unaffected.
+For TODAY: just confirm the toggle is **off** (Settings → Speech
+recognition). The bullets below are for whenever it's re-attempted:
+
+- [ ] (future) Dictate a sentence with your dictionary name, half-mumbled → comes out spelled right; debug.log shows small-N "Dictionary boost: N replacement(s)".
+- [ ] (future) Two long sentences with NO dictionary words → untouched; watch debug.log for "rejected — … (cap …)" lines.
+- [ ] (future) The unknown-name sentence above three times → never a dictionary word or email.
+- [ ] (future) Judge the added latency.
 
 ## 12. Factory reset (6.7) — OPTIONAL, destructive, do LAST if at all
 
@@ -106,6 +108,42 @@ Wipes everything including ~1.6 GB of models. Only if you want to test
 the fresh-install path: About → click the version 5× → **Erase
 Everything & Quit** → relaunch behaves like a brand-new install, and
 any deletion failures appear in an alert instead of being swallowed.
+
+## 13. Mid-QA fixes (2026-07-22) — verify these LAST, after one more update
+
+Everything below was fixed live during today's QA session. **Check for
+Updates first** (About shows a new build stamp), then run these. Keep
+Polish style on "Keep my words" and the boost toggle OFF throughout.
+
+Dictionary end-state for these tests: plain lines `Zach Abugov`,
+`Lauralyn`, `Marina Cremonese`, the plain line `zachabugov@gmail.com`,
+and the mapping `Abigail -> Abugov`. The old `Abagoff -> …` pile and
+the `zacov at gmail -> …` mapping can be deleted.
+
+- [ ] **Names by sound:** "hi my name is Zach Abugov" ×3, speaking
+      naturally and releasing the key immediately after the last
+      syllable → "Abugov" every time (grace capture + sound matching
+      together cover the clipped-audio case).
+- [ ] **Real-name snap:** same sentence once more, lazily — if it snaps
+      to "Abigail," the mapping line must still rescue it → "Abugov".
+- [ ] **Unknown names survive:** "I met Marina Cremonese today" ×2 →
+      never a dictionary word or email; spelling variants like
+      "Cremoneza" snap to "Cremonese" via the plain line.
+- [ ] **Spoken email:** "email me at zachabugov at gmail dot com"
+      (say your name-part naturally, even if it gets misheard) →
+      `zachabugov@gmail.com` assembled correctly.
+- [ ] **Email snippet:** add snippet "my email" → your address; say
+      "email me at my email" → the address, letter-perfect.
+- [ ] **Visible fields:** Snippets tab and Settings → Per-app style
+      notes now show bordered, obviously-clickable text boxes with
+      example placeholders.
+- [ ] **Spoken decimals:** "that costs 126453 point 3 dollars" →
+      `$126453.3` (not "point $3"); "growth was 12 point 5 percent" →
+      `12.5%`; "I want to make a point 3 times" stays plain words.
+- [ ] **No email bleed in polish:** a few ordinary sentences with Full
+      polish ("Rewrite for clarity") temporarily on → your email never
+      appears uninvited (it's excluded from the AI's dictionary now).
+      Switch back to "Keep my words" after.
 
 ---
 
