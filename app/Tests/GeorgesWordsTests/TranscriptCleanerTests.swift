@@ -118,6 +118,24 @@ final class TranscriptCleanerTests: XCTestCase {
         )
     }
 
+    func testSpokenDecimalsJoinBeforeUnits() {
+        // Owner report (2026-07-22): "…point 3 dollars" came out
+        // "point $3" — the decimal must join before the unit rules run.
+        XCTAssertEqual(
+            cleaner.clean("that costs 126453 point 3 dollars", dictionary: []),
+            "That costs $126453.3"
+        )
+        XCTAssertEqual(
+            cleaner.clean("growth was 12 point 5 percent", dictionary: []),
+            "Growth was 12.5%"
+        )
+        // "point" without digits on both sides is a word, not a decimal.
+        XCTAssertEqual(
+            cleaner.clean("i want to make a point 3 times", dictionary: []),
+            "I want to make a point 3 times"
+        )
+    }
+
     // MARK: - Sound-alike dictionary matching (2026-07-22)
 
     func testPhoneticDictionaryFixesUnseenMisspellings() {

@@ -60,10 +60,15 @@ struct TranscriptCleaner {
         // get the "$" treatment too.
         result = SpokenNumbers.normalize(result)
 
-        // Digit-adjacent spoken-number forms.
-        result = result.replacingOccurrences(of: #"(\d+)\s+percent\b"#, with: "$1%", options: .regularExpression)
-        result = result.replacingOccurrences(of: #"(\d+)\s+dollars\b"#, with: "\\$$1", options: .regularExpression)
-        result = result.replacingOccurrences(of: #"(\d+)\s+degrees\b"#, with: "$1°", options: .regularExpression)
+        // Digit-adjacent spoken-number forms. Spoken decimals join FIRST
+        // ("126453 point 3" → "126453.3") so the unit rules below see the
+        // whole number — otherwise "point 3 dollars" came out "point $3"
+        // (owner report, 2026-07-22). The unit rules accept decimals for
+        // the same reason.
+        result = result.replacingOccurrences(of: #"(\d+)\s+point\s+(\d+)"#, with: "$1.$2", options: .regularExpression)
+        result = result.replacingOccurrences(of: #"(\d+(?:\.\d+)?)\s+percent\b"#, with: "$1%", options: .regularExpression)
+        result = result.replacingOccurrences(of: #"(\d+(?:\.\d+)?)\s+dollars\b"#, with: "\\$$1", options: .regularExpression)
+        result = result.replacingOccurrences(of: #"(\d+(?:\.\d+)?)\s+degrees\b"#, with: "$1°", options: .regularExpression)
 
         // Tidy whitespace: collapse runs, remove space before punctuation.
         result = result.replacingOccurrences(of: #"\s{2,}"#, with: " ", options: .regularExpression)
