@@ -124,10 +124,17 @@ actor Transcriber {
 
     private func boostAgainstDictionary(result: ASRResult, samples: [Float]) async -> String? {
         // Docs guidance: boost works best on a modest list of real
-        // words — 3+ characters, at most ~100 terms.
+        // words — 3+ characters, at most ~100 terms. Name-shaped terms
+        // ONLY: emails and anything with digits/symbols must never be
+        // acoustic-swap material (on-device, 2026-07-22: an unknown
+        // name came out as a dictionary email address).
         let terms = AppSettings.shared.dictionaryTerms
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { $0.count >= 3 }
+            .filter { term in
+                term.count >= 3 && term.allSatisfy {
+                    $0.isLetter || $0 == " " || $0 == "-" || $0 == "'"
+                }
+            }
         guard !terms.isEmpty, terms.count <= 100 else { return nil }
         guard let tokenTimings = result.tokenTimings, !tokenTimings.isEmpty else { return nil }
 

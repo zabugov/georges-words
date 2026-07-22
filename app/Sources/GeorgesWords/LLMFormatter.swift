@@ -148,7 +148,11 @@ final class LLMFormatter {
                 lines.append("VOICE: match the tone, phrasing, and formality of this sample of the user's own writing (imitate its voice, never its content):\n\(styleSample)")
             }
         }
-        let terms = dictionary.filter { !$0.isEmpty }
+        // Emails (and anything symbol-laden) stay OUT of the model's
+        // dictionary: the deterministic layers own them exactly, and a
+        // small model given an email as a "term" will eventually paste
+        // it over an unknown name (seen 2026-07-15 and again 2026-07-22).
+        let terms = dictionary.filter { !$0.isEmpty && !$0.contains("@") }
         if !terms.isEmpty {
             lines.append("DICTIONARY: \(terms.joined(separator: ", "))")
         }

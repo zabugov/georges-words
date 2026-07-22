@@ -39,10 +39,6 @@ The "Unreleased" section becomes the release notes of the next update
   (Settings → Privacy).
 - **Pick your microphone** (Settings → Microphone) — and if a recording
   hears only silence, the app now says so instead of shrugging.
-- **Dictionary words from the audio itself (experimental).** Turn on
-  "Boost my dictionary words" under Speech recognition and a second,
-  small model listens for your names and jargon specifically, fixing
-  them at the source. First use downloads about 100 MB.
 - **Menu bar:** "Use Unpolished Version" restores your exact words if
   polish reworded something; "Undo Last Insertion" removes what was
   just typed.

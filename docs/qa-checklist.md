@@ -83,12 +83,16 @@ Do the first block in a **native** app (Notes/TextEdit), the second in an
 - [ ] Settings → Backup → **Export Settings…** → save the file.
 - [ ] Change something visible (hotkey, a dictionary line), then **Import Settings…** with the file → the change reverts. "Settings imported." appears.
 
-## 11. Dictionary boosting — experimental (2.2)
+## 11. Dictionary boosting — PARKED, keep OFF (2.2)
 
-Known incident (2026-07-22, fixed same day): with short name terms, the
-boost sprayed dictionary words across whole sentences. It now has a hard
-cap — it may change at most ~1 word in 8 (min 2) or the entire rescore
-is discarded. This test verifies the cap holds.
+Owner decision 2026-07-22 after live testing: it fixed the known name
+at the source, but it also swapped an UNKNOWN proper name for random
+dictionary terms. Keep the toggle off. This section is the gate for
+any future re-attempt — all bullets must pass, especially the last:
+
+- [ ] Dictate "I met Marina Cremonese today" (any full name NOT in the
+      dictionary) three times → it must come out as spoken (possibly
+      misspelled) and NEVER as a dictionary word or email.
 
 - [ ] Settings → Speech recognition → enable **Boost my dictionary words**.
 - [ ] Dictate a sentence containing your dictionary name; expect a pause on the first use (~100 MB one-time download; watch debug.log for "Dictionary boost: pipeline ready").
