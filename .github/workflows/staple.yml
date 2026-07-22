@@ -2,9 +2,12 @@ name: Staple Release
 
 # Second half of the release pipeline: once Apple accepts a submission,
 # fetch the EXACT DMG that was submitted (preserved as an artifact by
-# release.yml), staple the ticket to it, validate, and publish the
-# stapled DMG. Run it with the release run's ID (Actions → the run →
-# copy the number from its URL).
+# release.yml), staple the ticket to it, validate, and PUBLISH it — the
+# same GitHub release + appcast update the primary workflow performs,
+# via the shared scripts/publish-release.sh. A notarization that takes
+# longer than release.yml's in-run wait therefore still becomes a real,
+# customer-visible release (review P1, 2026-07-22). Run it with the
+# release run's ID (Actions → the run → copy the number from its URL).
 
 on:
   workflow_dispatch:
@@ -15,14 +18,18 @@ on:
 
 permissions:
   actions: read
-  contents: read
+  contents: write # publish the release + push the appcast
 
 jobs:
   staple:
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
-      - name: Download preserved DMG + submission ID
+      # The repo checkout supplies CHANGELOG.md, app/Info.plist, and
+      # the publish script; publishing pushes the appcast to main.
+      - uses: actions/checkout@v4
+
+      - name: Download preserved DMG + metadata
         uses: actions/download-artifact@v4
         with:
           pattern: GeorgesWords-*-dmg
@@ -68,3 +75,31 @@ jobs:
           name: GeorgesWords-stapled
           path: dist/GeorgesWords-*.dmg
           if-no-files-found: error
+
+      # Sparkle ships sign_update as a prebuilt artifact bundle, so a
+      # dependency resolve (no compile) is enough for the publish script
+      # to find it under app/.build.
+      - name: Fetch Sparkle signing tool
+        if: env.ACCEPTED == '1'
+        working-directory: app
+        run: swift package resolve
+
+      - name: Publish release and update feed
+        if: env.ACCEPTED == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          RELEASES_REPO: ${{ vars.RELEASES_REPO }}
+          RELEASES_REPO_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+        run: |
+          # Publish under the ORIGINAL release run's version/build —
+          # both were preserved alongside the DMG. Older artifacts from
+          # before the metadata existed fail loudly here, not silently.
+          if [ ! -f dist/version.txt ] || [ ! -f dist/build-number.txt ]; then
+            echo "::error::version.txt / build-number.txt missing from the preserved artifact — this run predates the publish-capable pipeline. Re-run the Release DMG workflow instead."
+            exit 1
+          fi
+          VERSION="$(cat dist/version.txt)" && BUILD_NUMBER="$(cat dist/build-number.txt)" && \
+          DMG_PATH="$(ls dist/GeorgesWords-*.dmg)" && \
+          export VERSION BUILD_NUMBER DMG_PATH && \
+          bash scripts/publish-release.sh

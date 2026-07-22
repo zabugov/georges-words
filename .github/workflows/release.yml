@@ -131,6 +131,10 @@ jobs:
         run: |
           VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' app/Info.plist)"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          # Preserved with the DMG so the Staple Release workflow can
+          # publish under the ORIGINAL run's version/build, not its own.
+          echo "$VERSION" > dist/version.txt
+          echo "$GITHUB_RUN_NUMBER" > dist/build-number.txt
           mkdir -p dist/dmg
           cp -R dist/GeorgesWords.app dist/dmg/
 
@@ -235,6 +239,8 @@ jobs:
           path: |
             dist/GeorgesWords-*.dmg
             dist/submission-id.txt
+            dist/version.txt
+            dist/build-number.txt
           if-no-files-found: error
 
       - name: Wait briefly for a verdict
@@ -279,6 +285,9 @@ jobs:
       # The stapled DMG becomes a real GitHub Release, and the Sparkle
       # appcast on main starts pointing at it — every installed copy
       # picks it up within a day (or on Check for Updates). ADR 0007.
+      # All of the logic lives in scripts/publish-release.sh, shared
+      # with staple.yml so a slow notarization verdict still ends in a
+      # real release (review P1, 2026-07-22).
       - name: Publish release and update feed
         if: env.NOTARY_ACCEPTED == '1'
         env:
@@ -291,161 +300,6 @@ jobs:
           RELEASES_REPO: ${{ vars.RELEASES_REPO }}
           RELEASES_REPO_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
         run: |
-          TAG="v${VERSION}-b${GITHUB_RUN_NUMBER}"
-          DMG="GeorgesWords-${VERSION}.dmg"
-
-          # Never ship an app whose feed nothing in this run updates.
-          FEED_URL=$(/usr/libexec/PlistBuddy -c 'Print SUFeedURL' app/Info.plist)
-          if [ -n "${RELEASES_REPO:-}" ]; then
-            if [ -z "${RELEASES_REPO_TOKEN:-}" ]; then
-              echo "::error::RELEASES_REPO is set but RELEASES_REPO_TOKEN is missing (ADR 0009 step 2)."
-              exit 1
-            fi
-            TARGET_REPO="$RELEASES_REPO"
-            RELEASE_TOKEN="$RELEASES_REPO_TOKEN"
-            case "$FEED_URL" in
-              *"$RELEASES_REPO"*) echo "Feed points at the releases repo." ;;
-              *) echo "::warning::SUFeedURL still points at the code repo — correct only for the migration release itself (ADR 0009 step 4)." ;;
-            esac
-          else
-            TARGET_REPO="$GITHUB_REPOSITORY"
-            RELEASE_TOKEN="$GH_TOKEN"
-            case "$FEED_URL" in
-              *"$GITHUB_REPOSITORY"*) ;;
-              *)
-                echo "::error::SUFeedURL ($FEED_URL) points away from this repo but RELEASES_REPO is not configured — installed apps would follow a feed this run never updates."
-                exit 1
-                ;;
-            esac
-          fi
-
-          # Release notes come from CHANGELOG.md's Unreleased section
-          # (9.9); the generic line is the fallback so notes can never
-          # block a release.
-          python3 - <<'NOTESEOF'
-          import re
-          notes = "Notarized, stapled, auto-updating build."
-          try:
-              text = open("CHANGELOG.md").read()
-              match = re.search(r"## Unreleased\n(.*?)(?=\n## |\Z)", text, re.S)
-              body = match.group(1).strip() if match else ""
-              if body:
-                  notes = body
-          except OSError:
-              pass
-          open("/tmp/release-notes.md", "w").write(notes + "\n")
-          NOTESEOF
-
-          # A stable-named copy so the download page can always link
-          # releases/latest/download/GeorgesWords.dmg (9.2).
-          cp "dist/$DMG" "dist/GeorgesWords.dmg"
-          GH_TOKEN="$RELEASE_TOKEN" gh release create "$TAG" "dist/$DMG" "dist/GeorgesWords.dmg" \
-            --repo "$TARGET_REPO" \
-            --title "George's Words ${VERSION} (build ${GITHUB_RUN_NUMBER})" \
-            --notes-file /tmp/release-notes.md
-          # EdDSA-sign the archive for Sparkle when the key exists (7.10);
-          # until the secret is added this quietly no-ops.
-          ED_SIG=""
-          if [ -n "${SPARKLE_ED_PRIVATE_KEY:-}" ]; then
-            SIGN_TOOL=$(find app/.build -name sign_update -type f -perm +111 2>/dev/null | head -1)
-            if [ -n "$SIGN_TOOL" ]; then
-              printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > ed_key.txt
-              ED_SIG=$("$SIGN_TOOL" -f ed_key.txt "dist/$DMG" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
-              rm -f ed_key.txt
-              test -n "$ED_SIG"
-            else
-              echo "::warning::SPARKLE_ED_PRIVATE_KEY set but sign_update tool not found"
-            fi
-          fi
-          LENGTH=$(stat -f%z "dist/$DMG")
-          URL="https://github.com/${TARGET_REPO}/releases/download/${TAG}/${DMG}"
-          python3 - "$VERSION" "$GITHUB_RUN_NUMBER" "$URL" "$LENGTH" "$ED_SIG" <<'PYEOF'
-          import html, sys, email.utils, time
-          version, build, url, length = sys.argv[1:5]
-          ed_sig = sys.argv[5] if len(sys.argv) > 5 else ""
-          sig_attr = f' sparkle:edSignature="{ed_sig}"' if ed_sig else ""
-          # Sparkle shows the item description as the update notes (9.9) —
-          # same text the GitHub release gets, minimally HTML-ified.
-          description = ""
-          try:
-              notes = open("/tmp/release-notes.md").read().strip()
-              if notes:
-                  rendered = "<br>".join(
-                      html.escape(line.strip()).replace("- ", "&bull; ", 1) if line.strip().startswith("- ")
-                      else html.escape(line.strip())
-                      for line in notes.splitlines() if line.strip()
-                  ).replace("**", "")
-                  description = f"<description><![CDATA[{rendered}]]></description>"
-          except OSError:
-              pass
-          appcast = f"""<?xml version="1.0" encoding="utf-8"?>
-          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
-            <channel>
-              <title>George's Words</title>
-              <item>
-                <title>Version {version} (build {build})</title>
-                <pubDate>{email.utils.formatdate(time.time())}</pubDate>
-                <sparkle:version>{build}</sparkle:version>
-                <sparkle:shortVersionString>{version}</sparkle:shortVersionString>
-                <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-                {description}
-                <enclosure url="{url}" length="{length}"{sig_attr} type="application/octet-stream"/>
-              </item>
-            </channel>
-          </rss>
-          """
-          lines = [line[10:] if line.startswith(" " * 10) else line for line in appcast.splitlines()]
-          open("appcast.xml", "w").write("\n".join(line for line in lines if line.strip() or line == "") + "\n")
-          PYEOF
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Roll the changelog: this release's notes get its version
-          # heading, and the next release starts a fresh Unreleased
-          # section (9.9). Defensive — a changelog hiccup must never
-          # block the feed commit below.
-          python3 - "$VERSION" "$GITHUB_RUN_NUMBER" <<'ROLLEOF'
-          import sys, datetime, re
-          try:
-              version, build = sys.argv[1], sys.argv[2]
-              text = open("CHANGELOG.md").read()
-              if re.search(r"## Unreleased\n+(?=[^\n#])", text):
-                  stamp = datetime.date.today().isoformat()
-                  text = text.replace(
-                      "## Unreleased",
-                      f"## Unreleased\n\n## {version} (build {build}) — {stamp}",
-                      1,
-                  )
-                  open("CHANGELOG.md", "w").write(text)
-          except Exception as error:
-              print(f"::warning::changelog roll skipped: {error}")
-          ROLLEOF
-
-          # swift build may have refreshed Package.resolved — commit it too
-          # so local checkouts stay clean, and autostash any other noise
-          # (run #13 died here on an unstaged-changes refusal).
-          git add appcast.xml app/Package.resolved CHANGELOG.md
-          git commit -m "Appcast: ${VERSION} build ${GITHUB_RUN_NUMBER}"
-          git pull --rebase --autostash origin main
-          git push origin main
-
-          # Two-repo split (ADR 0009): mirror the appcast into the public
-          # releases repo. The commit above keeps the OLD feed current too,
-          # so installs that haven't migrated yet still see this release —
-          # both feeds stay live until the code repo goes private.
-          if [ "$TARGET_REPO" != "$GITHUB_REPOSITORY" ]; then
-            git clone --depth 1 "https://x-access-token:${RELEASES_REPO_TOKEN}@github.com/${TARGET_REPO}.git" /tmp/releases-repo
-            cp appcast.xml /tmp/releases-repo/appcast.xml
-            # If the releases repo serves its site (and maybe the feed,
-            # on a custom domain) from site/, keep that copy fresh too.
-            if [ -d /tmp/releases-repo/site ]; then
-              cp appcast.xml /tmp/releases-repo/site/appcast.xml
-            fi
-            cd /tmp/releases-repo
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "Appcast: ${VERSION} build ${GITHUB_RUN_NUMBER}"
-            git push
-            cd "$GITHUB_WORKSPACE"
-          fi
+          BUILD_NUMBER="$GITHUB_RUN_NUMBER" \
+          DMG_PATH="dist/GeorgesWords-${VERSION}.dmg" \
+          bash scripts/publish-release.sh
