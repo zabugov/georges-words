@@ -45,6 +45,21 @@ final class SpokenContactsTests: XCTestCase {
                        "look at this dot org file")
     }
 
+    func testOrdinaryURLPhrasingLeftAlone() {
+        // "look at example dot com" is prose about a website, not an
+        // address — a single-word local part with no mail provider and
+        // no email wording nearby stays untouched (review P2, 2026-07-22).
+        XCTAssertEqual(SpokenContacts.normalize("look at example dot com for details"),
+                       "look at example dot com for details")
+        XCTAssertEqual(SpokenContacts.normalize("the demo is at acme dot io"),
+                       "the demo is at acme dot io")
+    }
+
+    func testEmailWordingEnablesPlainAddress() {
+        XCTAssertEqual(SpokenContacts.normalize("my address is bob at example dot com"),
+                       "my address is bob@example.com")
+    }
+
     func testBuildEmailValidation() {
         XCTAssertEqual(SpokenContacts.buildEmail(local: "john", domain: "gmail dot com"), "john@gmail.com")
         XCTAssertNil(SpokenContacts.buildEmail(local: "john", domain: "gmail"))          // no dot

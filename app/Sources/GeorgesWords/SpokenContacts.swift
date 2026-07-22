@@ -43,6 +43,19 @@ enum SpokenContacts {
         "her", "their", "a", "an", "it",
     ]
 
+    /// Domains that are overwhelmingly mail providers — "john at gmail
+    /// dot com" is an address even with no other cue in the sentence.
+    private static let mailProviders: Set<String> = [
+        "gmail", "googlemail", "yahoo", "ymail", "hotmail", "outlook",
+        "live", "msn", "icloud", "me", "mac", "proton", "protonmail",
+        "pm", "aol", "fastmail", "hey", "zoho", "gmx", "mail",
+        "sympatico", "rogers", "bell", "telus", "shaw", "videotron",
+    ]
+
+    /// Words that signal the speaker is dictating an address ("email me
+    /// at…", "my address is…", "reach me at…").
+    private static let emailContextPattern = #"(?i)\b(?:e-?mail|mail|address|contact|reach|write|message|inbox|send)\b"#
+
     /// "john at gmail dot com" → "john@gmail.com";
     /// "jane dot doe at proton dot me" → "jane.doe@proton.me".
     static func normalizeEmails(_ text: String) -> String {
@@ -61,16 +74,26 @@ enum SpokenContacts {
         for match in matches.reversed() {
             guard let whole = Range(match.range, in: result),
                   let localRange = Range(match.range(at: 1), in: result),
-                  let domainRange = Range(match.range(at: 2), in: result),
-                  let email = buildEmail(local: String(result[localRange]), domain: String(result[domainRange]))
+                  let domainRange = Range(match.range(at: 2), in: result)
             else { continue }
+            // Email-y wording shortly before the match ("email me at…")
+            // is one of the cues that licenses the conversion.
+            let prefixStart = result.index(whole.lowerBound, offsetBy: -60, limitedBy: result.startIndex)
+                ?? result.startIndex
+            let hasContext = result[prefixStart..<whole.lowerBound]
+                .range(of: emailContextPattern, options: .regularExpression) != nil
+            guard let email = buildEmail(
+                local: String(result[localRange]),
+                domain: String(result[domainRange]),
+                hasEmailContext: hasContext
+            ) else { continue }
             result.replaceSubrange(whole, with: email)
         }
         return result
     }
 
     /// Assemble and validate an address, or nil if the domain doesn't look real.
-    static func buildEmail(local rawLocal: String, domain rawDomain: String) -> String? {
+    static func buildEmail(local rawLocal: String, domain rawDomain: String, hasEmailContext: Bool = false) -> String? {
         let localPart = collapse(rawLocal)
         let domainPart = collapse(rawDomain)
 
@@ -86,6 +109,13 @@ enum SpokenContacts {
               isValidTLD(tld),
               labels.allSatisfy({ $0.range(of: #"^[a-z0-9]+(?:-[a-z0-9]+)*$"#, options: .regularExpression) != nil })
         else { return nil }
+
+        // "word at words dot tld" is also everyday prose ("look at
+        // example dot com"). Convert only with a real email cue: a
+        // multi-part local ("jane dot doe"), a known mail provider, or
+        // email-y wording just before it (review P2, 2026-07-22).
+        let multiPartLocal = localPart.contains(where: { "._-".contains($0) })
+        guard multiPartLocal || mailProviders.contains(first) || hasEmailContext else { return nil }
 
         return "\(localPart)@\(domainPart)"
     }

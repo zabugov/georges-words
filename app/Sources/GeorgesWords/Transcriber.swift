@@ -75,14 +75,14 @@ actor Transcriber {
             switch backend {
             case .whisper(let whisperKit):
                 let results = try await whisperKit.transcribe(audioArray: samples)
-                return tidy(results.map(\.text).joined(separator: " "))
+                return Self.tidy(results.map(\.text).joined(separator: " "))
             #if PARAKEET
             case .parakeet(let manager):
                 // Fresh decoder state per utterance (state persistence
                 // across calls is only for streaming chunk mode).
                 var decoderState = TdtDecoderState.make()
                 let result = try await manager.transcribe(samples, decoderState: &decoderState)
-                return tidy(result.text)
+                return Self.tidy(result.text)
             #endif
             }
         } catch {
@@ -104,13 +104,17 @@ actor Transcriber {
     // from git history if re-attempted; the research doc and the QA
     // §11 re-entry gate still stand.
 
-    /// Strip Whisper artifacts: special tokens like <|startoftranscript|> and
-    /// non-speech markers like [BLANK_AUDIO] or (music).
-    private func tidy(_ raw: String) -> String {
+    /// Known ASR non-speech markers, ONLY — dictated parentheticals like
+    /// "(draft)" or "[optional]" are content and must survive; stripping
+    /// every bracketed phrase deleted them (review P2, 2026-07-22).
+    nonisolated private static let nonSpeechMarker = #"(?i)[\[\(]\s*(?:blank[_ ]?audio|music|noise|silence|silent|applause|laughter|laughs|laughing|typing|inaudible|indistinct|unintelligible|sounds?|static|beep(?:ing)?|cough(?:ing)?|breath(?:ing)?|sigh(?:ing|s)?|clears throat|speaking in [a-z ]+)\s*[\]\)]"#
+
+    /// Strip Whisper/Parakeet artifacts: special tokens like
+    /// <|startoftranscript|> and the whitelisted non-speech markers.
+    nonisolated static func tidy(_ raw: String) -> String {
         var text = raw
         text = text.replacingOccurrences(of: #"<\|[^|]*\|>"#, with: "", options: .regularExpression)
-        text = text.replacingOccurrences(of: #"\[[A-Za-z_ ]+\]"#, with: "", options: .regularExpression)
-        text = text.replacingOccurrences(of: #"\([A-Za-z_ ]+\)"#, with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: Self.nonSpeechMarker, with: "", options: .regularExpression)
         text = text.replacingOccurrences(of: #"\s{2,}"#, with: " ", options: .regularExpression)
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
