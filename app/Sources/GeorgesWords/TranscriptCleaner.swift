@@ -93,9 +93,9 @@ struct TranscriptCleaner {
     /// transcript word must have 4+ letters, and then EITHER
     /// - the consonant skeletons match exactly and letter similarity is
     ///   ≥ 0.40 ("Abakoff" sits at 0.43), OR
-    /// - the skeletons nearly match (≥ 0.75 — clipped audio inserts
-    ///   stray consonants: "Abercov", "Abergoff") and the letter
-    ///   similarity is ≥ 0.50 to compensate.
+    /// - the word's skeleton contains the whole target skeleton in order
+    ///   with at most one inserted consonant (clipped audio inserts
+    ///   strays: "Abercov", "Abergoff") and letter similarity is ≥ 0.50.
     /// Multi-word terms contribute their individual words.
     static func applyPhoneticDictionary(_ text: String, dictionary: [String]) -> String {
         var targets: [(word: String, key: String)] = []
@@ -122,8 +122,15 @@ struct TranscriptCleaner {
             let key = Phonetics.key(lower)
             for target in targets {
                 let letterSimilarity = Phonetics.similarity(lower, target.word.lowercased())
+                // Near tier: clipped audio INSERTS stray consonants, so the
+                // word's skeleton must still contain the whole target
+                // skeleton in order, with at most one extra. A MISSING
+                // consonant ("above" → "apf" has no k) is a different word
+                // — CI caught exactly that false positive (2026-07-22).
+                let nearSkeleton = key.count <= target.key.count + 1
+                    && Phonetics.containsInOrder(target.key, in: key)
                 let matches = (key == target.key && letterSimilarity >= 0.40)
-                    || (Phonetics.similarity(key, target.key) >= 0.75 && letterSimilarity >= 0.50)
+                    || (nearSkeleton && letterSimilarity >= 0.50)
                 guard matches else { continue }
                 result = (result as NSString).replacingCharacters(in: match.range, with: target.word)
                 break

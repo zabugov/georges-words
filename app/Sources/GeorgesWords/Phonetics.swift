@@ -44,6 +44,21 @@ enum Phonetics {
         return skeleton
     }
 
+    /// True when `needle`'s characters all appear in `haystack` in order
+    /// (subsequence). Used to tell an INSERTED stray consonant (clipped
+    /// audio: "aprkf" still contains all of "apkf") from a MISSING one
+    /// ("apf" lacks the k — a genuinely different word).
+    static func containsInOrder(_ needle: String, in haystack: String) -> Bool {
+        var iterator = haystack.makeIterator()
+        outer: for target in needle {
+            while let ch = iterator.next() {
+                if ch == target { continue outer }
+            }
+            return false
+        }
+        return true
+    }
+
     /// Normalized Levenshtein similarity in 0…1.
     static func similarity(_ a: String, _ b: String) -> Double {
         let x = Array(a.unicodeScalars)
