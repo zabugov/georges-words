@@ -5,19 +5,18 @@
 ## Context
 
 ADR 0001 fixed the platform (macOS, Apple Silicon, fully local). A research
-pass (competitive notes kept outside the repo) surveyed stacks used by
-comparable apps: Handy (Tauri/Rust), OpenWhispr (Electron), VoiceInk
-(native Swift).
+pass (competitive notes kept outside the repo) surveyed the stacks used by
+comparable dictation apps — Tauri/Rust, Electron, and native Swift builds.
 
 ## Decision
 
 1. **Native Swift (AppKit menu-bar app), built with Swift Package Manager.**
    Deepest access to the OS hooks this app lives on — Accessibility API,
    event monitors, AVAudioEngine, pasteboard — plus CoreML/Neural Engine for
-   models, with no Electron/Tauri runtime overhead. VoiceInk validates the
-   shape (we reference its architecture only; its GPL code is not copied).
-   SPM + a small `build.sh` that assembles the `.app` bundle keeps the build
-   one command and Xcode-project-free.
+   models, with no Electron/Tauri runtime overhead. A comparable native-Swift
+   app validates the shape (architecture referenced only; its GPL code is
+   not copied). SPM + a small `build.sh` that assembles the `.app` bundle
+   keeps the build one command and Xcode-project-free.
 2. **WhisperKit as the STT runtime**, default model `small.en` (configurable
    via `defaults write com.georges.words ModelName …`). Swift-native,
    CoreML/ANE-optimized, well-maintained, one-line model swapping across the
