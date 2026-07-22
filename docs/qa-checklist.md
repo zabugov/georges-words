@@ -84,9 +84,15 @@ Do the first block in a **native** app (Notes/TextEdit), the second in an
 
 ## 11. Dictionary boosting — experimental (2.2)
 
+Known incident (2026-07-22, fixed same day): with short name terms, the
+boost sprayed dictionary words across whole sentences. It now has a hard
+cap — it may change at most ~1 word in 8 (min 2) or the entire rescore
+is discarded. This test verifies the cap holds.
+
 - [ ] Settings → Speech recognition → enable **Boost my dictionary words**.
 - [ ] Dictate a sentence containing your dictionary name; expect a pause on the first use (~100 MB one-time download; watch debug.log for "Dictionary boost: pipeline ready").
 - [ ] Deliberately half-mumble the name → it should still come out spelled right when the audio supports it; debug.log logs any "Dictionary boost: N replacement(s)".
+- [ ] **The regression check:** dictate two long sentences that DON'T contain any dictionary word → the transcript must come out untouched. If names appear where you didn't say them, turn the toggle off and report it — debug.log will show either "rejected — N replacement(s) … (cap …)" (cap working, threshold still too loose) or small-N replacement lines (swaps sneaking under the cap).
 - [ ] Judge the added latency. If it annoys, turn the toggle off — everything else is unaffected.
 
 ## 12. Factory reset (6.7) — OPTIONAL, destructive, do LAST if at all

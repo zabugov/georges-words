@@ -166,14 +166,26 @@ actor Transcriber {
                 tokenTimings: tokenTimings,
                 logProbs: spot.logProbs,
                 frameDuration: spot.frameDuration,
-                // Upstream defaults: cbw 3.0 (weight of the dictionary's
-                // vote), similarity floor 0.52 (how closely the decoded
-                // word must resemble the term before a swap is allowed).
+                // cbw 3.0 = weight of the dictionary's vote. The
+                // similarity floor was raised 0.52 → 0.70 after on-device
+                // testing (2026-07-22): at 0.52, short name terms were
+                // swapped into words that sounded nothing like them.
                 cbw: 3.0,
                 marginSeconds: ContextBiasingConstants.defaultMarginSeconds,
-                minSimilarity: 0.52
+                minSimilarity: 0.70
             )
             guard output.wasModified else { return nil }
+            // The hard guarantee: boosting exists to fix the OCCASIONAL
+            // misheard name. A rescore that touches more than ~1 word in 8
+            // (min 2) is misfiring — seen live: "Zachary" sprayed across a
+            // whole sentence — so distrust the entire rescore, not just
+            // the excess.
+            let wordCount = result.text.split(separator: " ").count
+            let cap = max(2, wordCount / 8)
+            guard output.replacements.count <= cap else {
+                DebugLog.log("Dictionary boost: rejected — \(output.replacements.count) replacement(s) on \(wordCount) words (cap \(cap))")
+                return nil
+            }
             DebugLog.log("Dictionary boost: \(output.replacements.count) replacement(s)")
             return output.text
         } catch {
