@@ -97,7 +97,15 @@ enum SpokenContacts {
             if let stop = suffix.firstIndex(where: { ".!?\n".contains($0) }) {
                 suffix = suffix[..<stop]
             }
-            let hasContext = prefix.range(of: leadingCuePattern, options: .regularExpression) != nil
+            // A dictation that IS the address — form entry, "john at
+            // gmail dot com" and nothing else — needs no cue words:
+            // the utterance's shape is the evidence (review follow-up,
+            // 2026-07-22). Common-name locals convert here even though
+            // they're in the word list.
+            let outside = result[result.startIndex..<whole.lowerBound] + result[whole.upperBound...]
+            let bareUtterance = outside.allSatisfy { $0.isWhitespace || $0.isPunctuation }
+            let hasContext = bareUtterance
+                || prefix.range(of: leadingCuePattern, options: .regularExpression) != nil
                 || suffix.range(of: trailingCuePattern, options: .regularExpression) != nil
             guard let email = buildEmail(
                 local: String(result[localRange]),

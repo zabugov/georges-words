@@ -524,7 +524,7 @@ struct AboutView: View {
                     Button("Erase Everything & Quit", role: .destructive) {
                         FactoryReset.perform()
                     }
-                    Text("Fresh-install testing: wipes all settings, history, stats, the downloaded speech/polish files, and revokes the Microphone and Accessibility permissions, then quits. The next launch behaves exactly like a brand-new install — including ~1.6 GB of re-downloads.")
+                    Text("Fresh-install testing: wipes all settings, history, stats, the downloaded speech/polish files, and revokes the Microphone and Accessibility permissions, then quits. The next launch behaves exactly like a brand-new install — including ~1.6 GB of re-downloads. Speech models live in caches shared with any other app built on the same frameworks; if you have one, it would re-download its models too.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

@@ -98,6 +98,13 @@ final class SpokenContactsTests: XCTestCase {
                        "jane@proton.me is my address")
     }
 
+    func testBareUtteranceAddressConverts() {
+        // Dictating ONLY the address (form entry) needs no cue words,
+        // even when the local part is a common name in the word list.
+        XCTAssertEqual(SpokenContacts.normalize("john at gmail dot com"), "john@gmail.com")
+        XCTAssertEqual(SpokenContacts.normalize("support at acme dot io."), "support@acme.io.")
+    }
+
     func testCueDoesNotCrossSentenceBoundary() {
         XCTAssertEqual(
             SpokenContacts.normalize("that is my address. look at example dot com for details"),
