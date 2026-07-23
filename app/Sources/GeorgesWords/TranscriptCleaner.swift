@@ -254,7 +254,10 @@ struct TranscriptCleaner {
                     }
                 }
                 guard let foldFrom else {
-                    DebugLog.log("Email fold: site at dictionary domain, no name match")
+                    // Lengths only, never content: enough to see the
+                    // SHAPE of a miss from a remote debug.log.
+                    let localKey = Phonetics.key(local.lowercased().filter(\.isLetter))
+                    DebugLog.log("Email fold: site at dictionary domain, no name match (local \(local.count) chars/key \(localKey.count), dict key \(dictKey.count), \(words.count) word(s) before)")
                     continue
                 }
                 let kept = words[0..<foldFrom].joined(separator: " ")

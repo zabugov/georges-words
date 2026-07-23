@@ -900,7 +900,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             strength: strength
         )
         await updateTiming(transcribe: transcribeSeconds, polish: Date().timeIntervalSince(polishStart))
-        guard let polished, polished != cleaned else { return (cleaned, nil) }
+        guard var polished, polished != cleaned else { return (cleaned, nil) }
+        // The polish model re-copies the transcript and can mangle rare
+        // letter-strings — debug.log 2026-07-23: the cleaned text held
+        // the correct dictionary address ("Email fold: snapped") yet a
+        // misspelled one reached the field. Emails are deliberately
+        // excluded from the model's DICTIONARY line, so nothing anchors
+        // them for it; re-fold deterministically after polish.
+        polished = TranscriptCleaner.applyDictionaryEmails(polished, dictionary: dictionary)
+        guard polished != cleaned else { return (cleaned, nil) }
         return (polished, cleaned)
     }
 
@@ -1024,13 +1032,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let dictionary = settings.dictionaryTerms
         let model = settings.effectiveLLMModel
         let strength = settings.polishStrength
-        guard let polished = await llmFormatter.format(
+        guard var polished = await llmFormatter.format(
             cleaned,
             tone: context.tone,
             dictionary: dictionary,
             model: model,
             strength: strength
         ) else { return }
+        // Same post-polish email restoration as the final pass — the
+        // cache must hold exactly what the final pass would produce.
+        polished = TranscriptCleaner.applyDictionaryEmails(polished, dictionary: dictionary)
 
         // A newer recording may have started while we polished — never
         // hand it a stale guess.
