@@ -138,6 +138,10 @@ struct TranscriptCleaner {
             }
         }
         guard !targets.isEmpty else { return text }
+        // Fail CLOSED: without the word list there is no safe way to
+        // fuzzy-match — skip snapping entirely rather than silently
+        // fall back to corrupting prose (review follow-up, 2026-07-22).
+        guard !SystemWords.all.isEmpty else { return text }
         guard let wordRegex = try? NSRegularExpression(pattern: #"[A-Za-z][A-Za-z']*"#) else { return text }
 
         var result = text
@@ -147,7 +151,7 @@ struct TranscriptCleaner {
             let word = (result as NSString).substring(with: match.range)
             let lower = word.lowercased()
             guard lower.count >= 4, !dictionaryWords.contains(lower) else { continue }
-            guard !Self.systemWords.contains(lower) else { continue }
+            guard !SystemWords.all.contains(lower) else { continue }
             let key = Phonetics.key(lower)
             for target in targets {
                 let letterSimilarity = Phonetics.similarity(lower, target.word.lowercased())
@@ -167,23 +171,6 @@ struct TranscriptCleaner {
         }
         return result
     }
-
-    /// The macOS word list (~235k entries), lowercased, once. Words the
-    /// language already owns are off-limits to phonetic snapping. An
-    /// unreadable list degrades to an empty set — matching then behaves
-    /// as before the guard, which is still bounded by the similarity
-    /// gates. Only ≥4-letter entries are kept (shorter can't be
-    /// candidates anyway).
-    private static let systemWords: Set<String> = {
-        guard let contents = try? String(contentsOfFile: "/usr/share/dict/words", encoding: .utf8) else {
-            return []
-        }
-        var words = Set<String>()
-        for line in contents.split(separator: "\n") where line.count >= 4 {
-            words.insert(line.lowercased())
-        }
-        return words
-    }()
 
     // MARK: - Spoken control commands (backlog 3.1)
 

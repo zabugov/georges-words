@@ -52,9 +52,12 @@ enum SpokenContacts {
         "sympatico", "rogers", "bell", "telus", "shaw", "videotron",
     ]
 
-    /// Words that signal the speaker is dictating an address ("email me
-    /// at…", "my address is…", "reach me at…").
-    private static let emailContextPattern = #"(?i)\b(?:e-?mail|mail|address|contact|reach|write|message|inbox|send)\b"#
+    /// Words that signal the speaker is dictating an address, BOUND to
+    /// it: the cue must sit within three words of the candidate ("email
+    /// me at john…", "my address is bob…"). An unanchored search let a
+    /// "send" much earlier in the sentence convert an unrelated
+    /// "look at example dot com" (review follow-up, 2026-07-22).
+    private static let emailContextPattern = #"(?i)\b(?:e-?mail|mail|address|contact|reach|write|message|inbox|send)\b(?:\s+\S+){0,3}\s*$"#
 
     /// "john at gmail dot com" → "john@gmail.com";
     /// "jane dot doe at proton dot me" → "jane.doe@proton.me".
@@ -112,10 +115,14 @@ enum SpokenContacts {
 
         // "word at words dot tld" is also everyday prose ("look at
         // example dot com"). Convert only with a real email cue: a
-        // multi-part local ("jane dot doe"), a known mail provider, or
-        // email-y wording just before it (review P2, 2026-07-22).
+        // multi-part local ("jane dot doe"), email-y wording bound just
+        // before it, or a known mail provider — and the provider only
+        // counts when the local part isn't itself an ordinary word
+        // ("look at gmail dot com" is prose about a website; "zachabugov
+        // at gmail dot com" is an address) (review P2 + follow-up).
         let multiPartLocal = localPart.contains(where: { "._-".contains($0) })
-        guard multiPartLocal || mailProviders.contains(first) || hasEmailContext else { return nil }
+        let providerCue = mailProviders.contains(first) && !SystemWords.all.contains(localPart)
+        guard multiPartLocal || providerCue || hasEmailContext else { return nil }
 
         return "\(localPart)@\(domainPart)"
     }

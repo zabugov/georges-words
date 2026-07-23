@@ -5,11 +5,11 @@ final class AudioInputDevicesTests: XCTestCase {
 
     func testSystemGhostAggregatesAreFilteredFromThePicker() {
         // The echo-cancelling wrappers CoreAudio creates for
-        // voice-processing apps (seen live 2026-07-22 as
-        // "CADefaultDeviceAggregate-31068-0") must never be listed
-        // or restorable as a remembered selection.
-        XCTAssertTrue(AudioInputDevices.isTransientAggregate(uid: "CADefaultDeviceAggregate-31068-0"))
-        XCTAssertTrue(AudioInputDevices.isTransientAggregate(uid: "CADefaultDeviceAggregate-902-1"))
+        // voice-processing apps ("CADefaultDeviceAggregate-<pid>-<n>",
+        // seen live 2026-07-22) must never be listed or restorable as
+        // a remembered selection.
+        XCTAssertTrue(AudioInputDevices.isTransientAggregate(uid: "CADefaultDeviceAggregate-123-0"))
+        XCTAssertTrue(AudioInputDevices.isTransientAggregate(uid: "CADefaultDeviceAggregate-45-1"))
     }
 
     func testRealDeviceUIDsAreNotFiltered() {

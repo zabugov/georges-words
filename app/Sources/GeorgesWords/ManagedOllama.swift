@@ -81,7 +81,7 @@ final class ManagedOllama: ObservableObject {
         setupGeneration += 1
         let generation = setupGeneration
         setupTask = Task {
-            await self.run(model: model)
+            await self.run(model: model, generation: generation)
             // Only the task that still owns the slot clears it: a
             // cancelled predecessor finishing late must not erase the
             // newer task's reference — that would leave the off switch
@@ -96,6 +96,10 @@ final class ManagedOllama: ObservableObject {
     func shutdown() {
         setupTask?.cancel()
         setupTask = nil
+        // Retire the generation too: a setup task suspended at an await
+        // when the cancel landed would otherwise resume and start a NEW
+        // server after this off switch ran (review follow-up, 2026-07-22).
+        setupGeneration += 1
         // Clear the reference before terminating so the supervision
         // handler recognizes this as intentional and doesn't restart.
         let process = serverProcess
@@ -121,9 +125,16 @@ final class ManagedOllama: ObservableObject {
         }
     }
 
-    private func run(model: String) async {
+    private func run(model: String, generation: Int) async {
+        // Every await is a suspension where a cancel, a newer setup, or
+        // the off switch can land — re-check before EVERY side effect,
+        // not just at the end. A task resumed after shutdown() must
+        // never start a server the off switch can't see (review
+        // follow-up, 2026-07-22).
+        func superseded() -> Bool { Task.isCancelled || generation != setupGeneration }
         do {
             if !FileManager.default.isExecutableFile(atPath: binaryURL.path) {
+                if superseded() { return }
                 phase = .downloadingEngine
                 try await downloadEngine()
             }
@@ -136,19 +147,21 @@ final class ManagedOllama: ObservableObject {
                 ourServerAlive = await Self.responds(Self.baseURL)
             }
             if !ourServerAlive {
+                if superseded() { return }
                 phase = .startingEngine
                 try startServer()
                 try await waitForServer()
             }
             if !(await hasModel(model)) {
+                if superseded() { return }
                 phase = .downloadingModel(percent: nil)
                 try await pull(model: model)
             }
-            guard !Task.isCancelled else { return }
+            guard !superseded() else { return }
             crashRestarts = 0
             phase = .ready
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !superseded() else { return }
             phase = .failed(error.localizedDescription)
         }
     }

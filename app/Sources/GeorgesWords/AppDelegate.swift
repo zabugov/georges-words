@@ -449,22 +449,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Model
 
+    /// Guards overlapping loads: only the NEWEST call may touch app
+    /// state afterwards. A superseded load's CancellationError used to
+    /// land in the catch and stamp .error over the newer load's flow
+    /// (review follow-up, 2026-07-22).
+    private var modelLoadGeneration = 0
+
     private func loadModel() async {
-        await MainActor.run {
+        let generation = await MainActor.run { () -> Int in
             // A model swap can land mid-recording; don't leave the mic running.
             if case .recording = self.state { _ = self.recorder.stop() }
             self.previewTask?.cancel()
             self.state = .loadingModel
+            self.modelLoadGeneration += 1
+            return self.modelLoadGeneration
         }
         do {
             try await transcriber.load()
             await MainActor.run {
+                guard generation == self.modelLoadGeneration else { return }
                 // A press may have started a recording while we loaded —
                 // don't clobber it; it resolves to .idle on its own.
                 if case .loadingModel = self.state { self.state = .idle }
             }
+        } catch is CancellationError {
+            // Superseded by a newer load — that call owns the state now.
         } catch {
-            await MainActor.run { self.state = .error("Model failed to load: \(error.localizedDescription)") }
+            await MainActor.run {
+                guard generation == self.modelLoadGeneration else { return }
+                self.state = .error("Model failed to load: \(error.localizedDescription)")
+            }
         }
     }
 

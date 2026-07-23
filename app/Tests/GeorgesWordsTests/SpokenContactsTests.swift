@@ -26,7 +26,30 @@ final class SpokenContactsTests: XCTestCase {
     }
 
     func testEmailLowercasesInput() {
-        XCTAssertEqual(SpokenContacts.normalize("John at Gmail dot Com"), "john@gmail.com")
+        XCTAssertEqual(SpokenContacts.normalize("Email John at Gmail dot Com"), "Email john@gmail.com")
+    }
+
+    func testStandaloneNameAtProviderConverts() {
+        // Dictating just the address into a form — no context words at
+        // all. A name-shaped local at a mail provider is cue enough.
+        XCTAssertEqual(SpokenContacts.normalize("zachabugov at gmail dot com"),
+                       "zachabugov@gmail.com")
+    }
+
+    func testCommonWordAtProviderLeftAlone() {
+        // Prose about visiting a provider's site must not become an
+        // address (review follow-up, 2026-07-22).
+        XCTAssertEqual(SpokenContacts.normalize("look at gmail dot com to log in"),
+                       "look at gmail dot com to log in")
+    }
+
+    func testDistantCueDoesNotConvert() {
+        // "send" early in the sentence is not about the later phrase —
+        // the cue must sit within a few words of the candidate.
+        XCTAssertEqual(
+            SpokenContacts.normalize("send the quarterly report and then look at example dot com"),
+            "send the quarterly report and then look at example dot com"
+        )
     }
 
     func testEmailKeepsTrailingSentencePeriod() {
