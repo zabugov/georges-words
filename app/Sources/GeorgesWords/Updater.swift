@@ -139,12 +139,33 @@ final class Updater {
     }
 
     /// Append to ~/Library/Logs/GeorgesWords/update.log for diagnosis.
+    /// Bounded twice over (a 436 MB log was found in the wild,
+    /// 2026-07-23): each entry is capped, and the file rotates down to
+    /// its recent tail once it exceeds a few MB.
     private static func log(_ message: String) {
         let dir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Logs/GeorgesWords", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = dir.appendingPathComponent("update.log")
-        let line = "[\(Date().formatted(date: .abbreviated, time: .standard))] \(message)\n"
+
+        var bounded = message
+        if bounded.count > 20_000 {
+            bounded = "[entry truncated from \(bounded.count) chars]\n…" + bounded.suffix(20_000)
+        }
+        let line = "[\(Date().formatted(date: .abbreviated, time: .standard))] \(bounded)\n"
+
+        // Rotate BEFORE appending: keep the newest ~200 KB and start
+        // over. Tail is read via seek — never the whole file.
+        if let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
+           size > 2_000_000,
+           let handle = try? FileHandle(forReadingFrom: url) {
+            try? handle.seek(toOffset: UInt64(max(0, size - 200_000)))
+            let tail = (try? handle.readToEnd()) ?? Data()
+            try? handle.close()
+            let header = Data("[log rotated — was \(size / 1_000_000) MB]\n".utf8)
+            try? (header + tail).write(to: url)
+        }
+
         if let handle = try? FileHandle(forWritingTo: url) {
             handle.seekToEndOfFile()
             handle.write(Data(line.utf8))
@@ -201,7 +222,17 @@ final class Updater {
         var outputData = Data()
         let readDone = DispatchSemaphore(value: 0)
         Thread.detachNewThread {
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            // Chunked with a cap: a runaway child must not balloon
+            // memory (or, downstream, the log) — keep the newest MB,
+            // which is the part that explains a failure.
+            var data = Data()
+            let reader = pipe.fileHandleForReading
+            while let chunk = try? reader.read(upToCount: 65_536), !chunk.isEmpty {
+                data.append(chunk)
+                if data.count > 2_000_000 {
+                    data = data.suffix(1_000_000)
+                }
+            }
             outputBox.lock()
             outputData = data
             outputBox.unlock()
