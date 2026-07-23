@@ -208,6 +208,10 @@ The bullets below came from the written code review (2026-07-22,
       pick the MacBook mic, dictate; switch back to System default,
       dictate again → both work (the second one actively re-selects
       today's default device).
+- [ ] **Menu-bar icon is George:** when idle, the menu bar shows the
+      app's own icon instead of a microphone glyph (no more confusion
+      with the system mic indicator). While recording it still turns
+      into the dancing waveform, and it returns to George afterwards.
 
 ---
 

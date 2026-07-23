@@ -40,6 +40,9 @@ The "Unreleased" section becomes the release notes of the next update
   (Settings → Privacy).
 - **Pick your microphone** (Settings → Microphone) — and if a recording
   hears only silence, the app now says so instead of shrugging.
+- **The menu-bar icon is now George.** The little microphone looked
+  too much like macOS's own microphone indicator — the app's icon sits
+  there instead, switching to a live waveform while you dictate.
 - **Menu bar:** "Undo AI Rewording" restores your own wording if the
   AI reworded something (basic cleanup stays); "Undo Last Insertion"
   removes what was just typed — and both now refuse, rather than

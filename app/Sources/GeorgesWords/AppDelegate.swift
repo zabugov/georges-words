@@ -1149,15 +1149,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.menu = menu
     }
 
+    /// The app icon shrunk for the menu bar — George himself, not a
+    /// microphone glyph: the SF Symbols mic read as the SYSTEM's
+    /// input indicator sitting next to the real one (owner request,
+    /// 2026-07-22). Deliberately not a template image; the artwork is
+    /// the recognizable brand mark. Built once.
+    private static let menuBarAppIcon: NSImage? = {
+        guard let icon = NSApp.applicationIconImage?.copy() as? NSImage else { return nil }
+        icon.size = NSSize(width: 18, height: 18)
+        return icon
+    }()
+
     private func updateStatusUI() {
-        let symbol: String
+        let symbol: String?
         let text: String
         switch state {
         case .loadingModel:
             symbol = "hourglass"
             text = "Downloading / loading model…"
         case .idle:
-            symbol = "mic"
+            // The app icon when ready; the transient states below keep
+            // their distinct glyphs so state feedback stays obvious
+            // (recording additionally dances via the waveform in onLevel).
+            symbol = nil
             text = "Ready — hold \(settings.hotkey.displayName) and speak"
         case .recording:
             symbol = "mic.fill"
@@ -1169,7 +1183,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             symbol = "exclamationmark.triangle"
             text = message
         }
-        statusItem.button?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: text)
+        if let symbol {
+            statusItem.button?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: text)
+        } else {
+            statusItem.button?.image = Self.menuBarAppIcon
+                ?? NSImage(systemSymbolName: "text.bubble", accessibilityDescription: text)
+        }
+        statusItem.button?.toolTip = text
         statusMenuItem.title = text
 
         appStatus.statusText = text

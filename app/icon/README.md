@@ -17,5 +17,7 @@ stepped-halving downscale for the small sizes), then pack the PNGs into
 an icns container — `icns` header plus `(type, length, png-bytes)`
 chunks, types icp4/icp5/ic07–ic14. On a Mac, `iconutil -c icns` over a
 standard `.iconset` folder does the same, but crop/mask the source
-first. The menu-bar icon is unaffected: it stays an SF Symbols template
-image (`mic.fill` / `waveform`).
+first. The menu-bar icon reuses this same artwork while idle (an SF
+Symbols mic looked like the system's own input indicator — owner
+request, 2026-07-22); recording/processing/error still use SF Symbol
+glyphs for state feedback.
