@@ -212,6 +212,13 @@ The bullets below came from the written code review (2026-07-22,
       app's own icon instead of a microphone glyph (no more confusion
       with the system mic indicator). While recording it still turns
       into the dancing waveform, and it returns to George afterwards.
+- [ ] **Split-name email reassembles:** dictate "email me at
+      zachabugov at gmail dot com" a few times → even when the
+      recognizer hears the name-part as two words ("Zach Abugov") and
+      it briefly assembled as "Zach abugov@gmail.com", it now folds
+      back into `zachabugov@gmail.com`. Also dictate a DIFFERENT
+      address at the same domain ("sarah at gmail dot com" with an
+      email cue) → it stays sarah's, never yours.
 
 ---
 

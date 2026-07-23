@@ -203,6 +203,31 @@ final class TranscriptCleanerTests: XCTestCase {
         XCTAssertEqual(out, "Shack sack jack")
     }
 
+    func testDictionaryEmailReassemblesSplitName() {
+        // The recognizer hears the name-part as separate words — it IS
+        // the user's name — so only the last word reaches the @ and the
+        // rest strands outside: "Zach abugov@gmail.com" (on-device,
+        // 2026-07-22). The domain anchor folds it back together.
+        XCTAssertEqual(
+            cleaner.clean("email me at zach abugov at gmail dot com", dictionary: ["zachabugov@gmail.com"]),
+            "Email me at zachabugov@gmail.com"
+        )
+        // Phonetic variant of the split pieces still folds.
+        XCTAssertEqual(
+            cleaner.clean("email me at zack abogov at gmail dot com", dictionary: ["zachabugov@gmail.com"]),
+            "Email me at zachabugov@gmail.com"
+        )
+    }
+
+    func testDictionaryEmailLeavesOtherAddressesAlone() {
+        // Same domain, different person — must never be folded or
+        // rewritten into the dictionary address.
+        XCTAssertEqual(
+            cleaner.clean("email me at sarah at gmail dot com", dictionary: ["zachabugov@gmail.com"]),
+            "Email me at sarah@gmail.com"
+        )
+    }
+
     func testPhoneticDictionaryFixesEmailNamePart() {
         // Real-world failures (2026-07-22): the spoken name-part of the
         // user's own email got mangled a new way each attempt, and the

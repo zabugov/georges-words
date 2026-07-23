@@ -54,6 +54,14 @@ struct TranscriptCleaner {
         // "555-1234", "john at gmail dot com" → "john@gmail.com".
         result = SpokenContacts.normalize(result)
 
+        // Dictionary emails, final assembly: the recognizer often hears
+        // the name-part as SEPARATE words ("zachabugov" → "Zach
+        // Abugov"), so only the last word reaches the @ and the rest
+        // strands outside — "Zach abugov@gmail.com" (on-device,
+        // 2026-07-22). With the exact domain as the anchor, fold the
+        // stranded words back in and snap to the dictionary address.
+        result = Self.applyDictionaryEmails(result, dictionary: dictionary)
+
         // Spelled-out numbers: "twenty five percent", "three thirty pm",
         // "one hundred twenty three" → "123". Runs before the digit-adjacent
         // rules below so cardinals like "five hundred dollars" → "500 dollars"
@@ -167,6 +175,57 @@ struct TranscriptCleaner {
                 guard matches else { continue }
                 result = (result as NSString).replacingCharacters(in: match.range, with: target.word)
                 break
+            }
+        }
+        return result
+    }
+
+    // MARK: - Dictionary email assembly
+
+    /// Snap `… Zach abugov@gmail.com` to `… zachabugov@gmail.com` when
+    /// the dictionary holds an address at that exact domain. Up to two
+    /// words immediately before the local part are candidates for
+    /// folding in; the joined result must match the dictionary's
+    /// name-part by spelling or by sound. The exact-domain anchor is
+    /// what makes this safe: an unrelated `sarah@gmail.com` never
+    /// sounds like the dictionary name-part, so it survives untouched.
+    static func applyDictionaryEmails(_ text: String, dictionary: [String]) -> String {
+        var result = text
+        for term in dictionary {
+            let trimmed = term.trimmingCharacters(in: .whitespaces)
+            let parts = trimmed.split(separator: "@", maxSplits: 1)
+            guard parts.count == 2 else { continue }
+            let dictLocal = parts[0].lowercased().filter(\.isLetter)
+            let domain = String(parts[1])
+            guard dictLocal.count >= 4, !domain.isEmpty else { continue }
+
+            let pattern = #"((?:[A-Za-z][A-Za-z']*\s+){0,2})([A-Za-z0-9._-]+)@"#
+                + NSRegularExpression.escapedPattern(for: domain)
+                + #"(?![A-Za-z0-9-])"#
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
+
+            let matches = regex.matches(in: result, range: NSRange(result.startIndex..., in: result))
+            for match in matches.reversed() {
+                let ns = result as NSString
+                let words = ns.substring(with: match.range(at: 1))
+                    .split(whereSeparator: { $0.isWhitespace }).map(String.init)
+                let local = ns.substring(with: match.range(at: 2))
+                // Longest fold first: the name's own split-off pieces
+                // sit directly before the local part.
+                var foldFrom: Int?
+                for start in 0...words.count {
+                    let joined = (words[start...].joined() + local).lowercased().filter(\.isLetter)
+                    if joined == dictLocal
+                        || (Phonetics.key(joined) == Phonetics.key(dictLocal)
+                            && Phonetics.similarity(joined, dictLocal) >= 0.5) {
+                        foldFrom = start
+                        break
+                    }
+                }
+                guard let foldFrom else { continue }
+                let kept = words[0..<foldFrom].joined(separator: " ")
+                let replacement = kept.isEmpty ? trimmed : kept + " " + trimmed
+                result = ns.replacingCharacters(in: match.range, with: replacement)
             }
         }
         return result
