@@ -227,6 +227,10 @@ final class TranscriptCleanerTests: XCTestCase {
             "sack abaclav at gmail dot com",
             "zacabugov at gmail dot com",
             "zach abugov at gmail dot com",
+            // A dropped consonant ("ababov" lost the g) and a Cyrillic
+            // "дот" from the multilingual recognizer — both on-device.
+            "zach ababov at gmail dot com",
+            "zach abugov at gmail дот com",
         ] {
             let out = cleaner.clean(heard, dictionary: ["zachabugov@gmail.com"])
             XCTAssertEqual(out, "zachabugov@gmail.com", "\(heard) should fold to the address")

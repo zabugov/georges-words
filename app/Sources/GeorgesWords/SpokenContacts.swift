@@ -9,10 +9,24 @@ import Foundation
 /// ordinary prose is left untouched.
 enum SpokenContacts {
 
+    /// Parakeet v3 is multilingual and occasionally code-switches a
+    /// spoken connector into another script — "dot" arrived as Cyrillic
+    /// "дот" on-device (2026-07-22), which broke email assembly
+    /// entirely. Normalize known alternate renderings back to English
+    /// before any shape matching.
+    private static let connectorTransliterations: [(pattern: String, replacement: String)] = [
+        (#"(?i)\bдот\b"#, "dot"),
+        (#"(?i)\bточка\b"#, "dot"),
+        (#"(?i)\bпоинт\b"#, "point"),
+    ]
+
     static func normalize(_ text: String) -> String {
         // Email first: it consumes the spoken word "at", which the phone
         // pass never touches, so order only matters for clarity.
         var result = text
+        for entry in connectorTransliterations {
+            result = result.replacingOccurrences(of: entry.pattern, with: entry.replacement, options: .regularExpression)
+        }
         result = normalizeEmails(result)
         result = normalizePhones(result)
         return result

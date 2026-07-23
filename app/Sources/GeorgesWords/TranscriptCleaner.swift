@@ -229,15 +229,25 @@ struct TranscriptCleaner {
                 for start in stride(from: words.count, through: 0, by: -1) {
                     let joined = (words[start...].joined() + local).lowercased().filter(\.isLetter)
                     let joinedKey = Phonetics.key(joined)
-                    // Exact spelling; same skeleton; or one stray inserted
-                    // consonant (ASR inventions: "Sack abaclav" for
-                    // "zachabugov" — on-device, 2026-07-22) with letter
-                    // similarity backing it up.
-                    let sounds = joinedKey == dictKey
-                        ? Phonetics.similarity(joined, dictLocal) >= 0.5
-                        : (joinedKey.count <= dictKey.count + 1
-                            && Phonetics.containsInOrder(dictKey, in: joinedKey)
-                            && Phonetics.similarity(joined, dictLocal) >= 0.45)
+                    // Exact spelling; same skeleton; one stray INSERTED
+                    // consonant ("Sack abaclav"); or one DROPPED one
+                    // ("ababov" lost the g) — both seen on-device
+                    // 2026-07-22, always with letter similarity backing
+                    // it up. The exact-domain anchor is what makes this
+                    // much looser than general phonetic matching safe.
+                    let similarity = Phonetics.similarity(joined, dictLocal)
+                    let sounds: Bool
+                    if joinedKey == dictKey {
+                        sounds = similarity >= 0.5
+                    } else if joinedKey.count <= dictKey.count + 1,
+                              Phonetics.containsInOrder(dictKey, in: joinedKey) {
+                        sounds = similarity >= 0.45
+                    } else if joinedKey.count >= dictKey.count - 1,
+                              Phonetics.containsInOrder(joinedKey, in: dictKey) {
+                        sounds = similarity >= 0.5
+                    } else {
+                        sounds = false
+                    }
                     if joined == dictLocal || sounds {
                         foldFrom = start
                         break
