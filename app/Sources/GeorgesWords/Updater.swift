@@ -81,10 +81,18 @@ final class Updater {
         log("=== Update check started ===")
         progress("Checking for updates…")
 
+        // An unexplained spinner reads as broken — say something when
+        // the check is slower than it ever should be (2026-07-23).
+        let slowNotice = DispatchWorkItem {
+            progress("Still checking — the network or iCloud may be slow…")
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: slowNotice)
+
         // Compare commits rather than parsing `git pull` prose (which varies
         // by git version and locale).
         let before = run("/usr/bin/git", ["rev-parse", "HEAD"], cwd: repo, timeout: 30)
         let pull = run("/usr/bin/git", ["pull", "--ff-only"], cwd: repo, timeout: 120)
+        slowNotice.cancel()
         log("git pull (status \(pull.status)):\n\(pull.output)")
         guard pull.status == 0 else {
             return .failed("git pull failed:\n\(tail(pull.output))")
@@ -184,24 +192,53 @@ final class Updater {
             return (127, error.localizedDescription)
         }
 
-        // Hard kill on timeout so a hung step can't wedge the updater silently.
+        // Read on a separate thread, NEVER on this one: a step can hang
+        // unkillably (git in a disk wait while iCloud re-downloads an
+        // evicted repo file), and blocking here meant an endless spinner
+        // the user could only escape by restarting the Mac (on-device,
+        // 2026-07-23). This thread only polls and enforces the deadline.
+        let outputBox = NSLock()
+        var outputData = Data()
+        let readDone = DispatchSemaphore(value: 0)
+        Thread.detachNewThread {
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            outputBox.lock()
+            outputData = data
+            outputBox.unlock()
+            readDone.signal()
+        }
+
         var timedOut = false
-        let killer = DispatchWorkItem {
+        let deadline = Date().addingTimeInterval(timeout)
+        while process.isRunning && Date() < deadline {
+            usleep(100_000)
+        }
+        if process.isRunning {
+            timedOut = true
+            process.terminate()
+            usleep(500_000)
+            // SIGTERM can be ignored; escalate. (A process stuck in a
+            // disk wait survives even this — handled below.)
             if process.isRunning {
-                timedOut = true
-                process.terminate()
+                kill(process.processIdentifier, SIGKILL)
             }
         }
-        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: killer)
+        // Unblock the reader even when descendants — or an unkillable
+        // parent — still hold the pipe's write end: closing OUR end
+        // forces readDataToEndOfFile to return.
+        if readDone.wait(timeout: .now() + 3) == .timedOut {
+            try? pipe.fileHandleForReading.close()
+            _ = readDone.wait(timeout: .now() + 2)
+        }
+        if !timedOut {
+            process.waitUntilExit()
+        }
 
-        // Read before waiting so a chatty build can't fill and deadlock the pipe.
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        killer.cancel()
-
-        let output = String(data: data, encoding: .utf8) ?? ""
+        outputBox.lock()
+        let output = String(data: outputData, encoding: .utf8) ?? ""
+        outputBox.unlock()
         if timedOut {
-            return (1, output + "\n[timed out after \(Int(timeout)) s]")
+            return (1, output + "\n[timed out after \(Int(timeout)) s — if this repeats, iCloud may be re-downloading the repo folder: open it in Finder, let any cloud icons finish, then try again]")
         }
         return (process.terminationStatus, output)
     }
