@@ -69,14 +69,32 @@ struct TranscriptCleaner {
         result = SpokenNumbers.normalize(result)
 
         // Digit-adjacent spoken-number forms. Spoken decimals join FIRST
-        // ("126453 point 3" → "126453.3") so the unit rules below see the
-        // whole number — otherwise "point 3 dollars" came out "point $3"
-        // (owner report, 2026-07-22). The unit rules accept decimals for
-        // the same reason.
-        result = result.replacingOccurrences(of: #"(\d+)\s+point\s+(\d+)"#, with: "$1.$2", options: .regularExpression)
-        result = result.replacingOccurrences(of: #"(\d+(?:\.\d+)?)\s+percent\b"#, with: "$1%", options: .regularExpression)
-        result = result.replacingOccurrences(of: #"(\d+(?:\.\d+)?)\s+dollars\b"#, with: "\\$$1", options: .regularExpression)
-        result = result.replacingOccurrences(of: #"(\d+(?:\.\d+)?)\s+degrees\b"#, with: "$1°", options: .regularExpression)
+        // ("126,453 point 3" → "126,453.3") so the unit rules below see
+        // the whole number — otherwise "point 3 dollars" came out
+        // "point $3" (owner report, 2026-07-22). Numbers may carry
+        // thousands separators from the cardinal pass, so every rule
+        // accepts them.
+        let integer = #"(?:\d{1,3}(?:,\d{3})+|\d+)"#
+        result = result.replacingOccurrences(of: #"(?i)("# + integer + #")\s+point\s+(\d+)"#, with: "$1.$2", options: .regularExpression)
+        result = result.replacingOccurrences(of: #"(?i)("# + integer + #"(?:\.\d+)?)\s+percent\b"#, with: "$1%", options: .regularExpression)
+        result = result.replacingOccurrences(of: #"(?i)("# + integer + #"(?:\.\d+)?)\s+dollars\b"#, with: "\\$$1", options: .regularExpression)
+        result = result.replacingOccurrences(of: #"(?i)("# + integer + #"(?:\.\d+)?)\s+degrees\b"#, with: "$1°", options: .regularExpression)
+
+        // Large dollar amounts read with thousands separators —
+        // "$2,756,243.7", not "$2756243.7" (owner report, 2026-07-23).
+        // Only money is grouped here: bare digit runs can be IDs.
+        if let dollarRegex = try? NSRegularExpression(pattern: #"\$(\d{5,})"#) {
+            let matches = dollarRegex.matches(in: result, range: NSRange(result.startIndex..., in: result))
+            for match in matches.reversed() {
+                let ns = result as NSString
+                var out: [Character] = []
+                for (index, digit) in ns.substring(with: match.range(at: 1)).reversed().enumerated() {
+                    if index > 0 && index % 3 == 0 { out.append(",") }
+                    out.append(digit)
+                }
+                result = ns.replacingCharacters(in: match.range, with: "$" + String(out.reversed()))
+            }
+        }
 
         // Tidy whitespace: collapse runs, remove space before punctuation.
         result = result.replacingOccurrences(of: #"\s{2,}"#, with: " ", options: .regularExpression)

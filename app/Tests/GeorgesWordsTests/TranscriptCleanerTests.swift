@@ -121,9 +121,10 @@ final class TranscriptCleanerTests: XCTestCase {
     func testSpokenDecimalsJoinBeforeUnits() {
         // Owner report (2026-07-22): "…point 3 dollars" came out
         // "point $3" — the decimal must join before the unit rules run.
+        // Large dollar amounts also gain thousands separators (2026-07-23).
         XCTAssertEqual(
             cleaner.clean("that costs 126453 point 3 dollars", dictionary: []),
-            "That costs $126453.3"
+            "That costs $126,453.3"
         )
         XCTAssertEqual(
             cleaner.clean("growth was 12 point 5 percent", dictionary: []),
@@ -133,6 +134,34 @@ final class TranscriptCleanerTests: XCTestCase {
         XCTAssertEqual(
             cleaner.clean("i want to make a point 3 times", dictionary: []),
             "I want to make a point 3 times"
+        )
+    }
+
+    func testSpokenNumberShapesFromLiveQA() {
+        // The recognizer sometimes emits number WORDS where it emitted
+        // digits a moment earlier — the words path must land on the
+        // same output (owner reports, 2026-07-23).
+        XCTAssertEqual(
+            cleaner.clean(
+                "that cost two million seven hundred fifty six thousand two hundred forty three point seven dollars",
+                dictionary: []
+            ),
+            "That cost $2,756,243.7"
+        )
+        XCTAssertEqual(
+            cleaner.clean(
+                "it was two million seven hundred fifty six thousand times bigger",
+                dictionary: []
+            ),
+            "It was 2,756,000 times bigger"
+        )
+        XCTAssertEqual(
+            cleaner.clean("we grew by twelve point 5 percent in January of twenty twenty-six", dictionary: []),
+            "We grew by 12.5% in January of 2026"
+        )
+        XCTAssertEqual(
+            cleaner.clean("we grew by twelve point five percent in January of twenty twenty-six", dictionary: []),
+            "We grew by 12.5% in January of 2026"
         )
     }
 

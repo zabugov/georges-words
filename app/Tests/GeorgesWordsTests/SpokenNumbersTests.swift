@@ -55,6 +55,40 @@ final class SpokenNumbersTests: XCTestCase {
         XCTAssertEqual(SpokenNumbers.normalize("the year two thousand twenty six"), "the year 2026")
     }
 
+    // MARK: - Years, decimals, grouping (2026-07-23)
+
+    func testYearPairs() {
+        XCTAssertEqual(SpokenNumbers.normalize("in January of twenty twenty-six"),
+                       "in January of 2026")
+        XCTAssertEqual(SpokenNumbers.normalize("back in nineteen eighty-four"),
+                       "back in 1984")
+        XCTAssertEqual(SpokenNumbers.normalize("around twenty oh nine"),
+                       "around 2009")
+        // No second pair-word → not a year.
+        XCTAssertEqual(SpokenNumbers.normalize("twenty-five people came"),
+                       "twenty-five people came")
+    }
+
+    func testSpokenDecimalsJoinBeforeUnitWords() {
+        // "…point seven dollars" must never become "point $7" — the
+        // decimal joins before the unit pass (on-device, 2026-07-23).
+        XCTAssertEqual(SpokenNumbers.normalize("twelve point five percent"),
+                       "12.5 percent")
+        XCTAssertEqual(SpokenNumbers.normalize("two point seven five"), "2.75")
+        XCTAssertEqual(SpokenNumbers.normalize("make a point three times"),
+                       "make a point three times")
+    }
+
+    func testLargeCardinalsGetThousandsSeparators() {
+        XCTAssertEqual(
+            SpokenNumbers.normalize("two million seven hundred fifty six thousand times bigger"),
+            "2,756,000 times bigger"
+        )
+        // Below the grouping floor (and years!) stay plain.
+        XCTAssertEqual(SpokenNumbers.normalize("about two thousand people"), "about 2000 people")
+        XCTAssertEqual(SpokenNumbers.normalize("the year two thousand twenty six"), "the year 2026")
+    }
+
     func testCardinalsLeaveSmallAndIdiomaticFormsAlone() {
         // No magnitude word → small counts stay as words.
         XCTAssertEqual(SpokenNumbers.normalize("twenty five people"), "twenty five people")

@@ -135,7 +135,7 @@ the `zacov at gmail -> …` mapping can be deleted.
 - [ ] **Visible fields:** the Snippets tab now shows bordered,
       obviously-clickable text boxes with example placeholders.
 - [ ] **Spoken decimals:** "that costs 126453 point 3 dollars" →
-      `$126453.3` (not "point $3"); "growth was 12 point 5 percent" →
+      `$126,453.3` (not "point $3"); "growth was 12 point 5 percent" →
       `12.5%`; "I want to make a point 3 times" stays plain words.
 - [ ] **No email bleed in polish:** a few ordinary sentences with Full
       polish ("Rewrite for clarity") temporarily on → your email never
@@ -219,6 +219,13 @@ The bullets below came from the written code review (2026-07-22,
       back into `zachabugov@gmail.com`. Also dictate a DIFFERENT
       address at the same domain ("sarah at gmail dot com" with an
       email cue) → it stays sarah's, never yours.
+- [ ] **Numbers as words come out like numbers as digits** (the
+      recognizer alternates between the two): "two million seven
+      hundred fifty six thousand two hundred forty three point seven
+      dollars" → `$2,756,243.7` (no stranded "point $7", commas
+      included); "…times bigger" → `2,756,000 times bigger`; "twelve
+      point five percent" → `12.5%`; "twenty twenty-six" → `2026`
+      (years never get commas).
 
 ---
 
