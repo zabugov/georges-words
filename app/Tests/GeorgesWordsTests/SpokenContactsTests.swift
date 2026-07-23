@@ -84,9 +84,25 @@ final class SpokenContactsTests: XCTestCase {
     }
 
     func testBuildEmailValidation() {
-        XCTAssertEqual(SpokenContacts.buildEmail(local: "john", domain: "gmail dot com"), "john@gmail.com")
-        XCTAssertNil(SpokenContacts.buildEmail(local: "john", domain: "gmail"))          // no dot
-        XCTAssertNil(SpokenContacts.buildEmail(local: "", domain: "gmail dot com"))      // empty local
+        // This test pins the DOMAIN validation; the cue policy is
+        // exercised end-to-end above ("john" is in the system word
+        // list, so it needs a cue like any common word).
+        XCTAssertEqual(SpokenContacts.buildEmail(local: "john", domain: "gmail dot com", hasEmailContext: true), "john@gmail.com")
+        XCTAssertNil(SpokenContacts.buildEmail(local: "john", domain: "gmail", hasEmailContext: true))     // no dot
+        XCTAssertNil(SpokenContacts.buildEmail(local: "", domain: "gmail dot com", hasEmailContext: true)) // empty local
+    }
+
+    func testTrailingCueEnablesConversion() {
+        // The cue can come AFTER the address too (CI catch, 2026-07-22).
+        XCTAssertEqual(SpokenContacts.normalize("jane at proton dot me is my address"),
+                       "jane@proton.me is my address")
+    }
+
+    func testCueDoesNotCrossSentenceBoundary() {
+        XCTAssertEqual(
+            SpokenContacts.normalize("that is my address. look at example dot com for details"),
+            "that is my address. look at example dot com for details"
+        )
     }
 
     // MARK: - Phone (spoken digit words)

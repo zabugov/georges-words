@@ -53,11 +53,14 @@ enum SpokenContacts {
     ]
 
     /// Words that signal the speaker is dictating an address, BOUND to
-    /// it: the cue must sit within three words of the candidate ("email
-    /// me at john…", "my address is bob…"). An unanchored search let a
-    /// "send" much earlier in the sentence convert an unrelated
-    /// "look at example dot com" (review follow-up, 2026-07-22).
-    private static let emailContextPattern = #"(?i)\b(?:e-?mail|mail|address|contact|reach|write|message|inbox|send)\b(?:\s+\S+){0,3}\s*$"#
+    /// it: the cue must sit within three words of the candidate, on
+    /// either side ("email me at john…", "jane at proton dot me is my
+    /// address"). An unanchored search let a "send" much earlier in the
+    /// sentence convert an unrelated "look at example dot com" (review
+    /// follow-up, 2026-07-22).
+    private static let emailCueWords = #"(?:e-?mail|mail|address|contact|reach|write|message|inbox|send)"#
+    private static let leadingCuePattern = #"(?i)\b"# + emailCueWords + #"\b(?:\s+\S+){0,3}\s*$"#
+    private static let trailingCuePattern = #"(?i)^\W*(?:\S+\s+){0,3}"# + emailCueWords + #"\b"#
 
     /// "john at gmail dot com" → "john@gmail.com";
     /// "jane dot doe at proton dot me" → "jane.doe@proton.me".
@@ -79,12 +82,23 @@ enum SpokenContacts {
                   let localRange = Range(match.range(at: 1), in: result),
                   let domainRange = Range(match.range(at: 2), in: result)
             else { continue }
-            // Email-y wording shortly before the match ("email me at…")
-            // is one of the cues that licenses the conversion.
+            // Email-y wording bound to the match on either side ("email
+            // me at…", "…is my address") licenses the conversion — but a
+            // cue never reaches across a sentence boundary.
             let prefixStart = result.index(whole.lowerBound, offsetBy: -60, limitedBy: result.startIndex)
                 ?? result.startIndex
-            let hasContext = result[prefixStart..<whole.lowerBound]
-                .range(of: emailContextPattern, options: .regularExpression) != nil
+            let suffixEnd = result.index(whole.upperBound, offsetBy: 60, limitedBy: result.endIndex)
+                ?? result.endIndex
+            var prefix = result[prefixStart..<whole.lowerBound]
+            if let stop = prefix.lastIndex(where: { ".!?\n".contains($0) }) {
+                prefix = prefix[prefix.index(after: stop)...]
+            }
+            var suffix = result[whole.upperBound..<suffixEnd]
+            if let stop = suffix.firstIndex(where: { ".!?\n".contains($0) }) {
+                suffix = suffix[..<stop]
+            }
+            let hasContext = prefix.range(of: leadingCuePattern, options: .regularExpression) != nil
+                || suffix.range(of: trailingCuePattern, options: .regularExpression) != nil
             guard let email = buildEmail(
                 local: String(result[localRange]),
                 domain: String(result[domainRange]),
@@ -115,11 +129,13 @@ enum SpokenContacts {
 
         // "word at words dot tld" is also everyday prose ("look at
         // example dot com"). Convert only with a real email cue: a
-        // multi-part local ("jane dot doe"), email-y wording bound just
-        // before it, or a known mail provider — and the provider only
-        // counts when the local part isn't itself an ordinary word
-        // ("look at gmail dot com" is prose about a website; "zachabugov
-        // at gmail dot com" is an address) (review P2 + follow-up).
+        // multi-part local ("jane dot doe"), email-y wording bound to
+        // it on either side, or a known mail provider — and the
+        // provider only counts when the local part isn't itself an
+        // ordinary word ("look at gmail dot com" is prose about a
+        // website; "zachabugov at gmail dot com" is an address; "jane"
+        // needs a cue because it's in the word list too) (review P2 +
+        // follow-up).
         let multiPartLocal = localPart.contains(where: { "._-".contains($0) })
         let providerCue = mailProviders.contains(first) && !SystemWords.all.contains(localPart)
         guard multiPartLocal || providerCue || hasEmailContext else { return nil }
