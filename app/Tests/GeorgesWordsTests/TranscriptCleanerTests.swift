@@ -231,10 +231,24 @@ final class TranscriptCleanerTests: XCTestCase {
             // "дот" from the multilingual recognizer — both on-device.
             "zach ababov at gmail dot com",
             "zach abugov at gmail дот com",
+            // Pre-dotted domain straight from the recognizer (2026-07-23).
+            "zachapog at gmail.com",
         ] {
             let out = cleaner.clean(heard, dictionary: ["zachabugov@gmail.com"])
             XCTAssertEqual(out, "zachabugov@gmail.com", "\(heard) should fold to the address")
         }
+    }
+
+    func testDictionaryEmailWithHomoglyphStillMatches() {
+        // A dictionary line dictated or pasted through the multilingual
+        // recognizer can carry a Cyrillic lookalike letter — visually
+        // identical, matches nothing (on-device diagnosis, 2026-07-23).
+        // Both matching AND the written-out replacement must use the
+        // clean Latin form.
+        let poisoned = "z\u{0430}chabugov@gmail.com" // Cyrillic а
+        let out = cleaner.clean("zacabugov at gmail dot com", dictionary: [poisoned])
+        XCTAssertEqual(out, "zachabugov@gmail.com")
+        XCTAssertTrue(out.allSatisfy(\.isASCII), "replacement must be pure Latin")
     }
 
     func testDictionaryEmailFoldsMinimally() {

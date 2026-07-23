@@ -123,10 +123,14 @@ struct TranscriptCleaner {
         var targets: [(word: String, key: String)] = []
         var dictionaryWords = Set<String>()
         func addTarget(_ target: String) {
-            let lower = target.lowercased()
+            // Latinized on both sides: a homoglyph in the stored line
+            // (or in the transcript) must never break matching, and the
+            // replacement written out is always the clean Latin form.
+            let clean = Phonetics.latinize(target)
+            let lower = clean.lowercased()
             guard dictionaryWords.insert(lower).inserted else { return }
-            guard target.count >= 5, target.first?.isLetter == true else { return }
-            targets.append((target, Phonetics.key(lower)))
+            guard clean.count >= 5, clean.first?.isLetter == true else { return }
+            targets.append((clean, Phonetics.key(lower)))
         }
         for term in dictionary {
             if term.contains("@") {
@@ -163,7 +167,7 @@ struct TranscriptCleaner {
         let matches = wordRegex.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed()
         for match in matches {
             let word = (result as NSString).substring(with: match.range)
-            let lower = word.lowercased()
+            let lower = Phonetics.latinize(word.lowercased())
             guard lower.count >= 4, !dictionaryWords.contains(lower) else { continue }
             guard !SystemWords.all.contains(lower) else { continue }
             let key = Phonetics.key(lower)
@@ -204,7 +208,14 @@ struct TranscriptCleaner {
                 .last(where: { $0.contains("@") })
                 .map(String.init)
             else { continue }
-            let parts = address.split(separator: "@", maxSplits: 1)
+            // A line dictated/pasted through the recognizer can carry
+            // Cyrillic lookalikes that make every comparison fail while
+            // LOOKING perfect — normalize, and say so in the log.
+            if address.contains(where: { !$0.isASCII }) {
+                DebugLog.log("Email fold: dictionary address contains non-Latin lookalike characters — normalizing (retype the line by keyboard to fix permanently)")
+            }
+            let cleanAddress = Phonetics.latinize(address)
+            let parts = cleanAddress.split(separator: "@", maxSplits: 1)
             guard parts.count == 2 else { continue }
             let dictLocal = parts[0].lowercased().filter(\.isLetter)
             let dictKey = Phonetics.key(dictLocal)
@@ -227,7 +238,8 @@ struct TranscriptCleaner {
                 // words ahead of a correct address must never be eaten.
                 var foldFrom: Int?
                 for start in stride(from: words.count, through: 0, by: -1) {
-                    let joined = (words[start...].joined() + local).lowercased().filter(\.isLetter)
+                    let joined = Phonetics.latinize((words[start...].joined() + local).lowercased())
+                        .filter(\.isLetter)
                     let joinedKey = Phonetics.key(joined)
                     // Exact spelling; same skeleton; one stray INSERTED
                     // consonant ("Sack abaclav"); or one DROPPED one
@@ -261,7 +273,7 @@ struct TranscriptCleaner {
                     continue
                 }
                 let kept = words[0..<foldFrom].joined(separator: " ")
-                let replacement = kept.isEmpty ? address : kept + " " + address
+                let replacement = kept.isEmpty ? cleanAddress : kept + " " + cleanAddress
                 if ns.substring(with: match.range) != replacement {
                     DebugLog.log("Email fold: snapped (\(words.count - foldFrom) word(s) folded)")
                 }

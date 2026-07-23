@@ -28,7 +28,61 @@ enum SpokenContacts {
             result = result.replacingOccurrences(of: entry.pattern, with: entry.replacement, options: .regularExpression)
         }
         result = normalizeEmails(result)
+        result = normalizeDottedDomainEmails(result)
         result = normalizePhones(result)
+        return result
+    }
+
+    /// The email-cue decision for one candidate span: cue wording bound
+    /// within three words on either side (never across a sentence
+    /// boundary), or the candidate IS the whole utterance (form entry).
+    private static func hasEmailCue(around whole: Range<String.Index>, in result: String) -> Bool {
+        let outside = result[result.startIndex..<whole.lowerBound] + result[whole.upperBound...]
+        if outside.allSatisfy({ $0.isWhitespace || $0.isPunctuation }) { return true }
+
+        let prefixStart = result.index(whole.lowerBound, offsetBy: -60, limitedBy: result.startIndex)
+            ?? result.startIndex
+        var prefix = result[prefixStart..<whole.lowerBound]
+        if let stop = prefix.lastIndex(where: { ".!?\n".contains($0) }) {
+            prefix = prefix[prefix.index(after: stop)...]
+        }
+        if prefix.range(of: leadingCuePattern, options: .regularExpression) != nil { return true }
+
+        let suffixEnd = result.index(whole.upperBound, offsetBy: 60, limitedBy: result.endIndex)
+            ?? result.endIndex
+        var suffix = result[whole.upperBound..<suffixEnd]
+        if let stop = suffix.firstIndex(where: { ".!?\n".contains($0) }) {
+            suffix = suffix[..<stop]
+        }
+        return suffix.range(of: trailingCuePattern, options: .regularExpression) != nil
+    }
+
+    /// The recognizer sometimes emits the domain ALREADY dotted —
+    /// "zachapog at gmail.com" (on-device, 2026-07-23) — a shape the
+    /// spoken-connector pattern can't see. Same validation and cue
+    /// rules; the literal domain is re-expanded for buildEmail.
+    static func normalizeDottedDomainEmails(_ text: String) -> String {
+        // The trailing lookaheads stop mid-domain matches ("gmail.co"
+        // inside "gmail.com.br") while still allowing a sentence period
+        // right after the address.
+        let pattern = #"\b([A-Za-z0-9]+)\s+at\s+((?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})(?![A-Za-z0-9-])(?!\.[A-Za-z0-9])"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return text }
+
+        var result = text
+        let matches = regex.matches(in: result, range: NSRange(result.startIndex..., in: result))
+        for match in matches.reversed() {
+            guard let whole = Range(match.range, in: result),
+                  let localRange = Range(match.range(at: 1), in: result),
+                  let domainRange = Range(match.range(at: 2), in: result)
+            else { continue }
+            let spokenDomain = result[domainRange].replacingOccurrences(of: ".", with: " dot ")
+            guard let email = buildEmail(
+                local: String(result[localRange]),
+                domain: spokenDomain,
+                hasEmailContext: hasEmailCue(around: whole, in: result)
+            ) else { continue }
+            result.replaceSubrange(whole, with: email)
+        }
         return result
     }
 
@@ -96,35 +150,10 @@ enum SpokenContacts {
                   let localRange = Range(match.range(at: 1), in: result),
                   let domainRange = Range(match.range(at: 2), in: result)
             else { continue }
-            // Email-y wording bound to the match on either side ("email
-            // me at…", "…is my address") licenses the conversion — but a
-            // cue never reaches across a sentence boundary.
-            let prefixStart = result.index(whole.lowerBound, offsetBy: -60, limitedBy: result.startIndex)
-                ?? result.startIndex
-            let suffixEnd = result.index(whole.upperBound, offsetBy: 60, limitedBy: result.endIndex)
-                ?? result.endIndex
-            var prefix = result[prefixStart..<whole.lowerBound]
-            if let stop = prefix.lastIndex(where: { ".!?\n".contains($0) }) {
-                prefix = prefix[prefix.index(after: stop)...]
-            }
-            var suffix = result[whole.upperBound..<suffixEnd]
-            if let stop = suffix.firstIndex(where: { ".!?\n".contains($0) }) {
-                suffix = suffix[..<stop]
-            }
-            // A dictation that IS the address — form entry, "john at
-            // gmail dot com" and nothing else — needs no cue words:
-            // the utterance's shape is the evidence (review follow-up,
-            // 2026-07-22). Common-name locals convert here even though
-            // they're in the word list.
-            let outside = result[result.startIndex..<whole.lowerBound] + result[whole.upperBound...]
-            let bareUtterance = outside.allSatisfy { $0.isWhitespace || $0.isPunctuation }
-            let hasContext = bareUtterance
-                || prefix.range(of: leadingCuePattern, options: .regularExpression) != nil
-                || suffix.range(of: trailingCuePattern, options: .regularExpression) != nil
             guard let email = buildEmail(
                 local: String(result[localRange]),
                 domain: String(result[domainRange]),
-                hasEmailContext: hasContext
+                hasEmailContext: hasEmailCue(around: whole, in: result)
             ) else { continue }
             result.replaceSubrange(whole, with: email)
         }

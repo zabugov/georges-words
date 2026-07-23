@@ -44,6 +44,27 @@ enum Phonetics {
         return skeleton
     }
 
+    /// Fold Cyrillic/Greek lookalike letters to their Latin twins. The
+    /// multilingual recognizer code-switches mid-word ("дот" for "dot"),
+    /// and a dictionary line dictated or pasted through it can carry
+    /// invisible homoglyphs — "zаchabugov" with a Cyrillic а LOOKS
+    /// identical but matches nothing (on-device, 2026-07-23). Applied to
+    /// both sides of every comparison, and to replacements so a poisoned
+    /// stored spelling can't propagate. Accented Latin (é, ü) is left
+    /// alone — only cross-script lookalikes fold.
+    static func latinize(_ text: String) -> String {
+        let map: [Character: Character] = [
+            "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "у": "y",
+            "х": "x", "і": "i", "ј": "j", "ѕ": "s", "к": "k", "м": "m",
+            "т": "t", "в": "b", "н": "h", "д": "d", "г": "g", "б": "b",
+            "п": "p", "ф": "f", "л": "l", "з": "z", "ш": "s", "и": "i",
+            "α": "a", "ο": "o", "ν": "v", "ι": "i", "κ": "k", "τ": "t",
+            "ρ": "p", "ε": "e", "υ": "u",
+        ]
+        guard text.contains(where: { map[$0] != nil }) else { return text }
+        return String(text.map { map[$0] ?? $0 })
+    }
+
     /// True when `needle`'s characters all appear in `haystack` in order
     /// (subsequence). Used to tell an INSERTED stray consonant (clipped
     /// audio: "aprkf" still contains all of "apkf") from a MISSING one

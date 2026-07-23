@@ -98,6 +98,18 @@ final class SpokenContactsTests: XCTestCase {
                        "jane@proton.me is my address")
     }
 
+    func testAlreadyDottedDomainConverts() {
+        // The recognizer sometimes emits the domain pre-dotted
+        // ("zachapog at gmail.com" — on-device, 2026-07-23).
+        XCTAssertEqual(SpokenContacts.normalize("zachapog at gmail.com"),
+                       "zachapog@gmail.com")
+        XCTAssertEqual(SpokenContacts.normalize("email me at zachapog at gmail.com."),
+                       "email me at zachapog@gmail.com.")
+        // Prose around a plain website stays prose.
+        XCTAssertEqual(SpokenContacts.normalize("meet me at target.com for the sale"),
+                       "meet me at target.com for the sale")
+    }
+
     func testBareUtteranceAddressConverts() {
         // Dictating ONLY the address (form entry) needs no cue words,
         // even when the local part is a common name in the word list.
