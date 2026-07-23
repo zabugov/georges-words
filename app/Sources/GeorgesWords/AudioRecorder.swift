@@ -76,7 +76,21 @@ final class AudioRecorder {
         lock.lock()
         samples.removeAll(keepingCapacity: true)
         lock.unlock()
+        try beginCapture()
+    }
 
+    /// Rebuild the engine graph and tap after a device/configuration
+    /// change WITHOUT discarding captured audio — samples are already
+    /// converted to 16 kHz mono, so the dictation continues seamlessly
+    /// on the new device (owner report, 2026-07-23: the first press
+    /// after every update died with "Audio device changed").
+    func restart() throws {
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
+        try beginCapture()
+    }
+
+    private func beginCapture() throws {
         let input = engine.inputNode
         // Select the microphone before reading the format — the format
         // follows the device. Always assign explicitly: the audio unit
@@ -95,13 +109,25 @@ final class AudioRecorder {
             chosen = AudioInputDevices.systemDefaultInputID()
         }
         if let deviceID = chosen, let unit = input.audioUnit {
-            var device = deviceID
-            let status = AudioUnitSetProperty(
+            // Only assign when it actually differs: setting the property
+            // fires AVAudioEngineConfigurationChange, and doing that on
+            // every start made the first recording after launch cancel
+            // itself (owner report, 2026-07-23).
+            var current = AudioDeviceID(0)
+            var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+            let read = AudioUnitGetProperty(
                 unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
-                &device, UInt32(MemoryLayout<AudioDeviceID>.size)
+                &current, &size
             )
-            if status != noErr {
-                DebugLog.log("Input device select failed (\(status)) — using engine default")
+            if read != noErr || current != deviceID {
+                var device = deviceID
+                let status = AudioUnitSetProperty(
+                    unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+                    &device, UInt32(MemoryLayout<AudioDeviceID>.size)
+                )
+                if status != noErr {
+                    DebugLog.log("Input device select failed (\(status)) — using engine default")
+                }
             }
         }
         let inputFormat = input.outputFormat(forBus: 0)

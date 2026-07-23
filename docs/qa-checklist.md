@@ -226,6 +226,13 @@ The bullets below came from the written code review (2026-07-22,
       included); "…times bigger" → `2,756,000 times bigger`; "twelve
       point five percent" → `12.5%`; "twenty twenty-six" → `2026`
       (years never get commas).
+- [ ] **First dictation after an update works:** immediately after
+      Check for Updates relaunches the app, hold fn and dictate →
+      text inserts normally, no "Audio device changed — dictation
+      cancelled" flash (the first capture used to die when macOS
+      rebuilt the audio graph; it now rebuilds mid-recording and
+      keeps going — debug.log shows "capture rebuilt, recording
+      continues" when it happens).
 
 ---
 

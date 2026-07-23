@@ -66,6 +66,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// True when the last insertion went into a private app (8.1): later
     /// edits of it (command mode, raw swap) must stay out of History too.
     private var lastInsertionPrivate = false
+    /// Debounces capture rebuilds after audio-configuration changes.
+    private var lastCaptureRebuild = Date.distantPast
     private var disturbanceMonitor: Any?
     private var cancellables = Set<AnyCancellable>()
     private var previewTask: Task<Void, Never>?
@@ -148,9 +150,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         recorder.onConfigurationChange = { [weak self] in
             guard let self, case .recording = self.state else { return }
-            // The engine graph is stale once the input device changes
-            // (AirPods connected/disconnected) — cancel cleanly.
-            self.cancelRecording(message: "Audio device changed — dictation cancelled")
+            // The engine graph is stale once the configuration changes —
+            // AirPods connect, or macOS builds its voice-processing
+            // aggregate on the FIRST capture after launch. Rebuild the
+            // capture path and KEEP recording: captured audio is already
+            // converted and survives. Cancelling here killed the first
+            // dictation after every update (owner report, 2026-07-23).
+            // Debounced: the rebuild itself can echo one more change.
+            guard Date().timeIntervalSince(self.lastCaptureRebuild) > 0.75 else { return }
+            self.lastCaptureRebuild = Date()
+            do {
+                try self.recorder.restart()
+                DebugLog.log("Audio configuration changed mid-recording — capture rebuilt, recording continues")
+            } catch {
+                self.cancelRecording(message: "Audio device changed — dictation cancelled")
+            }
         }
 
         // Sleep eats key-up events: without this, waking the Mac could
