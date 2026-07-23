@@ -77,7 +77,7 @@ final class Updater {
 
     // MARK: - The update pipeline
 
-    private static func performUpdate(repo: URL, progress: (String?) -> Void) -> UpdateResult {
+    private static func performUpdate(repo: URL, progress: @escaping (String?) -> Void) -> UpdateResult {
         log("=== Update check started ===")
         progress("Checking for updates…")
 
