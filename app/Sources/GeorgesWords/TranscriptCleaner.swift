@@ -129,14 +129,20 @@ struct TranscriptCleaner {
             targets.append((target, Phonetics.key(lower)))
         }
         for term in dictionary {
-            if let atIndex = term.firstIndex(of: "@") {
+            if term.contains("@") {
                 // Email terms: the full address is never a sound-target,
                 // but the name-part before the @ is exactly what people
                 // dictate ("zachabugov at gmail dot com") and gets
                 // mangled like any unknown name. Its letter-fragments
                 // become targets so the spelling snaps right before
                 // SpokenContacts assembles the address (2026-07-22).
-                for fragment in term[..<atIndex].split(whereSeparator: { !$0.isLetter }) {
+                // The address is the last @-carrying token, so a
+                // decorated line can't leak its label words in.
+                guard let address = term.split(whereSeparator: { $0.isWhitespace })
+                    .last(where: { $0.contains("@") }),
+                      let atIndex = address.firstIndex(of: "@")
+                else { continue }
+                for fragment in address[..<atIndex].split(whereSeparator: { !$0.isLetter }) {
                     addTarget(String(fragment))
                 }
             } else {
@@ -192,10 +198,16 @@ struct TranscriptCleaner {
     static func applyDictionaryEmails(_ text: String, dictionary: [String]) -> String {
         var result = text
         for term in dictionary {
-            let trimmed = term.trimmingCharacters(in: .whitespaces)
-            let parts = trimmed.split(separator: "@", maxSplits: 1)
+            // Tolerate decoration on the line ("work: zachabugov@…"):
+            // the address is the last @-carrying token.
+            guard let address = term.split(whereSeparator: { $0.isWhitespace })
+                .last(where: { $0.contains("@") })
+                .map(String.init)
+            else { continue }
+            let parts = address.split(separator: "@", maxSplits: 1)
             guard parts.count == 2 else { continue }
             let dictLocal = parts[0].lowercased().filter(\.isLetter)
+            let dictKey = Phonetics.key(dictLocal)
             let domain = String(parts[1])
             guard dictLocal.count >= 4, !domain.isEmpty else { continue }
 
@@ -210,21 +222,36 @@ struct TranscriptCleaner {
                 let words = ns.substring(with: match.range(at: 1))
                     .split(whereSeparator: { $0.isWhitespace }).map(String.init)
                 let local = ns.substring(with: match.range(at: 2))
-                // Longest fold first: the name's own split-off pieces
-                // sit directly before the local part.
+                // SMALLEST fold first — consume preceding words only when
+                // the local part alone doesn't already match; unrelated
+                // words ahead of a correct address must never be eaten.
                 var foldFrom: Int?
-                for start in 0...words.count {
+                for start in stride(from: words.count, through: 0, by: -1) {
                     let joined = (words[start...].joined() + local).lowercased().filter(\.isLetter)
-                    if joined == dictLocal
-                        || (Phonetics.key(joined) == Phonetics.key(dictLocal)
-                            && Phonetics.similarity(joined, dictLocal) >= 0.5) {
+                    let joinedKey = Phonetics.key(joined)
+                    // Exact spelling; same skeleton; or one stray inserted
+                    // consonant (ASR inventions: "Sack abaclav" for
+                    // "zachabugov" — on-device, 2026-07-22) with letter
+                    // similarity backing it up.
+                    let sounds = joinedKey == dictKey
+                        ? Phonetics.similarity(joined, dictLocal) >= 0.5
+                        : (joinedKey.count <= dictKey.count + 1
+                            && Phonetics.containsInOrder(dictKey, in: joinedKey)
+                            && Phonetics.similarity(joined, dictLocal) >= 0.45)
+                    if joined == dictLocal || sounds {
                         foldFrom = start
                         break
                     }
                 }
-                guard let foldFrom else { continue }
+                guard let foldFrom else {
+                    DebugLog.log("Email fold: site at dictionary domain, no name match")
+                    continue
+                }
                 let kept = words[0..<foldFrom].joined(separator: " ")
-                let replacement = kept.isEmpty ? trimmed : kept + " " + trimmed
+                let replacement = kept.isEmpty ? address : kept + " " + address
+                if ns.substring(with: match.range) != replacement {
+                    DebugLog.log("Email fold: snapped (\(words.count - foldFrom) word(s) folded)")
+                }
                 result = ns.replacingCharacters(in: match.range, with: replacement)
             }
         }

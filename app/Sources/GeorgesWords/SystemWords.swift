@@ -12,12 +12,14 @@ import Foundation
 enum SystemWords {
     static let all: Set<String> = {
         guard let contents = try? String(contentsOfFile: "/usr/share/dict/words", encoding: .utf8) else {
+            DebugLog.log("System word list UNAVAILABLE — phonetic dictionary matching is disabled (fail-closed)")
             return []
         }
         var words = Set<String>()
         for line in contents.split(separator: "\n") where line.count >= 4 {
             words.insert(line.lowercased())
         }
+        DebugLog.log("System word list: \(words.count) entries")
         return words
     }()
 }

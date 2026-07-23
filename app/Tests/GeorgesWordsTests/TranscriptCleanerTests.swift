@@ -219,6 +219,29 @@ final class TranscriptCleanerTests: XCTestCase {
         )
     }
 
+    func testDictionaryEmailSurvivesInventedConsonants() {
+        // Real on-device outputs for one address, dictated five times
+        // (2026-07-22): split words, dropped h, and a stray l. All must
+        // land on the dictionary address.
+        for heard in [
+            "sack abaclav at gmail dot com",
+            "zacabugov at gmail dot com",
+            "zach abugov at gmail dot com",
+        ] {
+            let out = cleaner.clean(heard, dictionary: ["zachabugov@gmail.com"])
+            XCTAssertEqual(out, "zachabugov@gmail.com", "\(heard) should fold to the address")
+        }
+    }
+
+    func testDictionaryEmailFoldsMinimally() {
+        // Words ahead of an already-correct address must never be eaten
+        // by the fold — smallest fold wins.
+        XCTAssertEqual(
+            cleaner.clean("email me at zachabugov at gmail dot com", dictionary: ["zachabugov@gmail.com"]),
+            "Email me at zachabugov@gmail.com"
+        )
+    }
+
     func testDictionaryEmailLeavesOtherAddressesAlone() {
         // Same domain, different person — must never be folded or
         // rewritten into the dictionary address.
