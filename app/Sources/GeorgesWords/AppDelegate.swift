@@ -68,6 +68,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastInsertionPrivate = false
     /// Debounces capture rebuilds after audio-configuration changes.
     private var lastCaptureRebuild = Date.distantPast
+    /// Launch-time audio warm-up (owner report, 2026-07-23: the FIRST
+    /// press after every update/install never worked — macOS rebuilds
+    /// the audio graph on the first capture, historically eating the
+    /// recording silently). A throwaway capture takes that hit before
+    /// the user's first real press.
+    private var warmingUpAudio = false
+    private var audioWarmedUp = false
+    private let launchDate = Date()
     private var disturbanceMonitor: Any?
     private var cancellables = Set<AnyCancellable>()
     private var previewTask: Task<Void, Never>?
@@ -163,7 +171,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try self.recorder.restart()
                 DebugLog.log("Audio configuration changed mid-recording — capture rebuilt, recording continues")
             } catch {
-                self.cancelRecording(message: "Audio device changed — dictation cancelled")
+                // Right after launch this is the graph still settling,
+                // not a device swap — say so (owner request, 2026-07-23).
+                let message = Date().timeIntervalSince(self.launchDate) < 8
+                    ? "Just starting up — try that dictation again"
+                    : "Audio device changed — dictation cancelled"
+                self.cancelRecording(message: message)
             }
         }
 
@@ -235,6 +248,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showOnboarding()
         } else if !launchedAsLoginItem {
             openMainWindow()
+        }
+
+        // Settle the audio graph BEFORE the first real press: the first
+        // capture after a launch makes macOS rebuild the graph (and
+        // spawn its voice-processing aggregate), which ate the first
+        // dictation after every update — silently for weeks, then with
+        // a confusing cancellation (owner report, 2026-07-23). A brief
+        // throwaway capture takes that hit now instead. Skipped without
+        // the mic permission — never trigger the prompt at startup; the
+        // onboarding practice page is the warm-up on a fresh install.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            self?.warmUpAudioCapture()
+        }
+    }
+
+    private func warmUpAudioCapture() {
+        guard !audioWarmedUp, !warmingUpAudio else { return }
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { return }
+        if case .recording = state {
+            // The user beat the warm-up to it — their capture settles
+            // the graph (the config-change rebuild covers them).
+            audioWarmedUp = true
+            return
+        }
+        do {
+            try recorder.start()
+        } catch {
+            DebugLog.log("Audio warm-up skipped: \(error.localizedDescription)")
+            audioWarmedUp = true
+            return
+        }
+        warmingUpAudio = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            guard let self else { return }
+            // A real press may have taken the mic over meanwhile —
+            // startRecording cleared the flag and owns the engine now.
+            guard self.warmingUpAudio else { return }
+            _ = self.recorder.stop()
+            self.warmingUpAudio = false
+            self.audioWarmedUp = true
+            DebugLog.log("Audio warm-up complete — graph settled before the first dictation")
         }
     }
 
@@ -612,6 +666,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         pressStartedAt = Date()
         recordingContext = AppContext.current()
+        // A real press takes the microphone over from the launch
+        // warm-up — stop it first so the tap is never installed twice.
+        if warmingUpAudio {
+            _ = recorder.stop()
+            warmingUpAudio = false
+            audioWarmedUp = true
+        }
         do {
             try recorder.start()
             SoundFeedback.recordingStarted()
